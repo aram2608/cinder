@@ -1,0 +1,12 @@
+BasedOnStyle: Google
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ColumnLimit: 80
+BreakBeforeBraces: Attach
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Empty
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+SortIncludes: false

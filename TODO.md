@@ -1,0 +1,5 @@
+- [] Come up with name
+- [] Solidify syntax
+- [] Create a lexer
+- [] Create a parser
+- [] Create a compiler to clang compatible Assembly
