@@ -75,11 +75,27 @@ bool IsEnd(Lexer* lexer);
 
 /**
  * @brief Method to test if a current character is in the alphabet
- * @param lexer A pointer to the lexer
+ * @param c The char to be tested
  *
  * @return Either true or false
  */
 bool IsAlpha(char c);
+
+/**
+ * @brief Method to test if a current character is numeric
+ * @param c The char to be tested
+ *
+ * @return Either true or false
+ */
+bool IsNumeric(char c);
+
+/**
+ * @brief Method to test if a current character is alpha numeric
+ * @param c The char to be tested
+ *
+ * @return Either true or false
+ */
+bool IsAlphaNumeric(char c);
 
 /**
  * @brief Method to peek at the current character in the source code
@@ -105,23 +121,21 @@ char PeekNextChar(Lexer* lexer);
 void AddToken(Lexer* lexer, TokenType tok_type);
 
 /**
- * @brief Method to add a token with an associated value
- * @param lexer A pointer to the lexer
- * @param tokType The type of token to be added
- * @param lexeme The lexeme parsed from the source code
- * @param value The value to be added (can be an int, float, or char*)
- * @param valueType The type of value to be added (we use a tagged union for our
- * value)
- */
-void AddVariableToken(Lexer* lexer, TokenType tok_type, char* lexeme,
-                      void* value, ValueType value_type);
-
-/**
  * @brief Method to help during debugging, prints the tokens incrementally
  * @param lexer A pointer to the lexer
  */
 void EmitTokens(Lexer* lexer);
 
+/**
+ * @brief A simple helper method to parse token types into string for debugging
+ * @param tok_type The token to be formatted
+ */
 char* TokenTypeToString(TokenType tok_type);
+
+/**
+ * @brief Method to lex identifiers and key words
+ * @param lexer
+ */
+void TokenizeIdentifier(Lexer* lexer);
 
 #endif

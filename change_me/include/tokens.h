@@ -14,13 +14,11 @@ typedef enum {
   TT_BANGEQ, /** "!=" */
   TT_EQ,     /** "=" */
   TT_EQEQ,   /** "==" */
-
   // Control flow
   TT_IF,   /** If statement */
   TT_THEN, /** Then branch */
   TT_ELSE, /** Else branch */
   TT_FOR,  /** For loop */
-
   // Containers
   TT_LPAREN,   /** "(" */
   TT_RPAREN,   /** ")" */
@@ -29,17 +27,25 @@ typedef enum {
   TT_LBRACKET, /** "[" */
   TT_RBRACKET, /** "]" */
   TT_QUOTE,
-
-  // Key words
+  // Key words and idnetifiers
   TT_IDENTIFER, /** Any series of characters */
   TT_DEF,       /** "def" keyword */
-
-  // Misc
+  TT_END,       /** "end" keyword */
+  TT_INT_SPECIFIER,
+  TT_FLT_SPECIFIER,
+  TT_STR_SPECIFIER,
+  // Types
+  TT_INT,
+  TT_FLT,
+  TT_STR,
+  // Delimiters
   TT_COLON,     /** ":" */
   TT_SEMICOLON, /** ";" */
-  TT_ERROR,     /** Used during parsing for error handling */
-  TT_EOF,       /** The end of the list of tokens */
-  TT_COUNT,     /** The number of tokens available */
+
+  // Misc
+  TT_ERROR, /** Used during parsing for error handling */
+  TT_EOF,   /** The end of the list of tokens */
+  TT_COUNT, /** The number of tokens available */
 } TokenType;
 
 typedef union {
@@ -55,7 +61,7 @@ typedef enum {
   VT_NULL, /** NULL */
 } ValueType;
 
-#define MAX_LEXEME_LENGTH 50
+#define MAX_LEXEME_LENGTH 255
 #define MAX_IDENTIFIER_LENGTH 255
 
 typedef struct {

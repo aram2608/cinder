@@ -6,7 +6,7 @@ int main(void) {
   // We free memory in the lexer so i am dynamically allocating this memory
   // TODO: Create a function that can read files, it will likely malloc some
   // memory which is why i am bothering to do this now
-  char* source = "! + - * % = == !=";
+  char* source = "! + - * % = == != [ ] { } ( ) ; : \" def end if then else for int flt str";
   size_t size = strlen(source);
   char* source_str = (char*)malloc(size + 1);
   strcpy(source_str, source);

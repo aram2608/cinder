@@ -2,14 +2,14 @@
 
 Lexer* NewLexer(char* source_str) {
   Lexer* lexer = (Lexer*)malloc(sizeof(Lexer) + LEXER_INIT * sizeof(Token));
-  (lexer)->source_str = (char*)malloc(strlen(source_str));
-  strcpy((lexer)->source_str, source_str);
+  lexer->source_str = (char*)malloc(strlen(source_str));
+  strcpy(lexer->source_str, source_str);
 
-  (lexer)->array_pos = 0;
-  (lexer)->line_count = 0;
-  (lexer)->current_pos = 0;
-  (lexer)->start_pos = 0;
-  (lexer)->capacity = LEXER_INIT;
+  lexer->array_pos = 0;
+  lexer->line_count = 0;
+  lexer->current_pos = 0;
+  lexer->start_pos = 0;
+  lexer->capacity = LEXER_INIT;
   free(source_str);
 
   return lexer;
@@ -24,16 +24,16 @@ void ResizeLexer(Lexer* lexer, size_t new_cap) {
   }
 
   lexer = temp;
-  (lexer)->capacity = new_cap;
+  lexer->capacity = new_cap;
 }
 
 void ScanTokens(Lexer* lexer) {
   while (!IsEnd(lexer)) {
-    if ((lexer)->array_pos < (lexer)->capacity) {
-      (lexer)->start_pos = (lexer)->current_pos;
+    if (lexer->array_pos < lexer->capacity) {
+      lexer->start_pos = lexer->current_pos;
       Scan(lexer);
     } else {
-      ResizeLexer(lexer, (lexer)->capacity + BUMP_CAP);
+      ResizeLexer(lexer, lexer->capacity + BUMP_CAP);
     }
   }
   AddToken(lexer, TT_EOF);
@@ -41,9 +41,20 @@ void ScanTokens(Lexer* lexer) {
 
 void Scan(Lexer* lexer) {
   char c = Advance(lexer);
+
+  if (IsAlpha(c)) {
+    TokenizeIdentifier(lexer);
+    return;
+  }
+
+  if (IsNumeric(c)) {
+    printf("TODO: Implement numbers\n");
+    return;
+  }
+
   switch (c) {
     case '\n':
-      (lexer)->line_count++;
+      lexer->line_count++;
       break;
     case '\r':
       break;
@@ -53,8 +64,6 @@ void Scan(Lexer* lexer) {
       break;
     case '\0':
       break;
-    // TODO: Add strings
-    // TODO: Add floats and ints
     case '"':
       AddToken(lexer, TT_QUOTE);
       break;
@@ -93,6 +102,23 @@ void Scan(Lexer* lexer) {
       } else {
         AddToken(lexer, TT_EQ);
       }
+    case '[':
+      AddToken(lexer, TT_LBRACKET);
+      break;
+    case ']':
+      AddToken(lexer, TT_RBRACKET);
+      break;
+    case '(':
+      AddToken(lexer, TT_LPAREN);
+      break;
+    case ')':
+      AddToken(lexer, TT_RPAREN);
+      break;
+    case '{':
+      AddToken(lexer, TT_LBRACE);
+      break;
+    case '}':
+      AddToken(lexer, TT_RBRACE);
       break;
     default:
       assert(0 && "Unreachable");
@@ -101,27 +127,35 @@ void Scan(Lexer* lexer) {
 
 char Advance(Lexer* lexer) {
   if (!IsEnd(lexer)) {
-    return (lexer)->source_str[(lexer)->current_pos++];
+    return lexer->source_str[lexer->current_pos++];
   }
   return '\0';
 }
 
 bool IsEnd(Lexer* lexer) {
-  return (lexer)->source_str[(lexer->current_pos)] == '\0';
+  return lexer->source_str[(lexer->current_pos)] == '\0';
 }
 
-bool isAlpha(char c) {
+bool IsAlpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
 }
 
+bool IsNumeric(char c) {
+  return (c >= '0' && c <= '9');
+}
+
+bool IsAlphaNumeric(char c) {
+  return IsAlpha(c) || IsNumeric(c);
+}
+
 char PeekChar(Lexer* lexer) {
-  return (lexer)->source_str[(lexer)->current_pos];
+  return lexer->source_str[lexer->current_pos];
 }
 
 char PeekNextChar(Lexer* lexer) {
   if (!IsEnd(lexer)) {
-    int index = (lexer)->current_pos + 1;
-    return (lexer)->source_str[index];
+    int index = lexer->current_pos + 1;
+    return lexer->source_str[index];
   }
   return '\0';
 }
@@ -129,51 +163,32 @@ char PeekNextChar(Lexer* lexer) {
 void AddToken(Lexer* lexer, TokenType tok_type) {
   Token tok = {0};
   tok.token_type = tok_type;
-  tok.line_num = (lexer)->line_count;
-  (lexer)->tokens[(lexer)->array_pos++] = tok;
-}
-
-void AddVariableToken(Lexer* lexer, TokenType tok_type, char* lexeme,
-                      void* value, ValueType value_type) {
-  // This is a dumb hack to cast the type void* into its corresponding type
-  float* float_ptr;
-  int* int_ptr;
-  char* char_ptr;
-  Token tok = {0};
-
-  strcpy(tok.lexeme, lexeme);
-  tok.token_type = tok_type;
-  tok.value_type = value_type;
-  tok.line_num = (lexer)->line_count;
-
-  switch (value_type) {
-    case VT_FLT:
-      float_ptr = (float*)value;
-      tok.value.flt = *float_ptr;
-      break;
-    case VT_INT:
-      int_ptr = (int*)value;
-      tok.value.num = *int_ptr;
-      break;
-    case VT_STR:
-      char_ptr = (char*)value;
-      strcpy(tok.value.str, char_ptr);
-      break;
-    default:
-      assert(0 && "Unreachable");
-  }
-
-  (lexer)->tokens[(lexer)->array_pos++] = tok;
+  tok.line_num = lexer->line_count;
+  lexer->tokens[lexer->array_pos++] = tok;
 }
 
 void EmitTokens(Lexer* lexer) {
-  for (size_t it = 0; it <= (lexer)->array_pos - 1; it++) {
-    printf("%d\n", (lexer)->tokens[it].token_type);
+  for (size_t it = 0; it <= lexer->array_pos - 1; it++) {
+    TokenType temp = lexer->tokens[it].token_type;
+    printf("%s\n", TokenTypeToString(temp));
   }
+}
+
+void TokenizeIdentifier(Lexer* lexer) {
+  while(!IsEnd(lexer) && IsAlphaNumeric(PeekChar(lexer))) {
+    Advance(lexer);
+  }
+  char buff[MAX_LEXEME_LENGTH];
+  size_t length = lexer->current_pos - lexer->start_pos;
+  strncpy(buff, lexer->source_str + lexer->start_pos, length);
+  buff[length] = '\0';
+  printf("lexeme: %s\n", buff);
 }
 
 char* TokenTypeToString(TokenType tok_type) {
   switch (tok_type) {
+    case TT_QUOTE:
+      return "\"";
     case TT_PLUS:
       return "+";
     case TT_MINUS:
