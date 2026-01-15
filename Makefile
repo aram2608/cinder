@@ -1,18 +1,19 @@
-CC := gcc
+CXX := clang++
 
 APP_DIR := ./change_me
 INCLUDE_DIR := $(APP_DIR)/include
 SRC_DIR := $(APP_DIR)/src
 
-SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
+SRC_FILES = $(wildcard $(SRC_DIR)/*.cpp)
 
 BUILD_DIR := ./build
 TARGET := main
 
 # Flags
-WFLAGS := -Wall -Wextra -pedantic
+WFLAGS := -g -Wall -Wextra -pedantic
 INCLUDE_FLAGS := -I$(INCLUDE_DIR)
+LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ -L/opt/homebrew/opt/llvm/lib/unwind -lunwind
 
 $(BUILD_DIR)/$(TARGET):
 	@mkdir -p $(@D)
-	$(CC) $(INCLUDE_FLAGS) $(SRC_FILES) -o $@ $(WFLAGS)
+	$(CXX) $(INCLUDE_FLAGS) $(SRC_FILES) $(LDFLAGS) -o $@ $(WFLAGS)

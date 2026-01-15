@@ -1,9 +1,9 @@
 #ifndef TOKENS_H
 #define TOKENS_H
 
-#include "common.h"
+#include "common.hpp"
 
-typedef enum {
+enum TokenType {
   // Binops
   TT_PLUS,   /** "+" */
   TT_MINUS,  /** "-" */
@@ -15,10 +15,10 @@ typedef enum {
   TT_EQ,     /** "=" */
   TT_EQEQ,   /** "==" */
   // Control flow
-  TT_IF,   /** If statement */
-  TT_THEN, /** Then branch */
-  TT_ELSE, /** Else branch */
-  TT_FOR,  /** For loop */
+  TT_IF,     /** If statement */
+  TT_ELSEIF, /** Then branch */
+  TT_ELSE,   /** Else branch */
+  TT_FOR,    /** For loop */
   // Containers
   TT_LPAREN,   /** "(" */
   TT_RPAREN,   /** ")" */
@@ -46,34 +46,32 @@ typedef enum {
   TT_ERROR, /** Used during parsing for error handling */
   TT_EOF,   /** The end of the list of tokens */
   TT_COUNT, /** The number of tokens available */
-} TokenType;
+};
 
-typedef union {
-  char* str;     /** String value */
-  int number;    /** Integer value */
-  float decimal; /** Floating point value */
-} Value;
-
-typedef enum {
+enum ValueType {
   VT_INT,  /** Integer */
   VT_STR,  /** String */
   VT_FLT,  /** Float */
   VT_NULL, /** NULL */
-} ValueType;
+};
 
-#define MAX_LEXEME_LENGTH 255
-#define MAX_IDENTIFIER_LENGTH 255
+using Value = std::variant<std::string, int, float>;
 
-typedef struct {
+struct Token {
+  Token(TokenType token_type, size_t line_num)
+      : token_type(token_type), line_num(line_num) {}
+  Token(TokenType token_type, size_t line_num, std::string lexeme,
+        ValueType value_type, Value value)
+      : token_type(token_type),
+        line_num(line_num),
+        lexeme(lexeme),
+        value_type(value_type),
+        value(value) {}
   TokenType token_type;
   size_t line_num;
-  char lexeme[MAX_LEXEME_LENGTH];
+  std::string lexeme;
   ValueType value_type;
-  union {
-    char str[MAX_IDENTIFIER_LENGTH];
-    int num;
-    float flt;
-  } value;
-} Token;
+  Value value;
+};
 
 #endif

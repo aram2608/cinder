@@ -4,7 +4,6 @@
 - def-end for functions
 
 ``` Ruby
-
 def main() -> int
     int: a = 3
     int: b = 4

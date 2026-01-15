@@ -1,4 +1,4 @@
 #!/bin/bash
 
-git ls-files "*.c" | xargs clang-format -i
-git ls-files "*.h" | xargs clang-format -i
+git ls-files "*.cpp" | xargs clang-format -i
+git ls-files "*.hpp" | xargs clang-format -i
