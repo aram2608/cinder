@@ -166,7 +166,7 @@ void Lexer::TokenizeIdentifier() {
     AddToken(match->second);
     return;
   }
-  // AddToken(TT_IDENTIFER, temp, VT_INT, std::stoi(temp));
+  AddToken(TT_IDENTIFER, temp, VT_INT, std::stoi(temp));
 }
 
 // TODO: Implement floats
@@ -176,7 +176,7 @@ void Lexer::TokenizeNumber() {
   }
   size_t index = current_pos - start_pos;
   std::string temp = source_str.substr(start_pos, index);
-  // AddToken(TT_IDENTIFER, temp, VT_INT, std::stoi(temp));
+  AddToken(TT_INT, temp, VT_INT, std::stoi(temp));
 }
 
 const char* Lexer::TokenTypeToString(TokenType tok_type) {

@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "tokens.hpp"
+#include "expr.hpp"
 
 struct Parser {
   std::vector<Token> tokens;
@@ -10,7 +11,16 @@ struct Parser {
   Parser(std::vector<Token> tokens);
 
   void Parse();
+  std::unique_ptr<Expr> Expression();
+  std::unique_ptr<Expr> Term();
+  std::unique_ptr<Expr> Factor();
+  std::unique_ptr<Expr> Atom();
+  bool MatchType(std::initializer_list<TokenType> types);
+  Token Peek();
+  Token Previous();
   bool IsEnd();
+  Token Advance();
+  void EmitAST(std::vector<std::unique_ptr<Expr>> expressions);
 };
 
 #endif
