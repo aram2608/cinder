@@ -144,7 +144,7 @@ void Lexer::AddToken(TokenType tok_type) {
 }
 
 void Lexer::AddToken(TokenType tok_type, std::string lexeme,
-                     ValueType value_type, Value value) {
+                     ValueType value_type, TokenValue value) {
   tokens.emplace_back(tok_type, line_count, lexeme, value_type, value);
 }
 
@@ -174,9 +174,19 @@ void Lexer::TokenizeNumber() {
   while (!IsEnd() && IsNumeric(PeekChar())) {
     Advance();
   }
-  size_t index = current_pos - start_pos;
-  std::string temp = source_str.substr(start_pos, index);
-  AddToken(TT_INT, temp, VT_INT, std::stoi(temp));
+  if (PeekChar() == '.' && IsNumeric(PeekNextChar())) {
+    Advance();
+    while (!IsEnd() && IsNumeric(PeekChar())) {
+      Advance();
+    }
+    size_t index = current_pos - start_pos;
+    std::string temp = source_str.substr(start_pos, index);
+    AddToken(TT_FLT, temp, VT_FLT, std::stof(temp));
+  } else {
+    size_t index = current_pos - start_pos;
+    std::string temp = source_str.substr(start_pos, index);
+    AddToken(TT_INT, temp, VT_INT, std::stoi(temp));
+  }
 }
 
 const char* Lexer::TokenTypeToString(TokenType tok_type) {
@@ -231,8 +241,6 @@ const char* Lexer::TokenTypeToString(TokenType tok_type) {
       return "DEF";
     case TT_END:
       return "END";
-    case TT_ERROR:
-      return "ERROR";
     case TT_EOF:
       return "EOF";
     case TT_INT_SPECIFIER:

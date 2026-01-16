@@ -10,7 +10,8 @@ struct Parser {
   size_t current_tok;
   Parser(std::vector<Token> tokens);
 
-  void Parse();
+  std::vector<std::unique_ptr<Expr>> Parse();
+  std::vector<std::unique_ptr<Expr>> ParseExpressions();
   std::unique_ptr<Expr> Expression();
   std::unique_ptr<Expr> Term();
   std::unique_ptr<Expr> Factor();
@@ -20,7 +21,9 @@ struct Parser {
   Token Previous();
   bool IsEnd();
   Token Advance();
+  void Consume(TokenType type, std::string message);
   void EmitAST(std::vector<std::unique_ptr<Expr>> expressions);
+  std::string ErrorMessageFormat(std::string message);
 };
 
 #endif

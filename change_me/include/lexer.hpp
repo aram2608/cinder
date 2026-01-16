@@ -87,7 +87,7 @@ struct Lexer {
    * @param value
    */
   void AddToken(TokenType tok_type, std::string lexeme, ValueType value_type,
-                Value value);
+                TokenValue value);
 
   /**
    * @brief Method to help during debugging, prints the tokens incrementally

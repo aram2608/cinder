@@ -43,7 +43,6 @@ enum TokenType {
   TT_SEMICOLON, /** ";" */
 
   // Misc
-  TT_ERROR, /** Used during parsing for error handling */
   TT_EOF,   /** The end of the list of tokens */
   TT_COUNT, /** The number of tokens available */
 };
@@ -55,13 +54,13 @@ enum ValueType {
   VT_NULL, /** NULL */
 };
 
-using Value = std::variant<std::string, int, float>;
+using TokenValue = std::variant<std::string, int, float>;
 
 struct Token {
   Token(TokenType token_type, size_t line_num)
       : token_type(token_type), line_num(line_num) {}
   Token(TokenType token_type, size_t line_num, std::string lexeme,
-        ValueType value_type, Value value)
+        ValueType value_type, TokenValue value)
       : token_type(token_type),
         line_num(line_num),
         lexeme(lexeme),
@@ -71,7 +70,7 @@ struct Token {
   size_t line_num;
   std::string lexeme;
   ValueType value_type;
-  Value value;
+  TokenValue value;
 };
 
 #endif

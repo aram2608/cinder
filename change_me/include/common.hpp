@@ -9,5 +9,8 @@
 #include <memory>
 #include <initializer_list>
 #include <exception>
+#include <utility>
+#include <any>
+#include <typeinfo>
 
 #endif

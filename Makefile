@@ -10,9 +10,11 @@ BUILD_DIR := ./build
 TARGET := main
 
 # Flags
-WFLAGS := -g -Wall -Wextra -pedantic
+WFLAGS := -g -Wall -Wextra -pedantic -Wno-unused-parameter
 INCLUDE_FLAGS := -I$(INCLUDE_DIR)
-LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ -L/opt/homebrew/opt/llvm/lib/unwind -lunwind
+LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ \
+	-L/opt/homebrew/opt/llvm/lib/unwind -lunwind\
+	$(shell llvm-config --cxxflags --ldflags --libs) \
 
 $(BUILD_DIR)/$(TARGET):
 	@mkdir -p $(@D)

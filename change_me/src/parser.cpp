@@ -2,19 +2,24 @@
 
 Parser::Parser(std::vector<Token> tokens) : tokens(tokens), current_tok(0) {}
 
-void Parser::Parse() {
+std::vector<std::unique_ptr<Expr>> Parser::Parse() {
+  std::vector<std::unique_ptr<Expr>> expressions;
   while (!IsEnd()) {
-    Expression();
+    expressions = ParseExpressions();
   }
+  return expressions;
+}
+
+std::vector<std::unique_ptr<Expr>> Parser::ParseExpressions() {
+  std::vector<std::unique_ptr<Expr>> expressions;
+  while (!IsEnd()) {
+    expressions.push_back(Expression());
+  }
+  return expressions;
 }
 
 std::unique_ptr<Expr> Parser::Expression() {
-  std::vector<std::unique_ptr<Expr>> expressions;
-  while (!IsEnd()) {
-    expressions.push_back(Term());
-  }
-  EmitAST(std::move(expressions));
-  return nullptr;
+  return Term();
 }
 
 std::unique_ptr<Expr> Parser::Term() {
@@ -38,11 +43,17 @@ std::unique_ptr<Expr> Parser::Factor() {
 }
 
 std::unique_ptr<Expr> Parser::Atom() {
-  if (MatchType({TT_INT, TT_FLT})) {
-    return std::make_unique<Numeric>(Previous().value_type, Previous().value);
+  if (MatchType({TT_INT, TT_FLT, TT_STR})) {
+    return std::make_unique<Literal>(Previous().value_type, Previous().value);
   }
-
-  throw std::exception{};
+  if (MatchType({TT_LPAREN})) {
+    std::unique_ptr<Expr> expr = Expression();
+    Consume(TT_RPAREN, ErrorMessageFormat("Expected ')' after grouping"));
+    return std::make_unique<Grouping>(std::move(expr));
+  }
+  printf("%s\n",
+         ErrorMessageFormat("Expected expression: " + Peek().lexeme).c_str());
+  exit(1);
 }
 
 bool Parser::MatchType(std::initializer_list<TokenType> types) {
@@ -74,8 +85,21 @@ Token Parser::Advance() {
   return tokens[current_tok];
 }
 
+void Parser::Consume(TokenType type, std::string message) {
+  if (Peek().token_type == type) {
+    Advance();
+    return;
+  }
+  printf("%s\n", ErrorMessageFormat(message).c_str());
+  exit(1);
+}
+
 void Parser::EmitAST(std::vector<std::unique_ptr<Expr>> expressions) {
   for (std::unique_ptr<Expr>& expr : expressions) {
     printf("%s\n", expr->ToString().c_str());
   }
+}
+
+std::string Parser::ErrorMessageFormat(std::string message) {
+  return message + "\nLine: " + std::to_string(Peek().line_num) + "\n";
 }
