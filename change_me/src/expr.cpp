@@ -1,7 +1,4 @@
 #include "../include/expr.hpp"
-#include "expr.hpp"
-
-Expr::~Expr() = default;
 
 Literal::Literal(ValueType value_type, TokenValue value)
     : value_type(value_type), value(value) {}

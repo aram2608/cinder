@@ -14,11 +14,22 @@ enum TokenType {
   TT_BANGEQ, /** "!=" */
   TT_EQ,     /** "=" */
   TT_EQEQ,   /** "==" */
+  TT_GREATER,
+  TT_LESSER,
+  TT_GREATER_EQ,
+  TT_LESSER_EQ,
+
+  TT_ARROW, /** "->" */
+  TT_PRINT,
+
   // Control flow
   TT_IF,     /** If statement */
   TT_ELSEIF, /** Then branch */
   TT_ELSE,   /** Else branch */
   TT_FOR,    /** For loop */
+  TT_TRUE,
+  TT_FALSE,
+  TT_RETURN,
   // Containers
   TT_LPAREN,   /** "(" */
   TT_RPAREN,   /** ")" */
@@ -58,7 +69,7 @@ using TokenValue = std::variant<std::string, int, float>;
 
 struct Token {
   Token(TokenType token_type, size_t line_num)
-      : token_type(token_type), line_num(line_num) {}
+      : token_type(token_type), line_num(line_num), value_type(VT_NULL) {}
   Token(TokenType token_type, size_t line_num, std::string lexeme,
         ValueType value_type, TokenValue value)
       : token_type(token_type),

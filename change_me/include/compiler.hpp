@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "expr.hpp"
+#include "stmt.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -15,13 +16,18 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
-struct Compiler : ExprVisitor {
-  std::vector<std::unique_ptr<Expr>> expressions;
+struct Compiler : ExprVisitor, StmtVisitor {
+  std::vector<std::unique_ptr<Stmt>> statements;
+  std::unordered_map<std::string, llvm::Value*> symbol_table;
 
-  Compiler(std::vector<std::unique_ptr<Expr>> expressions);
+  Compiler(std::vector<std::unique_ptr<Stmt>> statements);
 
   void Compile();
-  void CompileExpression();
+
+  llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
+  llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
+  llvm::Value* VisitReturnStmt(ReturnStmt& stmt) override;
+  llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) override;
 
   llvm::Value* VisitLiteral(Literal& expr) override;
   llvm::Value* VisitBoolean(Boolean& expr) override;

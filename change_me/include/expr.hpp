@@ -34,7 +34,7 @@ struct ExprVisitor {
 /// @brief Base class for the AST nodes for expressions
 struct Expr {
   /// @brief Virtual destructor, set to default
-  virtual ~Expr();
+  virtual ~Expr() = default;
 
   /**
    * @brief Method used to emply the visitor pattern

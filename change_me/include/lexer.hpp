@@ -10,12 +10,18 @@
 /// @struct Lexer
 /// @brief The main structure used during tokenization of source code
 struct Lexer {
-  size_t start_pos;   /** The starting position for the current lexeme */
-  size_t current_pos; /** The current positon in the lexeme */
-  size_t line_count;
-  std::string source_str;    /** The source string provided */
+  size_t start_pos;       /**< The starting position for the current lexeme */
+  size_t current_pos;     /**< The current positon in the lexeme */
+  size_t line_count;      /**< The line count */
+  std::string source_str; /** The source string provided */
   std::vector<Token> tokens; /** A flexible array member for the tokens */
 
+  /// @brief Constructor for std::string
+  /// @param source_str Source string
+  Lexer(std::string source_str);
+
+  /// @brief Constructor for const char*
+  /// @param source_str
   Lexer(const char* source_str);
 
   /**
@@ -74,6 +80,12 @@ struct Lexer {
   char PeekNextChar();
 
   /**
+   * @brief Method to test if a current chararacter matches the provided type
+   * @param c The character to be tested against the current_pos
+   */
+  bool Match(char c);
+
+  /**
    * @brief Method to add simple tokens
    * @param tok_type The type of token to be added
    */
@@ -98,7 +110,9 @@ struct Lexer {
    * @brief A simple helper method to parse token types into strings
    * @param tok_type The token to be formatted
    */
-  const char* TokenTypeToString(TokenType tok_type);
+  std::string TokenToString(Token tok);
+
+  void TokenizeString();
 
   /**
    * @brief Method to lex identifiers and key words

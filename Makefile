@@ -18,4 +18,4 @@ LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ \
 
 $(BUILD_DIR)/$(TARGET):
 	@mkdir -p $(@D)
-	$(CXX) $(INCLUDE_FLAGS) $(SRC_FILES) $(LDFLAGS) -o $@ $(WFLAGS)
+	$(CXX) $(INCLUDE_FLAGS) $(WFLAGS) $(LDFLAGS) -o $@ $(SRC_FILES)
