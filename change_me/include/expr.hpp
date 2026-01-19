@@ -20,6 +20,7 @@ struct Boolean;
 struct Variable;
 struct Grouping;
 struct Binary;
+struct CallExpr;
 
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
@@ -28,6 +29,7 @@ struct ExprVisitor {
   virtual llvm::Value* VisitVariable(Variable& expr) = 0;
   virtual llvm::Value* VisitGrouping(Grouping& expr) = 0;
   virtual llvm::Value* VisitBinary(Binary& expr) = 0;
+  virtual llvm::Value* VisitCall(CallExpr& expr) = 0;
 };
 
 /// @struct Expr
@@ -73,9 +75,9 @@ struct Boolean : Expr {
 /// @struct Variable
 /// @brief Variable node
 struct Variable : Expr {
-  std::string name;
+  Token name;
 
-  Variable(const std::string name);
+  Variable(Token name);
   llvm::Value* Accept(ExprVisitor& visitor) override;
   std::string ToString() override;
 };
@@ -98,6 +100,16 @@ struct Binary : Expr {
   Token op;
 
   Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, Token op);
+  llvm::Value* Accept(ExprVisitor& visitor) override;
+  std::string ToString() override;
+};
+
+struct CallExpr : Expr {
+  std::unique_ptr<Expr> callee;
+  std::vector<std::unique_ptr<Expr>> args;
+
+  CallExpr(std::unique_ptr<Expr> callee,
+           std::vector<std::unique_ptr<Expr>> args);
   llvm::Value* Accept(ExprVisitor& visitor) override;
   std::string ToString() override;
 };

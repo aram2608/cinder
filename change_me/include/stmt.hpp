@@ -64,10 +64,11 @@ struct ReturnStmt : Stmt {
 };
 
 struct VarDeclarationStmt : Stmt {
+  Token type;
   Token name;
   std::unique_ptr<Expr> value;
 
-  VarDeclarationStmt(Token name, std::unique_ptr<Expr> value);
+  VarDeclarationStmt(Token type, Token name, std::unique_ptr<Expr> value);
   llvm::Value* Accept(StmtVisitor& visitor) override;
   std::string ToString() override;
 };

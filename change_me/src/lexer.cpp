@@ -1,12 +1,19 @@
 #include "../include/lexer.hpp"
 
 static const std::unordered_map<std::string, TokenType> key_words = {
-    {"int", TT_INT_SPECIFIER}, {"float", TT_FLT_SPECIFIER},
-    {"str", TT_STR_SPECIFIER}, {"def", TT_DEF},
-    {"end", TT_END},           {"if", TT_IF},
-    {"elif", TT_ELSEIF},       {"else", TT_ELSE},
-    {"for", TT_FOR},           {"true", TT_TRUE},
-    {"false", TT_FALSE},       {"return", TT_RETURN},
+    {"int", TT_INT_SPECIFIER},
+    {"flt", TT_FLT_SPECIFIER},
+    {"str", TT_STR_SPECIFIER},
+    {"def", TT_DEF},
+    {"end", TT_END},
+    {"if", TT_IF},
+    {"elif", TT_ELSEIF},
+    {"else", TT_ELSE},
+    {"for", TT_FOR},
+    {"true", TT_TRUE},
+    {"false", TT_FALSE},
+    {"return", TT_RETURN},
+    {"void", TT_VOID_SPECIFIER},
 };
 
 Lexer::Lexer(std::string source_str)
@@ -50,6 +57,9 @@ void Lexer::Scan() {
       break;
     case '"':
       TokenizeString();
+      break;
+    case ',':
+      AddToken(TT_COMMA);
       break;
     case ':':
       AddToken(TT_COLON);

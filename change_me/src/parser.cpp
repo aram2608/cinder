@@ -7,7 +7,7 @@ std::vector<std::unique_ptr<Stmt>> Parser::Parse() {
   while (!IsEnd()) {
     statements.push_back(Function());
   }
-  EmitAST(std::move(statements));
+  // EmitAST(std::move(statements));
   return statements;
 }
 
@@ -55,6 +55,12 @@ std::unique_ptr<Stmt> Parser::Statement() {
 }
 
 std::unique_ptr<Stmt> Parser::ReturnStatement() {
+  if (Peek().token_type == TT_SEMICOLON) {
+    Advance();
+    std::unique_ptr<Expr> void_literal =
+        std::make_unique<Literal>(VT_VOID, Void{});
+    return std::make_unique<ReturnStmt>(std::move(void_literal));
+  }
   std::unique_ptr<Expr> expr = Expression();
   Consume(TT_SEMICOLON, "expected ';' after return statement");
   return std::make_unique<ReturnStmt>(std::move(expr));
@@ -72,7 +78,8 @@ std::unique_ptr<Stmt> Parser::VarDeclaration() {
     exit(1);
   }
   Consume(TT_SEMICOLON, "expected ';' after variable declaration");
-  return std::make_unique<VarDeclarationStmt>(var, std::move(initializer));
+  return std::make_unique<VarDeclarationStmt>(specifier, var,
+                                              std::move(initializer));
 }
 
 std::unique_ptr<Stmt> Parser::ExpressionStatement() {
@@ -96,12 +103,36 @@ std::unique_ptr<Expr> Parser::Term() {
 }
 
 std::unique_ptr<Expr> Parser::Factor() {
-  std::unique_ptr<Expr> expr = Atom();
+  std::unique_ptr<Expr> expr = Call();
   while (MatchType({TT_STAR, TT_SLASH})) {
     Token op = Previous();
-    std::unique_ptr<Expr> right = Atom();
+    std::unique_ptr<Expr> right = Call();
     expr = std::make_unique<Binary>(std::move(expr), std::move(right), op);
   }
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::Call() {
+  std::unique_ptr<Expr> expr = Atom();
+
+  if (MatchType({TT_LPAREN})) {
+    const size_t MAX_ARGS = 255;
+    std::vector<std::unique_ptr<Expr>> args;
+
+    if (!CheckType(TT_RPAREN)) {
+      do {
+        if (args.size() >= MAX_ARGS) {
+          printf("max arguments reached\n");
+          exit(1);
+        }
+        args.push_back(Expression());
+      } while (MatchType({TT_COMMA}));
+    }
+
+    Consume(TT_RPAREN, "expected ')' after call");
+    expr = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+  }
+
   return expr;
 }
 
@@ -116,6 +147,10 @@ std::unique_ptr<Expr> Parser::Atom() {
 
   if (MatchType({TT_FALSE})) {
     return std::make_unique<Boolean>(false);
+  }
+
+  if (MatchType({TT_IDENTIFER})) {
+    return std::make_unique<Variable>(Previous());
   }
 
   if (MatchType({TT_LPAREN})) {
@@ -140,6 +175,13 @@ bool Parser::MatchType(std::initializer_list<TokenType> types) {
 
 Token Parser::Peek() {
   return tokens[current_tok];
+}
+
+bool Parser::CheckType(TokenType type) {
+  if (IsEnd()) {
+    return false;
+  }
+  return Peek().token_type == type;
 }
 
 Token Parser::Previous() {

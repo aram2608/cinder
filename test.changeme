@@ -1,5 +1,20 @@
-def main() -> int
+def add() -> void
     int: a = 3;
     int: b = 4;
+    int: c = a + b;
+    flt: d = 1.0;
+    flt: f = 2.0;
+    flt: z = d + f;
+    return;
+end
+
+def get() -> int
+    int: a = 4;
+    return a;
+end
+
+def main() -> int
+    add();
+    int: b = get();
     return 0;
 end

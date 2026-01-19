@@ -21,9 +21,11 @@ struct Parser {
   std::unique_ptr<Expr> Expression();
   std::unique_ptr<Expr> Term();
   std::unique_ptr<Expr> Factor();
+  std::unique_ptr<Expr> Call();
   std::unique_ptr<Expr> Atom();
   bool MatchType(std::initializer_list<TokenType> types);
   Token Peek();
+  bool CheckType(TokenType type);
   Token Previous();
   bool IsEnd();
   Token Advance();

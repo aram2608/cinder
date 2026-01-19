@@ -15,10 +15,15 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/MC/TargetRegistry.h"
 
 struct Compiler : ExprVisitor, StmtVisitor {
   std::vector<std::unique_ptr<Stmt>> statements;
-  std::unordered_map<std::string, llvm::Value*> symbol_table;
+  std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
+  std::vector<std::string> func_table;
 
   Compiler(std::vector<std::unique_ptr<Stmt>> statements);
 
@@ -34,6 +39,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* VisitVariable(Variable& expr) override;
   llvm::Value* VisitGrouping(Grouping& expr) override;
   llvm::Value* VisitBinary(Binary& expr) override;
+  llvm::Value* VisitCall(CallExpr& expr) override;
 };
 
 #endif

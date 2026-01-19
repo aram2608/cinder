@@ -15,6 +15,8 @@ std::string Literal::ToString() {
       return std::to_string(std::get<float>(value));
     case VT_STR:
       return std::get<std::string>(value);
+    case VT_VOID:
+      return "void";
     default:
       return "UNREACHABLE";
   }
@@ -31,14 +33,14 @@ std::string Boolean::ToString() {
   return "(" + temp + ")";
 }
 
-Variable::Variable(const std::string name) : name(name) {}
+Variable::Variable(Token name) : name(name) {}
 
 llvm::Value* Variable::Accept(ExprVisitor& visitor) {
   return visitor.VisitVariable(*this);
 }
 
 std::string Variable::ToString() {
-  return "(" + name + ")";
+  return "(" + name.lexeme + ")";
 }
 
 Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
@@ -80,5 +82,21 @@ std::string Binary::ToString() {
   std::string temp{};
   temp +=
       "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
+  return temp;
+}
+
+CallExpr::CallExpr(std::unique_ptr<Expr> callee,
+                   std::vector<std::unique_ptr<Expr>> args)
+    : callee(std::move(callee)), args(std::move(args)) {}
+
+llvm::Value* CallExpr::Accept(ExprVisitor& visitor) {
+  return visitor.VisitCall(*this);
+}
+
+std::string CallExpr::ToString() {
+  std::string temp = callee->ToString();
+  for (auto& arg : args) {
+    temp += arg->ToString();
+  }
   return temp;
 }

@@ -51,8 +51,9 @@ std::string ReturnStmt::ToString() {
   return "Return: " + value->ToString();
 }
 
-VarDeclarationStmt::VarDeclarationStmt(Token name, std::unique_ptr<Expr> value)
-    : name(name), value(std::move(value)) {}
+VarDeclarationStmt::VarDeclarationStmt(Token type, Token name,
+                                       std::unique_ptr<Expr> value)
+    : type(type), name(name), value(std::move(value)) {}
 
 Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
   return visitor.VisitVarDeclarationStmt(*this);

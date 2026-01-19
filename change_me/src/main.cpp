@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
   // lexer.EmitTokens();
   Parser parser{lexer.tokens};
   std::vector<std::unique_ptr<Stmt>> statements = parser.Parse();
-  // Compiler compiler{std::move(statements)};
-  // compiler.Compile();
+  Compiler compiler{std::move(statements)};
+  compiler.Compile();
   return 0;
 }

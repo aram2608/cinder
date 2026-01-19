@@ -38,6 +38,7 @@ enum TokenType {
   TT_LBRACKET, /** "[" */
   TT_RBRACKET, /** "]" */
   TT_QUOTE,
+  TT_COMMA, /**< "," */
   // Key words and idnetifiers
   TT_IDENTIFER, /** Any series of characters */
   TT_DEF,       /** "def" keyword */
@@ -45,6 +46,7 @@ enum TokenType {
   TT_INT_SPECIFIER,
   TT_FLT_SPECIFIER,
   TT_STR_SPECIFIER,
+  TT_VOID_SPECIFIER,
   // Types
   TT_INT,
   TT_FLT,
@@ -59,13 +61,16 @@ enum TokenType {
 };
 
 enum ValueType {
-  VT_INT,  /** Integer */
-  VT_STR,  /** String */
-  VT_FLT,  /** Float */
+  VT_INT, /** Integer */
+  VT_STR, /** String */
+  VT_FLT, /** Float */
+  VT_VOID,
   VT_NULL, /** NULL */
 };
 
-using TokenValue = std::variant<std::string, int, float>;
+struct Void {};
+
+using TokenValue = std::variant<std::string, int, float, Void>;
 
 struct Token {
   Token(TokenType token_type, size_t line_num)
