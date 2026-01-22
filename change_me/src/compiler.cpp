@@ -82,9 +82,11 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   Function* Func =
       Function::Create(FT, Function::ExternalLinkage, func_name, *TheModule);
 
+  argument_table.clear();
   unsigned Idx = 0;
   for (auto& arg : Func->args()) {
-    arg.setName(stmt.args[Idx++].identifier.lexeme);
+    arg.setName(stmt.args[Idx].identifier.lexeme);
+    argument_table[stmt.args[Idx++].identifier.lexeme] = &arg;
   }
 
   func_table.push_back(func_name);
@@ -159,6 +161,11 @@ Value* Compiler::VisitVariable(Variable& expr) {
   auto it = std::find(func_table.begin(), func_table.end(), lex);
   if (it != func_table.end()) {
     return TheModule->getFunction(lex);
+  }
+
+  auto arg = argument_table.find(lex);
+  if(arg != argument_table.end()) {
+    return arg->second;
   }
 
   auto temp = symbol_table.find(lex);

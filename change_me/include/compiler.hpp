@@ -23,6 +23,7 @@
 struct Compiler : ExprVisitor, StmtVisitor {
   std::vector<std::unique_ptr<Stmt>> statements;
   std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
+  std::unordered_map<std::string, llvm::Argument*> argument_table;
   std::vector<std::string> func_table;
 
   Compiler(std::vector<std::unique_ptr<Stmt>> statements);
