@@ -1,20 +1,12 @@
-def add() -> void
-    int: a = 3;
-    int: b = 4;
-    int: c = a + b;
-    flt: d = 1.0;
-    flt: f = 2.0;
-    flt: z = d + f;
-    return;
-end
+extern printf() -> int
 
-def get() -> int
-    int: a = 4;
-    return a;
+def get(int a, int b) -> int
+    int: a = 1;
+    int: b = 2;
+    return a + b;
 end
 
 def main() -> int
-    add();
     int: b = get();
     return 0;
 end

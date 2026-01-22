@@ -13,6 +13,8 @@ struct Parser {
 
   std::vector<std::unique_ptr<Stmt>> Parse();
 
+  std::unique_ptr<Stmt> FunctionPrototype();
+  std::unique_ptr<Stmt> ExternFunction();
   std::unique_ptr<Stmt> Function();
   std::unique_ptr<Stmt> Statement();
   std::unique_ptr<Stmt> ReturnStatement();

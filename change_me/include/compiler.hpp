@@ -31,6 +31,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
 
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
   llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
+  llvm::Value* VisitFunctionProto(FunctionProto& stmt) override;
   llvm::Value* VisitReturnStmt(ReturnStmt& stmt) override;
   llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) override;
 

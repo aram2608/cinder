@@ -5,46 +5,62 @@ Parser::Parser(std::vector<Token> tokens) : tokens(tokens), current_tok(0) {}
 std::vector<std::unique_ptr<Stmt>> Parser::Parse() {
   std::vector<std::unique_ptr<Stmt>> statements;
   while (!IsEnd()) {
-    statements.push_back(Function());
+    statements.push_back(ExternFunction());
   }
   // EmitAST(std::move(statements));
   return statements;
 }
 
+std::unique_ptr<Stmt> Parser::FunctionPrototype() {
+  Token name = Consume(TT_IDENTIFER, "expected identifier after 'def'");
+  Consume(TT_LPAREN, "expected '(' after function name");
+
+  std::vector<FuncArg> args;
+  if (!CheckType(TT_RPAREN)) {
+    do {
+      if (args.size() >= 255) {
+        printf("error: exceeded maximum number of arguments: 255\n");
+        exit(1);
+      }
+      Token type = Advance();
+      Token identifier = Consume(TT_IDENTIFER, "expected arg name");
+      if (type.token_type == TT_INT_SPECIFIER) {
+        args.emplace_back(VT_INT, identifier);
+      } else if (type.token_type == TT_FLT_SPECIFIER) {
+        args.emplace_back(VT_FLT, identifier);
+      } else {
+        printf("type not allowed\n");
+        exit(1);
+      }
+    } while (MatchType({TT_COMMA}));
+  }
+  Consume(TT_RPAREN, "expected ')' after end of function declaration");
+  Consume(TT_ARROW, "expected '->' prior to the return type");
+  Token return_type = Advance();
+  return std::make_unique<FunctionProto>(name, return_type, args);
+}
+
+std::unique_ptr<Stmt> Parser::ExternFunction() {
+  if (MatchType({TT_EXTERN})) {
+    return FunctionPrototype();
+  }
+  return Function();
+}
+
 std::unique_ptr<Stmt> Parser::Function() {
   if (MatchType({TT_DEF})) {
-    Token name = Consume(TT_IDENTIFER, "expected identifier after 'def'");
-    Consume(TT_LPAREN, "expected '(' after function name");
-
-    std::vector<Token> args;
-    if (!(Peek().token_type == TT_RPAREN)) {
-      do {
-        if (args.size() >= 255) {
-          printf("error: exceeded maximum number of arguments: 255\n");
-          exit(1);
-        }
-        // TODO: Fix this logic
-        // We need to type check each argument
-        args.push_back(Consume(TT_IDENTIFER, "expected arg name"));
-      } while (0);
-    }
-    Consume(TT_RPAREN, "expected ')' after end of function declaration");
-    Consume(TT_ARROW, "expected '->' prior to the return type");
-    Token return_type = Advance();
+    std::unique_ptr<Stmt> proto = FunctionPrototype();
     std::vector<std::unique_ptr<Stmt>> stmts;
     while (!(Peek().token_type == TT_END) && !IsEnd()) {
       stmts.push_back(Statement());
     }
     Consume(TT_END, "expected end after a function body");
-    return std::make_unique<FunctionStmt>(name, return_type, args,
-                                          std::move(stmts));
+    return std::make_unique<FunctionStmt>(std::move(proto), std::move(stmts));
   }
   return Statement();
 }
 
 std::unique_ptr<Stmt> Parser::Statement() {
-  if (MatchType({TT_PRINT})) {
-  }
   if (MatchType({TT_INT_SPECIFIER, TT_FLT_SPECIFIER})) {
     return VarDeclaration();
   }
@@ -55,7 +71,7 @@ std::unique_ptr<Stmt> Parser::Statement() {
 }
 
 std::unique_ptr<Stmt> Parser::ReturnStatement() {
-  if (Peek().token_type == TT_SEMICOLON) {
+  if (CheckType(TT_SEMICOLON)) {
     Advance();
     std::unique_ptr<Expr> void_literal =
         std::make_unique<Literal>(VT_VOID, Void{});

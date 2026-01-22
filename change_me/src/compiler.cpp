@@ -1,4 +1,5 @@
 #include "../include/compiler.hpp"
+#include "compiler.hpp"
 
 using namespace llvm;
 static std::unique_ptr<LLVMContext> TheContext;
@@ -28,6 +29,21 @@ Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
 }
 
 Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
+  Function* Func = dyn_cast<Function>(stmt.proto->Accept(*this));
+
+  BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", Func);
+  Builder->SetInsertPoint(BB);
+
+  for (auto& stmt : stmt.body) {
+    stmt->Accept(*this);
+  }
+
+  verifyFunction(*Func);
+  symbol_table.clear();
+  return Func;
+}
+
+Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   std::string func_name = stmt.name.lexeme;
   auto it = std::find(func_table.begin(), func_table.end(), func_name);
   if (it != func_table.end()) {
@@ -48,12 +64,12 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
   }
 
   std::vector<Type*> arg_types;
-  for (Token& arg : stmt.args) {
-    if (arg.value_type == VT_INT) {
+  for (auto& arg : stmt.args) {
+    if (arg.type == VT_INT) {
       arg_types.push_back(Type::getInt32Ty(*TheContext));
-    } else if (arg.value_type == VT_FLT) {
+    } else if (arg.type == VT_FLT) {
       arg_types.push_back(Type::getFloatTy(*TheContext));
-    } else if (arg.value_type == VT_STR) {
+    } else if (arg.type == VT_STR) {
       printf("Implement me compiler.cpp line 47\n");
       exit(1);
     } else {
@@ -66,15 +82,11 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
   Function* Func =
       Function::Create(FT, Function::ExternalLinkage, func_name, *TheModule);
 
-  BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", Func);
-  Builder->SetInsertPoint(BB);
-
-  for (auto& stmt : stmt.body) {
-    stmt->Accept(*this);
+  unsigned Idx = 0;
+  for (auto& arg : Func->args()) {
+    arg.setName(stmt.args[Idx++].identifier.lexeme);
   }
 
-  verifyFunction(*Func);
-  symbol_table.clear();
   func_table.push_back(func_name);
   return Func;
 }

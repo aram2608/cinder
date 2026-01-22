@@ -17,6 +17,7 @@
 
 struct ExpressionStmt;
 struct FunctionStmt;
+struct FunctionProto;
 struct ReturnStmt;
 struct VarDeclarationStmt;
 
@@ -27,6 +28,7 @@ struct StmtVisitor {
   virtual llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) = 0;
   virtual llvm::Value* VisitReturnStmt(ReturnStmt& stmt) = 0;
   virtual llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) = 0;
+  virtual llvm::Value* VisitFunctionProto(FunctionProto& stmt) = 0;
 };
 
 struct Stmt {
@@ -43,13 +45,21 @@ struct ExpressionStmt : Stmt {
   std::string ToString() override;
 };
 
-struct FunctionStmt : Stmt {
+struct FunctionProto : Stmt {
   Token name;
   Token return_type;
-  std::vector<Token> args;
+  std::vector<FuncArg> args;
+
+  FunctionProto(Token name, Token return_type, std::vector<FuncArg> args);
+  llvm::Value* Accept(StmtVisitor& visitor) override;
+  std::string ToString() override;
+};
+
+struct FunctionStmt : Stmt {
+  std::unique_ptr<Stmt> proto;
   std::vector<std::unique_ptr<Stmt>> body;
 
-  FunctionStmt(Token name, Token return_type, std::vector<Token> args,
+  FunctionStmt(std::unique_ptr<Stmt> proto,
                std::vector<std::unique_ptr<Stmt>> body);
   llvm::Value* Accept(StmtVisitor& visitor) override;
   std::string ToString() override;

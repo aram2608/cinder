@@ -14,6 +14,7 @@ static const std::unordered_map<std::string, TokenType> key_words = {
     {"false", TT_FALSE},
     {"return", TT_RETURN},
     {"void", TT_VOID_SPECIFIER},
+    {"extern", TT_EXTERN},
 };
 
 Lexer::Lexer(std::string source_str)
@@ -281,6 +282,8 @@ std::string Lexer::TokenToString(Token tok) {
       return "ELSE";
     case TT_RETURN:
       return "RETURN";
+    case TT_EXTERN:
+      return "EXTERN";
     case TT_FOR:
       return "FOR";
     case TT_IDENTIFER:

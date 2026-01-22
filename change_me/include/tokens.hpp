@@ -20,7 +20,7 @@ enum TokenType {
   TT_LESSER_EQ,
 
   TT_ARROW, /** "->" */
-  TT_PRINT,
+  TT_EXTERN,
 
   // Control flow
   TT_IF,     /** If statement */
@@ -87,6 +87,13 @@ struct Token {
   std::string lexeme;
   ValueType value_type;
   TokenValue value;
+};
+
+struct FuncArg {
+  ValueType type;
+  Token identifier;
+  FuncArg(ValueType type, Token identifier)
+      : type(type), identifier(identifier) {}
 };
 
 #endif

@@ -15,24 +15,37 @@ std::string ExpressionStmt::ToString() {
   return "Statement: " + expr->ToString();
 }
 
-FunctionStmt::FunctionStmt(Token name, Token return_type,
-                           std::vector<Token> args,
+FunctionProto::FunctionProto(Token name, Token return_type,
+                             std::vector<FuncArg> args)
+    : name(name), return_type(return_type), args(args) {}
+
+Value* FunctionProto::Accept(StmtVisitor& visitor) {
+  return visitor.VisitFunctionProto(*this);
+}
+std::string FunctionProto::ToString() {
+  std::string temp = return_type.lexeme + " ";
+  temp += name.lexeme;
+  temp += " Args( ";
+  for (auto& tok : args) {
+    // temp += tok.type;
+    // temp += " ";
+    temp += tok.identifier.lexeme;
+    temp += " ";
+  }
+  temp += ") {\n";
+  return temp;
+}
+
+FunctionStmt::FunctionStmt(std::unique_ptr<Stmt> proto,
                            std::vector<std::unique_ptr<Stmt>> body)
-    : name(name), return_type(return_type), args(args), body(std::move(body)) {}
+    : proto(std::move(proto)), body(std::move(body)) {}
 
 Value* FunctionStmt::Accept(StmtVisitor& visitor) {
   return visitor.VisitFunctionStmt(*this);
 }
 
 std::string FunctionStmt::ToString() {
-  std::string temp = return_type.lexeme + " ";
-  temp += name.lexeme;
-  temp += " Args( ";
-  for (auto& tok : args) {
-    temp += tok.lexeme;
-    temp += " ";
-  }
-  temp += ") {\n";
+  std::string temp = proto->ToString();
   for (auto& stmt : body) {
     temp += stmt->ToString();
     temp += "\n";
