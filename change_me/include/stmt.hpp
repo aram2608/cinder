@@ -15,6 +15,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
+struct ModuleStmt;
 struct ExpressionStmt;
 struct FunctionStmt;
 struct FunctionProto;
@@ -29,12 +30,22 @@ struct StmtVisitor {
   virtual llvm::Value* VisitReturnStmt(ReturnStmt& stmt) = 0;
   virtual llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) = 0;
   virtual llvm::Value* VisitFunctionProto(FunctionProto& stmt) = 0;
+  virtual llvm::Value* VisitModuleStmt(ModuleStmt& stmt) = 0;
 };
 
 struct Stmt {
   virtual ~Stmt();
   virtual llvm::Value* Accept(StmtVisitor& visitor) = 0;
   virtual std::string ToString() = 0;
+};
+
+struct ModuleStmt : Stmt {
+  Token name;
+  std::vector<std::unique_ptr<Stmt>> stmts;
+
+  ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts);
+  llvm::Value* Accept(StmtVisitor& visitor) override;
+  std::string ToString() override;
 };
 
 struct ExpressionStmt : Stmt {

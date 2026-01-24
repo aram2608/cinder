@@ -31,6 +31,8 @@ enum TokenType {
   TT_FALSE,
   TT_RETURN,
   // Containers
+  TT_MOD,
+  TT_IMPORT,
   TT_LPAREN,   /** "(" */
   TT_RPAREN,   /** ")" */
   TT_LBRACE,   /** "{" */

@@ -6,21 +6,33 @@ static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
 static std::unordered_map<std::string, Value*> NamedValues;
+#define UNREACHABLE               \
+  do {                            \
+    std::cout << "UNREACHABLE\n"; \
+    exit(1);                      \
+  } while (0)
 
-Compiler::Compiler(std::vector<std::unique_ptr<Stmt>> statements)
-    : statements(std::move(statements)), symbol_table{} {}
+Compiler::Compiler(std::unique_ptr<Stmt> mod)
+    : mod(std::move(mod)), symbol_table{} {}
 
 void Compiler::Compile() {
   TheContext = std::make_unique<LLVMContext>();
-  TheModule = std::make_unique<Module>("no-name-lang", *TheContext);
+  mod->Accept(*this);
+}
+
+Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
+  TheModule = std::make_unique<Module>(stmt.name.lexeme, *TheContext);
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
 
-  for (auto& stmt : statements) {
+  for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
   }
 
-  TheModule->print(outs(), nullptr);
-  fprintf(stdin, "\n");
+  std::error_code EC;
+  StringRef name = TheModule->getModuleIdentifier() + ".ll";
+  raw_fd_ostream OS(name, EC, sys::fs::OF_None);
+  TheModule->print(OS, nullptr);
+  return nullptr;
 }
 
 Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
@@ -47,7 +59,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   std::string func_name = stmt.name.lexeme;
   auto it = std::find(func_table.begin(), func_table.end(), func_name);
   if (it != func_table.end()) {
-    printf("functions can not be redefined\n");
+    std::cout << "functions can not be redefined\n";
     exit(1);
   }
 
@@ -59,8 +71,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   } else if (stmt.return_type.token_type == TT_VOID_SPECIFIER) {
     return_type = Type::getVoidTy(*TheContext);
   } else {
-    printf("UNREACHABLE\n");
-    exit(1);
+    UNREACHABLE;
   }
 
   std::vector<Type*> arg_types;
@@ -70,11 +81,10 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
     } else if (arg.type == VT_FLT) {
       arg_types.push_back(Type::getFloatTy(*TheContext));
     } else if (arg.type == VT_STR) {
-      printf("Implement me compiler.cpp line 47\n");
+      std::cout << "Implement me compiler.cpp line 47\n";
       exit(1);
     } else {
-      printf("UNREACHABLE\n");
-      exit(1);
+      UNREACHABLE;
     }
   }
 
@@ -104,7 +114,7 @@ Value* Compiler::VisitReturnStmt(ReturnStmt& stmt) {
 Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
   std::string name = stmt.name.lexeme;
   if (symbol_table.find(name) != symbol_table.end()) {
-    printf("redeclaration of variable %s\n", name.c_str());
+    std::cout << "redeclaration of variable" << name << "\n";
     exit(1);
   }
   Type* type;
@@ -120,8 +130,7 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
       exit(1);
       break;
     default:
-      printf("UNREACHABLE\n");
-      exit(1);
+      UNREACHABLE;
   }
   Value* value = stmt.value->Accept(*this);
   AllocaInst* value_ptr = Builder->CreateAlloca(type, nullptr, name);
@@ -164,7 +173,7 @@ Value* Compiler::VisitVariable(Variable& expr) {
   }
 
   auto arg = argument_table.find(lex);
-  if(arg != argument_table.end()) {
+  if (arg != argument_table.end()) {
     return arg->second;
   }
 

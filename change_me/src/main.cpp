@@ -20,12 +20,11 @@ std::string ReadEntireFile(char* file_path) {
 }
 
 void Help() {
-  printf("Usage: ./build/main <PATH>\n");
+  std::cout << "Usage: ./build/main <PATH>\n";
 }
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    printf("missing file\n");
     Help();
     exit(1);
   }
@@ -35,8 +34,8 @@ int main(int argc, char** argv) {
   lexer.ScanTokens();
   // lexer.EmitTokens();
   Parser parser{lexer.tokens};
-  std::vector<std::unique_ptr<Stmt>> statements = parser.Parse();
-  Compiler compiler{std::move(statements)};
+  std::unique_ptr<Stmt> mod = parser.Parse();
+  Compiler compiler{std::move(mod)};
   compiler.Compile();
   return 0;
 }

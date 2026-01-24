@@ -1,5 +1,5 @@
-; ModuleID = 'no-name-lang'
-source_filename = "no-name-lang"
+; ModuleID = 'main'
+source_filename = "main"
 
 declare i32 @printf()
 

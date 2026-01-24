@@ -19,17 +19,19 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
 
 struct Compiler : ExprVisitor, StmtVisitor {
-  std::vector<std::unique_ptr<Stmt>> statements;
+  std::unique_ptr<Stmt> mod;
   std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
   std::unordered_map<std::string, llvm::Argument*> argument_table;
   std::vector<std::string> func_table;
 
-  Compiler(std::vector<std::unique_ptr<Stmt>> statements);
+  Compiler(std::unique_ptr<Stmt> mod);
 
   void Compile();
 
+  llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
   llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
   llvm::Value* VisitFunctionProto(FunctionProto& stmt) override;

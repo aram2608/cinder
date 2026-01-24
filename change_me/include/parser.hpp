@@ -11,8 +11,9 @@ struct Parser {
   size_t current_tok;
   Parser(std::vector<Token> tokens);
 
-  std::vector<std::unique_ptr<Stmt>> Parse();
+  std::unique_ptr<Stmt> Parse();
 
+  std::unique_ptr<Stmt> ParseModule();
   std::unique_ptr<Stmt> FunctionPrototype();
   std::unique_ptr<Stmt> ExternFunction();
   std::unique_ptr<Stmt> Function();
@@ -33,7 +34,7 @@ struct Parser {
   Token Advance();
   Token Consume(TokenType type, std::string message);
   void EmitAST(std::vector<std::unique_ptr<Stmt>> statement);
-  std::string ErrorMessageFormat(std::string message);
+  std::string ErrorMessageFormatLn(std::string message);
   std::string GetTokenTypeString(Token type);
 };
 

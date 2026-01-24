@@ -4,6 +4,21 @@ using namespace llvm;
 
 Stmt::~Stmt() = default;
 
+ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
+    : name(name), stmts(std::move(stmts)) {}
+
+Value* ModuleStmt::Accept(StmtVisitor& visitor) {
+  return visitor.VisitModuleStmt(*this);
+}
+
+std::string ModuleStmt::ToString() {
+  std::string temp = name.lexeme;
+  for (auto& stmt : stmts) {
+    temp += stmt->ToString();
+  }
+  return temp;
+}
+
 ExpressionStmt::ExpressionStmt(std::unique_ptr<Expr> expr)
     : expr(std::move(expr)) {}
 

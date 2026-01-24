@@ -1,3 +1,5 @@
+mod main;
+
 extern printf() -> int
 
 def get(int a, int b) -> int

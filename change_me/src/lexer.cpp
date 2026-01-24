@@ -15,6 +15,8 @@ static const std::unordered_map<std::string, TokenType> key_words = {
     {"return", TT_RETURN},
     {"void", TT_VOID_SPECIFIER},
     {"extern", TT_EXTERN},
+    {"mod", TT_MOD},
+    {"import", TT_IMPORT},
 };
 
 Lexer::Lexer(std::string source_str)
@@ -176,7 +178,7 @@ void Lexer::AddToken(TokenType tok_type, std::string lexeme,
 
 void Lexer::EmitTokens() {
   for (auto it = tokens.begin(); it != tokens.end(); it++) {
-    printf("%s\n", TokenToString(*it).c_str());
+    std::cout << TokenToString(*it) << "\n";
   }
 }
 
@@ -185,8 +187,7 @@ void Lexer::TokenizeString() {
     Advance();
   }
   if (IsEnd()) {
-    printf("forgot to close string: line %s\n",
-           std::to_string(start_pos).c_str());
+    std::cout << std::to_string(start_pos) << "\n";
     exit(1);
   }
   Advance();

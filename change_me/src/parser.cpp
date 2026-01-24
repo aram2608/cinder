@@ -2,13 +2,19 @@
 
 Parser::Parser(std::vector<Token> tokens) : tokens(tokens), current_tok(0) {}
 
-std::vector<std::unique_ptr<Stmt>> Parser::Parse() {
+std::unique_ptr<Stmt> Parser::Parse() {
+  return ParseModule();
+}
+
+std::unique_ptr<Stmt> Parser::ParseModule() {
+  Consume(TT_MOD, "expected module at start of translation unit");
+  Token name = Consume(TT_IDENTIFER, "expected identifier after module");
+  Consume(TT_SEMICOLON, "';' expected after statement");
   std::vector<std::unique_ptr<Stmt>> statements;
-  while (!IsEnd()) {
+  while(!IsEnd()) {
     statements.push_back(ExternFunction());
   }
-  // EmitAST(std::move(statements));
-  return statements;
+  return std::make_unique<ModuleStmt>(name, std::move(statements));
 }
 
 std::unique_ptr<Stmt> Parser::FunctionPrototype() {
@@ -19,7 +25,7 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
   if (!CheckType(TT_RPAREN)) {
     do {
       if (args.size() >= 255) {
-        printf("error: exceeded maximum number of arguments: 255\n");
+        std::cout << "error: exceeded maximum number of arguments: 255\n";
         exit(1);
       }
       Token type = Advance();
@@ -29,7 +35,7 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
       } else if (type.token_type == TT_FLT_SPECIFIER) {
         args.emplace_back(VT_FLT, identifier);
       } else {
-        printf("type not allowed\n");
+        std::cout << "type not allowed\n";
         exit(1);
       }
     } while (MatchType({TT_COMMA}));
@@ -90,7 +96,7 @@ std::unique_ptr<Stmt> Parser::VarDeclaration() {
   if (MatchType({TT_EQ})) {
     initializer = Expression();
   } else {
-    printf("variables must be instantiated\n");
+    std::cout << "variables must be instantiated\n";
     exit(1);
   }
   Consume(TT_SEMICOLON, "expected ';' after variable declaration");
@@ -138,7 +144,7 @@ std::unique_ptr<Expr> Parser::Call() {
     if (!CheckType(TT_RPAREN)) {
       do {
         if (args.size() >= MAX_ARGS) {
-          printf("max arguments reached\n");
+          std::cout << "max arguments reached\n";
           exit(1);
         }
         args.push_back(Expression());
@@ -171,11 +177,10 @@ std::unique_ptr<Expr> Parser::Atom() {
 
   if (MatchType({TT_LPAREN})) {
     std::unique_ptr<Expr> expr = Expression();
-    Consume(TT_RPAREN, ErrorMessageFormat("Expected ')' after grouping"));
+    Consume(TT_RPAREN, ErrorMessageFormatLn("Expected ')' after grouping"));
     return std::make_unique<Grouping>(std::move(expr));
   }
-  printf("%s\n",
-         ErrorMessageFormat("Expected expression: " + Peek().lexeme).c_str());
+  std::cout << ErrorMessageFormatLn("Expected expression: " + Peek().lexeme);
   exit(1);
 }
 
@@ -219,17 +224,17 @@ Token Parser::Consume(TokenType type, std::string message) {
   if (Peek().token_type == type) {
     return Advance();
   }
-  printf("%s\n", ErrorMessageFormat(message).c_str());
+  std::cout << ErrorMessageFormatLn(message);
   exit(1);
 }
 
 void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {
   for (std::unique_ptr<Stmt>& stmt : statements) {
-    printf("%s\n", stmt->ToString().c_str());
+    std::cout << stmt->ToString() << "\n";
   }
 }
 
-std::string Parser::ErrorMessageFormat(std::string message) {
+std::string Parser::ErrorMessageFormatLn(std::string message) {
   return message + "\nLine: " + std::to_string(Peek().line_num) + "\n";
 }
 
