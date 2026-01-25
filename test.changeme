@@ -1,12 +1,12 @@
 mod main;
 
-extern printf() -> int
-
 def get(int a, int b) -> int
     return a + b;
 end
 
 def main() -> int
-    int: b = get();
+    int: b = get(1, 4);
+    b = 4;
+    b = get(1, 6);
     return 0;
 end

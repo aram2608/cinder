@@ -1,9 +1,10 @@
 #include "../include/expr.hpp"
+using namespace llvm;
 
 Literal::Literal(ValueType value_type, TokenValue value)
     : value_type(value_type), value(value) {}
 
-llvm::Value* Literal::Accept(ExprVisitor& visitor) {
+Value* Literal::Accept(ExprVisitor& visitor) {
   return visitor.VisitLiteral(*this);
 }
 
@@ -24,7 +25,7 @@ std::string Literal::ToString() {
 
 Boolean::Boolean(bool boolean) : boolean(boolean) {}
 
-llvm::Value* Boolean::Accept(ExprVisitor& visitor) {
+Value* Boolean::Accept(ExprVisitor& visitor) {
   return visitor.VisitBoolean(*this);
 }
 
@@ -35,7 +36,7 @@ std::string Boolean::ToString() {
 
 Variable::Variable(Token name) : name(name) {}
 
-llvm::Value* Variable::Accept(ExprVisitor& visitor) {
+Value* Variable::Accept(ExprVisitor& visitor) {
   return visitor.VisitVariable(*this);
 }
 
@@ -45,7 +46,7 @@ std::string Variable::ToString() {
 
 Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
 
-llvm::Value* Grouping::Accept(ExprVisitor& visitor) {
+Value* Grouping::Accept(ExprVisitor& visitor) {
   return visitor.VisitGrouping(*this);
 }
 
@@ -57,7 +58,7 @@ Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
                Token op)
     : left(std::move(left)), right(std::move(right)), op(op) {}
 
-llvm::Value* Binary::Accept(ExprVisitor& visitor) {
+Value* Binary::Accept(ExprVisitor& visitor) {
   return visitor.VisitBinary(*this);
 }
 
@@ -85,11 +86,23 @@ std::string Binary::ToString() {
   return temp;
 }
 
+Assign::Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value)
+    : name(std::move(name)), value(std::move(value)) {}
+
+Value* Assign::Accept(ExprVisitor& visitor) {
+  return visitor.VisitAssignment(*this);
+}
+
+std::string Assign::ToString() {
+  std::string temp = "Assignment: " + name->ToString() + " ";
+  return temp + value->ToString();
+}
+
 CallExpr::CallExpr(std::unique_ptr<Expr> callee,
                    std::vector<std::unique_ptr<Expr>> args)
     : callee(std::move(callee)), args(std::move(args)) {}
 
-llvm::Value* CallExpr::Accept(ExprVisitor& visitor) {
+Value* CallExpr::Accept(ExprVisitor& visitor) {
   return visitor.VisitCall(*this);
 }
 

@@ -1,11 +1,11 @@
 #include "../include/compiler.hpp"
-#include "compiler.hpp"
 
 using namespace llvm;
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
 static std::unordered_map<std::string, Value*> NamedValues;
+
 #define UNREACHABLE               \
   do {                            \
     std::cout << "UNREACHABLE\n"; \
@@ -29,7 +29,7 @@ Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
   }
 
   std::error_code EC;
-  StringRef name = TheModule->getModuleIdentifier() + ".ll";
+  StringRef name{TheModule->getModuleIdentifier() + ".ll"};
   raw_fd_ostream OS(name, EC, sys::fs::OF_None);
   TheModule->print(OS, nullptr);
   return nullptr;
@@ -57,8 +57,8 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
 
 Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   std::string func_name = stmt.name.lexeme;
-  auto it = std::find(func_table.begin(), func_table.end(), func_name);
-  if (it != func_table.end()) {
+  auto func = func_table.find(func_name);
+  if (func != func_table.end()) {
     std::cout << "functions can not be redefined\n";
     exit(1);
   }
@@ -99,7 +99,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
     argument_table[stmt.args[Idx++].identifier.lexeme] = &arg;
   }
 
-  func_table.push_back(func_name);
+  func_table[func_name] = stmt.args.size();
   return Func;
 }
 
@@ -126,7 +126,7 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
       type = Type::getFloatTy(*TheContext);
       break;
     case TT_STR_SPECIFIER:
-      printf("NOT SUPPORTED YET, compiler.cpp line 86\n");
+      std::cout << "IMPLEMENT STRING TYPES\n";
       exit(1);
       break;
     default:
@@ -153,8 +153,7 @@ Value* Compiler::VisitLiteral(Literal& expr) {
       return nullptr;  // This is a horrible hack for void return types
                        // I need to think of a better solution
     default:
-      printf("UNREACHABLE");
-      exit(1);
+      UNREACHABLE;
   }
 }
 
@@ -167,8 +166,8 @@ Value* Compiler::VisitBoolean(Boolean& expr) {
 
 Value* Compiler::VisitVariable(Variable& expr) {
   std::string lex = expr.name.lexeme;
-  auto it = std::find(func_table.begin(), func_table.end(), lex);
-  if (it != func_table.end()) {
+  auto func = func_table.find(lex);
+  if (func != func_table.end()) {
     return TheModule->getFunction(lex);
   }
 
@@ -179,7 +178,7 @@ Value* Compiler::VisitVariable(Variable& expr) {
 
   auto temp = symbol_table.find(lex);
   if (temp == symbol_table.end()) {
-    printf("Variables is undefined %s\n", lex.c_str());
+    std::cout << "Variables is undefined " << lex;
     exit(1);
   }
 
@@ -211,8 +210,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
       case TT_SLASH:
         return Builder->CreateSDiv(left, right, "divtmp");
       default:
-        printf("UNREACHABLE\n");
-        exit(1);
+        UNREACHABLE;
     }
   } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
     switch (expr.op.token_type) {
@@ -225,13 +223,12 @@ Value* Compiler::VisitBinary(Binary& expr) {
       case TT_SLASH:
         return Builder->CreateFDiv(left, right, "divtmp");
       default:
-        printf("UNREACHABLE\n");
-        exit(1);
+        UNREACHABLE;
     }
   } else {
     l_type->print(errs(), true);
     r_type->print(errs(), true);
-    printf("incompatible types\n");
+    std::cout << "incompatible types\n";
     exit(1);
   }
   return nullptr;
@@ -240,7 +237,14 @@ Value* Compiler::VisitBinary(Binary& expr) {
 Value* Compiler::VisitCall(CallExpr& expr) {
   Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
   if (!callee) {
-    printf("callee is not a function\n");
+    std::cout << "callee is not a function\n";
+    exit(1);
+  }
+
+  std::string name = callee->getName().str();
+  auto func = func_table.find(name);
+  if(func->second != expr.args.size()) {
+    std::cout << "callee arguments do not match function signature\n";
     exit(1);
   }
 
@@ -255,4 +259,12 @@ Value* Compiler::VisitCall(CallExpr& expr) {
   }
 
   return Builder->CreateCall(callee, call_args, callee->getName());
+}
+
+Value* Compiler::VisitAssignment(Assign& expr) {
+  Value* value = expr.value->Accept(*this);
+  LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
+  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+  Builder->CreateStore(value, var_ptr);
+  return nullptr;
 }

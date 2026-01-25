@@ -21,6 +21,7 @@ struct Variable;
 struct Grouping;
 struct Binary;
 struct CallExpr;
+struct Assign;
 
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
@@ -30,6 +31,7 @@ struct ExprVisitor {
   virtual llvm::Value* VisitGrouping(Grouping& expr) = 0;
   virtual llvm::Value* VisitBinary(Binary& expr) = 0;
   virtual llvm::Value* VisitCall(CallExpr& expr) = 0;
+  virtual llvm::Value* VisitAssignment(Assign& expr) = 0;
 };
 
 /// @struct Expr
@@ -100,6 +102,15 @@ struct Binary : Expr {
   Token op;
 
   Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, Token op);
+  llvm::Value* Accept(ExprVisitor& visitor) override;
+  std::string ToString() override;
+};
+
+struct Assign : Expr {
+  std::unique_ptr<Expr> name;
+  std::unique_ptr<Expr> value;
+
+  Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value);
   llvm::Value* Accept(ExprVisitor& visitor) override;
   std::string ToString() override;
 };

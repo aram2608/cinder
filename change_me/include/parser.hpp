@@ -22,6 +22,7 @@ struct Parser {
   std::unique_ptr<Stmt> VarDeclaration();
   std::unique_ptr<Stmt> ExpressionStatement();
   std::unique_ptr<Expr> Expression();
+  std::unique_ptr<Expr> Assignment();
   std::unique_ptr<Expr> Term();
   std::unique_ptr<Expr> Factor();
   std::unique_ptr<Expr> Call();

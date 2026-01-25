@@ -11,7 +11,7 @@ std::unique_ptr<Stmt> Parser::ParseModule() {
   Token name = Consume(TT_IDENTIFER, "expected identifier after module");
   Consume(TT_SEMICOLON, "';' expected after statement");
   std::vector<std::unique_ptr<Stmt>> statements;
-  while(!IsEnd()) {
+  while (!IsEnd()) {
     statements.push_back(ExternFunction());
   }
   return std::make_unique<ModuleStmt>(name, std::move(statements));
@@ -111,7 +111,17 @@ std::unique_ptr<Stmt> Parser::ExpressionStatement() {
 }
 
 std::unique_ptr<Expr> Parser::Expression() {
-  return Term();
+  return Assignment();
+}
+
+std::unique_ptr<Expr> Parser::Assignment() {
+  std::unique_ptr<Expr> expr = Term();
+  if (MatchType({TT_EQ})) {
+    Token eq = Previous();
+    std::unique_ptr<Expr> value = Assignment();
+    return std::make_unique<Assign>(std::move(expr), std::move(value));
+  }
+  return expr;
 }
 
 std::unique_ptr<Expr> Parser::Term() {

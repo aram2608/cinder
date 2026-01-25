@@ -20,12 +20,13 @@
 #include "llvm/TargetParser/Host.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Linker/Linker.h"
 
 struct Compiler : ExprVisitor, StmtVisitor {
   std::unique_ptr<Stmt> mod;
   std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
   std::unordered_map<std::string, llvm::Argument*> argument_table;
-  std::vector<std::string> func_table;
+  std::unordered_map<std::string, size_t> func_table;
 
   Compiler(std::unique_ptr<Stmt> mod);
 
@@ -44,6 +45,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* VisitGrouping(Grouping& expr) override;
   llvm::Value* VisitBinary(Binary& expr) override;
   llvm::Value* VisitCall(CallExpr& expr) override;
+  llvm::Value* VisitAssignment(Assign& expr) override;
 };
 
 #endif
