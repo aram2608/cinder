@@ -29,11 +29,6 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (std::strcmp(argv[1], "--help")) {
-    Help();
-    return 0;
-  }
-
   std::string source = ReadEntireFile(argv[1]);
   Lexer lexer{source};
   lexer.ScanTokens();
