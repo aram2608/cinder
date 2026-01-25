@@ -19,9 +19,11 @@ struct Literal;
 struct Boolean;
 struct Variable;
 struct Grouping;
+struct PreInc;
 struct Binary;
 struct CallExpr;
 struct Assign;
+struct Conditional;
 
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
@@ -29,9 +31,11 @@ struct ExprVisitor {
   virtual llvm::Value* VisitBoolean(Boolean& expr) = 0;
   virtual llvm::Value* VisitVariable(Variable& expr) = 0;
   virtual llvm::Value* VisitGrouping(Grouping& expr) = 0;
+  virtual llvm::Value* VisitPreIncrement(PreInc& expr) = 0;
   virtual llvm::Value* VisitBinary(Binary& expr) = 0;
   virtual llvm::Value* VisitCall(CallExpr& expr) = 0;
   virtual llvm::Value* VisitAssignment(Assign& expr) = 0;
+  virtual llvm::Value* VisitConditional(Conditional& expr) = 0;
 };
 
 /// @struct Expr
@@ -43,9 +47,11 @@ struct Expr {
   /**
    * @brief Method used to emply the visitor pattern
    * All derived classes must implement this method
+   * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
   virtual llvm::Value* Accept(ExprVisitor& visitor) = 0;
+
   /**
    * @brief Method to return the string representation of the node
    * @return The string represention
@@ -56,72 +62,201 @@ struct Expr {
 /// @struct Literal
 /// @brief Numeric Node, stores floats and ints as of now
 struct Literal : Expr {
-  ValueType value_type;
-  TokenValue value;
+  ValueType value_type; /**< Value type for the literal */
+  TokenValue value;     /**< Appropriate value for the given value type */
 
   Literal(ValueType value_type, TokenValue value);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 /// @struct Boolean
 /// @brief Boolean node
 struct Boolean : Expr {
-  bool boolean;
+  bool boolean; /** The boolean value */
 
   Boolean(bool boolean);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 /// @struct Variable
 /// @brief Variable node
 struct Variable : Expr {
-  Token name;
+  Token name; /** Name of the variable */
 
   Variable(Token name);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 /// @struct Grouping
 /// @brief Grouping node
 struct Grouping : Expr {
-  std::unique_ptr<Expr> expr;
+  std::unique_ptr<Expr> expr; /** Expression inside of the paren, '( expr )' */
 
   Grouping(std::unique_ptr<Expr> expr);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
+  std::string ToString() override;
+};
+
+struct PreInc : Expr {
+  Token op; /**< The operator token */
+  std::unique_ptr<Expr>
+      var; /**< The parsed variable, should resolve to Variable */
+
+  PreInc(Token op, std::unique_ptr<Expr> var);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
+  llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 /// @struct Binary
 /// @brief Binary operation node
 struct Binary : Expr {
-  std::unique_ptr<Expr> left;
-  std::unique_ptr<Expr> right;
-  Token op;
+  std::unique_ptr<Expr> left;  /**< The lhs expression */
+  std::unique_ptr<Expr> right; /**< The rhs expression */
+  Token op;                    /** The binary operator */
 
   Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, Token op);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
+  std::string ToString() override;
+};
+
+struct Conditional : Expr {
+  std::unique_ptr<Expr> left;  /**< The lhs expression */
+  std::unique_ptr<Expr> right; /**< The rhs expression */
+  Token op;                    /**< The bianry operator */
+
+  Conditional(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
+              Token op);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
+  llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 struct Assign : Expr {
-  std::unique_ptr<Expr> name;
-  std::unique_ptr<Expr> value;
+  std::unique_ptr<Expr> name;  /**< Variable name, should resolve to Variable */
+  std::unique_ptr<Expr> value; /**< The variables new value */
 
   Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 
 struct CallExpr : Expr {
-  std::unique_ptr<Expr> callee;
-  std::vector<std::unique_ptr<Expr>> args;
+  std::unique_ptr<Expr> callee; /**< The name of the callee as an expr */
+  std::vector<std::unique_ptr<Expr>> args; /**< List of arguments in the call */
 
   CallExpr(std::unique_ptr<Expr> callee,
            std::vector<std::unique_ptr<Expr>> args);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
   llvm::Value* Accept(ExprVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
   std::string ToString() override;
 };
 

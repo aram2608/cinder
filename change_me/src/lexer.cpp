@@ -4,6 +4,7 @@ static const std::unordered_map<std::string, TokenType> key_words = {
     {"int", TT_INT_SPECIFIER},
     {"flt", TT_FLT_SPECIFIER},
     {"str", TT_STR_SPECIFIER},
+    {"bool", TT_BOOL_SPECIFIER},
     {"def", TT_DEF},
     {"end", TT_END},
     {"if", TT_IF},
@@ -72,12 +73,24 @@ void Lexer::Scan() {
       break;
     // BINOPS
     case '+':
-      AddToken(TT_PLUS);
+      AddToken(Match('+') ? TT_PLUS_PLUS : TT_PLUS);
       break;
     case '-':
-      AddToken(Match('>') ? TT_ARROW : TT_MINUS);
+      if (Match('>')) {
+        AddToken(TT_ARROW);
+      } else if (Match('-')) {
+        AddToken(TT_MINUS_MINUS);
+      } else {
+        AddToken(TT_MINUS);
+      }
       break;
     case '/':
+      if (Match('/')) {
+        while (PeekChar() != '\n') {
+          Advance();
+        }
+        break;
+      }
       AddToken(TT_SLASH);
       break;
     case '%':

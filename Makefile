@@ -10,6 +10,8 @@ BUILD_DIR := ./build
 TARGET := main
 
 # Flags
+# optimization levels
+# -01, -02, -03
 WFLAGS := -g -Wall -Wextra -pedantic -Wno-unused-parameter
 INCLUDE_FLAGS := -I$(INCLUDE_DIR)
 LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ \

@@ -39,13 +39,15 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* VisitReturnStmt(ReturnStmt& stmt) override;
   llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) override;
 
-  llvm::Value* VisitLiteral(Literal& expr) override;
-  llvm::Value* VisitBoolean(Boolean& expr) override;
-  llvm::Value* VisitVariable(Variable& expr) override;
-  llvm::Value* VisitGrouping(Grouping& expr) override;
-  llvm::Value* VisitBinary(Binary& expr) override;
-  llvm::Value* VisitCall(CallExpr& expr) override;
   llvm::Value* VisitAssignment(Assign& expr) override;
+  llvm::Value* VisitConditional(Conditional& expr) override;
+  llvm::Value* VisitBinary(Binary& expr) override;
+  llvm::Value* VisitPreIncrement(PreInc& expr) override;
+  llvm::Value* VisitCall(CallExpr& expr) override;
+  llvm::Value* VisitGrouping(Grouping& expr) override;
+  llvm::Value* VisitVariable(Variable& expr) override;
+  llvm::Value* VisitBoolean(Boolean& expr) override;
+  llvm::Value* VisitLiteral(Literal& expr) override;
 };
 
 #endif

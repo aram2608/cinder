@@ -8,7 +8,7 @@ std::string ReadEntireFile(char* file_path) {
   std::fstream file{file_path};
 
   if (!file.is_open()) {
-    printf("error opening file\n");
+    std::cout << "error opening file < " << file_path << " >\n";
     exit(1);
   }
 
@@ -26,7 +26,12 @@ void Help() {
 int main(int argc, char** argv) {
   if (argc < 2) {
     Help();
-    exit(1);
+    return 1;
+  }
+
+  if (std::strcmp(argv[1], "--help")) {
+    Help();
+    return 0;
   }
 
   std::string source = ReadEntireFile(argv[1]);

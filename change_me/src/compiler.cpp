@@ -6,10 +6,10 @@ static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
 static std::unordered_map<std::string, Value*> NamedValues;
 
-#define UNREACHABLE               \
-  do {                            \
-    std::cout << "UNREACHABLE\n"; \
-    exit(1);                      \
+#define UNREACHABLE(x, y)                                   \
+  do {                                                      \
+    std::cout << "UNREACHABLE " << #x << " " << #y << "\n"; \
+    exit(1);                                                \
   } while (0)
 
 Compiler::Compiler(std::unique_ptr<Stmt> mod)
@@ -71,7 +71,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   } else if (stmt.return_type.token_type == TT_VOID_SPECIFIER) {
     return_type = Type::getVoidTy(*TheContext);
   } else {
-    UNREACHABLE;
+    UNREACHABLE(FunctionProto, RETURN);
   }
 
   std::vector<Type*> arg_types;
@@ -84,7 +84,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
       std::cout << "Implement me compiler.cpp line 47\n";
       exit(1);
     } else {
-      UNREACHABLE;
+      UNREACHABLE(FunctionProto, ARGTYPES);
     }
   }
 
@@ -125,12 +125,15 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
     case TT_FLT_SPECIFIER:
       type = Type::getFloatTy(*TheContext);
       break;
+    case TT_BOOL_SPECIFIER:
+      type = Type::getInt1Ty(*TheContext);
+      break;
     case TT_STR_SPECIFIER:
       std::cout << "IMPLEMENT STRING TYPES\n";
       exit(1);
       break;
     default:
-      UNREACHABLE;
+      UNREACHABLE(VarDeclarationStmt, TYPE);
   }
   Value* value = stmt.value->Accept(*this);
   AllocaInst* value_ptr = Builder->CreateAlloca(type, nullptr, name);
@@ -139,29 +142,174 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitLiteral(Literal& expr) {
-  switch (expr.value_type) {
-    case VT_INT:
-      return ConstantInt::get(*TheContext,
-                              APInt(32, std::get<int>(expr.value)));
-    case VT_FLT:
-      return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
-    case VT_STR:
-      return ConstantDataArray::getString(*TheContext,
-                                          std::get<std::string>(expr.value));
-    case VT_VOID:
-      return nullptr;  // This is a horrible hack for void return types
-                       // I need to think of a better solution
-    default:
-      UNREACHABLE;
+Value* Compiler::VisitConditional(Conditional& expr) {
+  Value* left = expr.left->Accept(*this);
+  Value* right = expr.right->Accept(*this);
+
+  Type* l_type = left->getType();
+  Type* r_type = right->getType();
+
+  if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
+    switch (expr.op.token_type) {
+      case TT_BANGEQ:
+        return Builder->CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+      case TT_EQEQ:
+        return Builder->CreateCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+      case TT_LESSER:
+        return Builder->CreateCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+      case TT_LESSER_EQ:
+        return Builder->CreateCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+      case TT_GREATER:
+        return Builder->CreateCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+      case TT_GREATER_EQ:
+        return Builder->CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+      default:
+        UNREACHABLE(Conditional, IntegerType);
+    }
+  } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
+    switch (expr.op.token_type) {
+      case TT_BANGEQ:
+        return Builder->CreateFCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+      case TT_EQEQ:
+        return Builder->CreateFCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+      case TT_LESSER:
+        return Builder->CreateFCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+      case TT_LESSER_EQ:
+        return Builder->CreateFCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+      case TT_GREATER:
+        return Builder->CreateFCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+      case TT_GREATER_EQ:
+        return Builder->CreateFCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+      default:
+        UNREACHABLE(Conditional, FloatType);
+    }
+  } else {
+    l_type->print(errs(), true);
+    r_type->print(errs(), true);
+    std::cout << "incompatible types\n";
+    exit(1);
   }
+  return nullptr;
 }
 
-Value* Compiler::VisitBoolean(Boolean& expr) {
-  if (expr.boolean) {
-    return ConstantInt::getTrue(*TheContext);
+Value* Compiler::VisitBinary(Binary& expr) {
+  Value* left = expr.left->Accept(*this);
+  Value* right = expr.right->Accept(*this);
+
+  Type* l_type = left->getType();
+  Type* r_type = right->getType();
+
+  if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
+    switch (expr.op.token_type) {
+      case TT_PLUS:
+        return Builder->CreateAdd(left, right, "addtmp");
+      case TT_MINUS:
+        return Builder->CreateSub(left, right, "subtmp");
+      case TT_STAR:
+        return Builder->CreateMul(left, right, "multmp");
+      case TT_SLASH:
+        return Builder->CreateSDiv(left, right, "divtmp");
+      default:
+        UNREACHABLE(Binary, IntegerType);
+    }
+  } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
+    switch (expr.op.token_type) {
+      case TT_PLUS:
+        return Builder->CreateFAdd(left, right, "addtmp");
+      case TT_MINUS:
+        return Builder->CreateFSub(left, right, "subtmp");
+      case TT_STAR:
+        return Builder->CreateFMul(left, right, "multmp");
+      case TT_SLASH:
+        return Builder->CreateFDiv(left, right, "divtmp");
+      default:
+        UNREACHABLE(Binary, FloatType);
+    }
+  } else {
+    l_type->print(errs(), true);
+    r_type->print(errs(), true);
+    std::cout << "incompatible types\n";
+    exit(1);
   }
-  return ConstantInt::getFalse(*TheContext);
+  return nullptr;
+}
+
+Value* Compiler::VisitPreIncrement(PreInc& expr) {
+  LoadInst* var = dyn_cast<LoadInst>(expr.var->Accept(*this));
+  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+
+  Type* type = var_ptr->getAllocatedType();
+
+  Value* inc;
+  Value* value;
+
+  switch (expr.op.token_type) {
+    case TT_PLUS_PLUS:
+      if (type->isIntegerTy()) {
+        inc = ConstantInt::get(*TheContext, APInt(32, 1));
+        value = Builder->CreateAdd(var, inc, "addtmp");
+      } else if (type->isFloatTy()) {
+        inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+        value = Builder->CreateFAdd(var, inc, "addtmp");
+      } else {
+        UNREACHABLE(PreInc, UNKNOWN_VALUE_TYPE);
+      }
+      break;
+    case TT_MINUS_MINUS:
+      if (type->isIntegerTy()) {
+        inc = ConstantInt::get(*TheContext, APInt(32, 1));
+        value = Builder->CreateSub(var, inc, "subtmp");
+      } else if (type->isFloatTy()) {
+        inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+        value = Builder->CreateFSub(var, inc, "subtmp");
+      } else {
+        UNREACHABLE(PreInc, UNKNOWN_VALUE_TYPE);
+      }
+      break;
+    default:
+      UNREACHABLE(PreInc, UNKNOWN_TOKEN_TYPE);
+  }
+  Builder->CreateStore(value, var_ptr);
+  return nullptr;
+}
+
+Value* Compiler::VisitAssignment(Assign& expr) {
+  Value* value = expr.value->Accept(*this);
+  LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
+  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+  Builder->CreateStore(value, var_ptr);
+  return nullptr;
+}
+
+Value* Compiler::VisitCall(CallExpr& expr) {
+  Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
+  if (!callee) {
+    std::cout << "callee is not a function\n";
+    exit(1);
+  }
+
+  std::string name = callee->getName().str();
+  auto func = func_table.find(name);
+  if (func->second != expr.args.size()) {
+    std::cout << "callee arguments do not match function signature\n";
+    exit(1);
+  }
+
+  std::vector<Value*> call_args;
+  for (auto& arg : expr.args) {
+    call_args.push_back(arg->Accept(*this));
+  }
+
+  Type* ret_type = callee->getReturnType();
+  if (ret_type->isVoidTy()) {
+    return Builder->CreateCall(callee, call_args);
+  }
+
+  return Builder->CreateCall(callee, call_args, callee->getName());
+}
+
+Value* Compiler::VisitGrouping(Grouping& expr) {
+  return expr.expr->Accept(*this);
 }
 
 Value* Compiler::VisitVariable(Variable& expr) {
@@ -188,83 +336,27 @@ Value* Compiler::VisitVariable(Variable& expr) {
   return value;
 }
 
-Value* Compiler::VisitGrouping(Grouping& expr) {
-  return expr.expr->Accept(*this);
+Value* Compiler::VisitBoolean(Boolean& expr) {
+  if (expr.boolean) {
+    return ConstantInt::getTrue(*TheContext);
+  }
+  return ConstantInt::getFalse(*TheContext);
 }
 
-Value* Compiler::VisitBinary(Binary& expr) {
-  Value* left = expr.left->Accept(*this);
-  Value* right = expr.right->Accept(*this);
-
-  Type* l_type = left->getType();
-  Type* r_type = right->getType();
-
-  if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
-    switch (expr.op.token_type) {
-      case TT_PLUS:
-        return Builder->CreateAdd(left, right, "addtmp");
-      case TT_MINUS:
-        return Builder->CreateSub(left, right, "subtmp");
-      case TT_STAR:
-        return Builder->CreateMul(left, right, "multmp");
-      case TT_SLASH:
-        return Builder->CreateSDiv(left, right, "divtmp");
-      default:
-        UNREACHABLE;
-    }
-  } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
-    switch (expr.op.token_type) {
-      case TT_PLUS:
-        return Builder->CreateFAdd(left, right, "addtmp");
-      case TT_MINUS:
-        return Builder->CreateFSub(left, right, "subtmp");
-      case TT_STAR:
-        return Builder->CreateFMul(left, right, "multmp");
-      case TT_SLASH:
-        return Builder->CreateFDiv(left, right, "divtmp");
-      default:
-        UNREACHABLE;
-    }
-  } else {
-    l_type->print(errs(), true);
-    r_type->print(errs(), true);
-    std::cout << "incompatible types\n";
-    exit(1);
+Value* Compiler::VisitLiteral(Literal& expr) {
+  switch (expr.value_type) {
+    case VT_INT:
+      return ConstantInt::get(*TheContext,
+                              APInt(32, std::get<int>(expr.value)));
+    case VT_FLT:
+      return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
+    case VT_STR:
+      return ConstantDataArray::getString(*TheContext,
+                                          std::get<std::string>(expr.value));
+    case VT_VOID:
+      return nullptr;  // This is a horrible hack for void return types
+                       // I need to think of a better solution
+    default:
+      UNREACHABLE(Literal, ValueType);
   }
-  return nullptr;
-}
-
-Value* Compiler::VisitCall(CallExpr& expr) {
-  Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
-  if (!callee) {
-    std::cout << "callee is not a function\n";
-    exit(1);
-  }
-
-  std::string name = callee->getName().str();
-  auto func = func_table.find(name);
-  if(func->second != expr.args.size()) {
-    std::cout << "callee arguments do not match function signature\n";
-    exit(1);
-  }
-
-  std::vector<Value*> call_args;
-  for (auto& arg : expr.args) {
-    call_args.push_back(arg->Accept(*this));
-  }
-
-  Type* ret_type = callee->getReturnType();
-  if (ret_type->isVoidTy()) {
-    return Builder->CreateCall(callee, call_args);
-  }
-
-  return Builder->CreateCall(callee, call_args, callee->getName());
-}
-
-Value* Compiler::VisitAssignment(Assign& expr) {
-  Value* value = expr.value->Accept(*this);
-  LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
-  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
-  Builder->CreateStore(value, var_ptr);
-  return nullptr;
 }

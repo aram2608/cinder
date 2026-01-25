@@ -54,6 +54,19 @@ std::string Grouping::ToString() {
   return "(" + expr->ToString() + ")";
 }
 
+PreInc::PreInc(Token op, std::unique_ptr<Expr> var)
+    : op(op), var(std::move(var)) {}
+
+Value* PreInc::Accept(ExprVisitor& visitor) {
+  return visitor.VisitPreIncrement(*this);
+}
+
+std::string PreInc::ToString() {
+  std::string temp = "PreIncrement " + op.lexeme;
+  temp += var->ToString();
+  return temp;
+}
+
 Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
                Token op)
     : left(std::move(left)), right(std::move(right)), op(op) {}
@@ -80,10 +93,7 @@ std::string Binary::ToString() {
     default:
       temp_op = "UNREACHABLE";
   }
-  std::string temp{};
-  temp +=
-      "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
-  return temp;
+  return "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
 }
 
 Assign::Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value)
@@ -96,6 +106,35 @@ Value* Assign::Accept(ExprVisitor& visitor) {
 std::string Assign::ToString() {
   std::string temp = "Assignment: " + name->ToString() + " ";
   return temp + value->ToString();
+}
+
+Conditional::Conditional(std::unique_ptr<Expr> left,
+                         std::unique_ptr<Expr> right, Token op)
+    : left(std::move(left)), right(std::move(right)), op(op) {}
+
+Value* Conditional::Accept(ExprVisitor& visitor) {
+  return visitor.VisitConditional(*this);
+}
+
+std::string Conditional::ToString() {
+  std::string temp_op{};
+  switch (op.token_type) {
+    case TT_LESSER:
+      temp_op = "<";
+      break;
+    case TT_LESSER_EQ:
+      temp_op = "<=";
+      break;
+    case TT_GREATER:
+      temp_op = ">";
+      break;
+    case TT_GREATER_EQ:
+      temp_op = ">=";
+      break;
+    default:
+      temp_op = "UNREACHABLE";
+  }
+  return "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
 }
 
 CallExpr::CallExpr(std::unique_ptr<Expr> callee,

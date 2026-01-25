@@ -67,7 +67,7 @@ std::unique_ptr<Stmt> Parser::Function() {
 }
 
 std::unique_ptr<Stmt> Parser::Statement() {
-  if (MatchType({TT_INT_SPECIFIER, TT_FLT_SPECIFIER})) {
+  if (MatchType({TT_INT_SPECIFIER, TT_FLT_SPECIFIER, TT_BOOL_SPECIFIER})) {
     return VarDeclaration();
   }
   if (MatchType({TT_RETURN})) {
@@ -115,11 +115,21 @@ std::unique_ptr<Expr> Parser::Expression() {
 }
 
 std::unique_ptr<Expr> Parser::Assignment() {
-  std::unique_ptr<Expr> expr = Term();
+  std::unique_ptr<Expr> expr = Comparison();
   if (MatchType({TT_EQ})) {
     Token eq = Previous();
     std::unique_ptr<Expr> value = Assignment();
     return std::make_unique<Assign>(std::move(expr), std::move(value));
+  }
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::Comparison() {
+  std::unique_ptr<Expr> expr = Term();
+  while (MatchType({TT_LESSER, TT_LESSER_EQ, TT_GREATER, TT_GREATER_EQ})) {
+    Token op = Previous();
+    std::unique_ptr<Expr> right = Term();
+    expr = std::make_unique<Conditional>(std::move(expr), std::move(right), op);
   }
   return expr;
 }
@@ -135,13 +145,22 @@ std::unique_ptr<Expr> Parser::Term() {
 }
 
 std::unique_ptr<Expr> Parser::Factor() {
-  std::unique_ptr<Expr> expr = Call();
+  std::unique_ptr<Expr> expr = PreIncrement();
   while (MatchType({TT_STAR, TT_SLASH})) {
     Token op = Previous();
-    std::unique_ptr<Expr> right = Call();
+    std::unique_ptr<Expr> right = PreIncrement();
     expr = std::make_unique<Binary>(std::move(expr), std::move(right), op);
   }
   return expr;
+}
+
+std::unique_ptr<Expr> Parser::PreIncrement() {
+  if (MatchType({TT_PLUS_PLUS, TT_MINUS_MINUS})) {
+    Token op = Previous();
+    std::unique_ptr<Expr> var = Call();
+    return std::make_unique<PreInc>(op, std::move(var));
+  }
+  return Call();
 }
 
 std::unique_ptr<Expr> Parser::Call() {
@@ -256,6 +275,8 @@ std::string Parser::GetTokenTypeString(Token tok) {
       return "int";
     case VT_STR:
       return "str";
+    case VT_VOID:
+      return "void";
     default:
       return tok.lexeme;
   }

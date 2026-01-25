@@ -6,7 +6,9 @@ end
 
 def main() -> int
     int: b = get(1, 4);
+    bool: flag = 1 > 4;
     b = 4;
+    --b;
     b = get(1, 6);
     return 0;
 end

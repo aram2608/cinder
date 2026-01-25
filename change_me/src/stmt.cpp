@@ -2,8 +2,6 @@
 
 using namespace llvm;
 
-Stmt::~Stmt() = default;
-
 ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
     : name(name), stmts(std::move(stmts)) {}
 

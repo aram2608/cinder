@@ -5,8 +5,10 @@
 
 enum TokenType {
   // Binops
-  TT_PLUS,   /** "+" */
-  TT_MINUS,  /** "-" */
+  TT_PLUS, /** "+" */
+  TT_PLUS_PLUS,
+  TT_MINUS, /** "-" */
+  TT_MINUS_MINUS,
   TT_MODULO, /** "%" */
   TT_STAR,   /** "*" */
   TT_SLASH,  /** "/" */
@@ -41,10 +43,14 @@ enum TokenType {
   TT_RBRACKET, /** "]" */
   TT_QUOTE,
   TT_COMMA, /**< "," */
-  // Key words and idnetifiers
+
+  // Key words and identifiers
   TT_IDENTIFER, /** Any series of characters */
   TT_DEF,       /** "def" keyword */
   TT_END,       /** "end" keyword */
+
+  // Types
+  TT_BOOL_SPECIFIER,
   TT_INT_SPECIFIER,
   TT_FLT_SPECIFIER,
   TT_STR_SPECIFIER,
