@@ -1,10 +1,22 @@
 #include "../include/compiler.hpp"
+#include "../include/JIT.hpp"
 
 using namespace llvm;
+using namespace llvm::orc;
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
+static std::unique_ptr<JIT> TheJIT;
+static std::unique_ptr<FunctionPassManager>
+    TheFPM; /**< Function pass optimizer */
+static std::unique_ptr<LoopAnalysisManager> TheLAM; /** Loop optimizer */
+static std::unique_ptr<FunctionAnalysisManager> TheFAM;
+static std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
+static std::unique_ptr<ModuleAnalysisManager> TheMAM;
+static std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
+static std::unique_ptr<StandardInstrumentations> TheSI;
 static std::unordered_map<std::string, Value*> NamedValues;
+static ExitOnError ExitOnErr;
 
 #define UNREACHABLE(x, y)                                   \
   do {                                                      \
@@ -12,26 +24,80 @@ static std::unordered_map<std::string, Value*> NamedValues;
     exit(1);                                                \
   } while (0)
 
-Compiler::Compiler(std::unique_ptr<Stmt> mod)
-    : mod(std::move(mod)), symbol_table{} {}
+Compiler::Compiler(std::unique_ptr<Stmt> mod, std::string out_path,
+                   bool emit_llvm, bool run, bool compile)
+    : mod(std::move(mod)),
+      symbol_table{},
+      out_path(out_path),
+      compiled_program{},
+      emit_llvm(emit_llvm),
+      run(run),
+      compile(compile) {}
 
 void Compiler::Compile() {
+  InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
+  InitializeNativeTargetAsmParser();
   TheContext = std::make_unique<LLVMContext>();
+  TheJIT = ExitOnErr(JIT::Create());
   mod->Accept(*this);
+
+  if (emit_llvm) {
+    std::error_code EC;
+    StringRef name{out_path};
+    raw_fd_ostream OS(name, EC, sys::fs::OF_None);
+    TheModule->print(OS, nullptr);
+  }
+  if (run) {
+    // std::string out_str{};
+    // raw_string_ostream OS{out_str};
+    // TheModule->print(OS, nullptr);
+    // compiled_program = OS.str();
+    auto RT = TheJIT->GetMainJITDylib().createResourceTracker();
+    auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+    ExitOnErr(TheJIT->AddModule(std::move(TSM), RT));
+  }
+
+  if (compile) {
+    std::error_code EC;
+    std::string temp = "." + out_path + ".ll";
+    StringRef name{temp};
+    raw_fd_ostream OS(name, EC, sys::fs::OF_None);
+    TheModule->print(OS, nullptr);
+    std::string CMD = "clang " + temp + " -o " + out_path;
+    std::string CLEANUP = "rm " + temp;
+    system(CMD.c_str());
+    system(CLEANUP.c_str());
+  }
 }
 
 Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
   TheModule = std::make_unique<Module>(stmt.name.lexeme, *TheContext);
+  TheModule->setDataLayout(TheJIT->GetDataLayout());
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
+  TheFPM = std::make_unique<FunctionPassManager>();
+  TheLAM = std::make_unique<LoopAnalysisManager>();
+  TheFAM = std::make_unique<FunctionAnalysisManager>();
+  TheCGAM = std::make_unique<CGSCCAnalysisManager>();
+  TheMAM = std::make_unique<ModuleAnalysisManager>();
+  ThePIC = std::make_unique<PassInstrumentationCallbacks>();
+
+  TheSI = std::make_unique<StandardInstrumentations>(*TheContext, true);
+  TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+  TheFPM->addPass(InstCombinePass());
+  TheFPM->addPass(ReassociatePass());
+  TheFPM->addPass(GVNPass());
+  TheFPM->addPass(SimplifyCFGPass());
+
+  PassBuilder PB;
+  PB.registerModuleAnalyses(*TheMAM);
+  PB.registerFunctionAnalyses(*TheFAM);
+  PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
   }
-
-  std::error_code EC;
-  StringRef name{TheModule->getModuleIdentifier() + ".ll"};
-  raw_fd_ostream OS(name, EC, sys::fs::OF_None);
-  TheModule->print(OS, nullptr);
   return nullptr;
 }
 
@@ -51,6 +117,7 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
   }
 
   verifyFunction(*Func);
+  TheFPM->run(*Func, *TheFAM);
   symbol_table.clear();
   return Func;
 }
@@ -234,7 +301,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
   return nullptr;
 }
 
-Value* Compiler::VisitPreIncrement(PreInc& expr) {
+Value* Compiler::VisitPreIncrement(PreFixOp& expr) {
   LoadInst* var = dyn_cast<LoadInst>(expr.var->Accept(*this));
   AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
 
@@ -336,7 +403,7 @@ Value* Compiler::VisitVariable(Variable& expr) {
   return value;
 }
 
-Value* Compiler::VisitBoolean(Boolean& expr) {
+Value* Compiler::VisitBoolean(BoolLiteral& expr) {
   if (expr.boolean) {
     return ConstantInt::getTrue(*TheContext);
   }

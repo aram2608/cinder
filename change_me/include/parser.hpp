@@ -137,6 +137,10 @@ struct Parser {
   /// @param statements The statements to be printed
   void EmitAST(std::vector<std::unique_ptr<Stmt>> statements);
 
+  /// @brief Method to print out the ast
+  /// @param statement The statement to be printed
+  void EmitAST(std::unique_ptr<Stmt> statement);
+
   /**
    * @brief Method to format a message for errors with a new line
    * @param message The error message

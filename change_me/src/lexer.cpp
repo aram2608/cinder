@@ -100,10 +100,10 @@ void Lexer::Scan() {
       AddToken(TT_STAR);
       break;
     case '>':
-      AddToken(TT_GREATER);
+      AddToken(Match('=') ? TT_GREATER_EQ : TT_GREATER);
       break;
     case '<':
-      AddToken(TT_LESSER);
+      AddToken(Match('=') ? TT_LESSER_EQ : TT_LESSER);
       break;
     case '!':
       AddToken(Match('=') ? TT_BANGEQ : TT_BANG);
@@ -181,7 +181,9 @@ bool Lexer::Match(char c) {
 }
 
 void Lexer::AddToken(TokenType tok_type) {
-  tokens.emplace_back(tok_type, line_count);
+  size_t index = current_pos - start_pos;
+  std::string temp = source_str.substr(start_pos, index);
+  tokens.emplace_back(tok_type, line_count, temp, VT_NULL, temp);
 }
 
 void Lexer::AddToken(TokenType tok_type, std::string lexeme,
@@ -250,8 +252,12 @@ std::string Lexer::TokenToString(Token tok) {
       return "\"";
     case TT_PLUS:
       return "+";
+    case TT_PLUS_PLUS:
+      return "++";
     case TT_MINUS:
       return "-";
+    case TT_MINUS_MINUS:
+      return "--";
     case TT_MODULO:
       return "%";
     case TT_STAR:
@@ -266,6 +272,14 @@ std::string Lexer::TokenToString(Token tok) {
       return "=";
     case TT_EQEQ:
       return "==";
+    case TT_LESSER:
+      return ">";
+    case TT_LESSER_EQ:
+      return ">=";
+    case TT_GREATER:
+      return "<";
+    case TT_GREATER_EQ:
+      return "<=";
     case TT_ARROW:
       return "->";
     case TT_LPAREN:
@@ -284,6 +298,10 @@ std::string Lexer::TokenToString(Token tok) {
       return ":";
     case TT_SEMICOLON:
       return ";";
+    case TT_COMMA:
+      return ",";
+    case TT_MOD:
+      return "MOD";
     case TT_TRUE:
       return "true";
     case TT_FALSE:
@@ -314,6 +332,8 @@ std::string Lexer::TokenToString(Token tok) {
       return "FLOAT TYPE";
     case TT_STR_SPECIFIER:
       return "STR TYPE";
+    case TT_BOOL_SPECIFIER:
+      return "BOOL TYPE";
     case TT_INT:
       return "INT LITERAL: " + tok.lexeme;
     case TT_FLT:

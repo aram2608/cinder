@@ -126,7 +126,8 @@ std::unique_ptr<Expr> Parser::Assignment() {
 
 std::unique_ptr<Expr> Parser::Comparison() {
   std::unique_ptr<Expr> expr = Term();
-  while (MatchType({TT_LESSER, TT_LESSER_EQ, TT_GREATER, TT_GREATER_EQ})) {
+  while (MatchType(
+      {TT_LESSER, TT_LESSER_EQ, TT_GREATER, TT_GREATER_EQ, TT_BANGEQ})) {
     Token op = Previous();
     std::unique_ptr<Expr> right = Term();
     expr = std::make_unique<Conditional>(std::move(expr), std::move(right), op);
@@ -158,7 +159,7 @@ std::unique_ptr<Expr> Parser::PreIncrement() {
   if (MatchType({TT_PLUS_PLUS, TT_MINUS_MINUS})) {
     Token op = Previous();
     std::unique_ptr<Expr> var = Call();
-    return std::make_unique<PreInc>(op, std::move(var));
+    return std::make_unique<PreFixOp>(op, std::move(var));
   }
   return Call();
 }
@@ -193,11 +194,11 @@ std::unique_ptr<Expr> Parser::Atom() {
   }
 
   if (MatchType({TT_TRUE})) {
-    return std::make_unique<Boolean>(true);
+    return std::make_unique<BoolLiteral>(true);
   }
 
   if (MatchType({TT_FALSE})) {
-    return std::make_unique<Boolean>(false);
+    return std::make_unique<BoolLiteral>(false);
   }
 
   if (MatchType({TT_IDENTIFER})) {
@@ -261,6 +262,10 @@ void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {
   for (std::unique_ptr<Stmt>& stmt : statements) {
     std::cout << stmt->ToString() << "\n";
   }
+}
+
+void Parser::EmitAST(std::unique_ptr<Stmt> statement) {
+  std::cout << statement->ToString() << "\n";
 }
 
 std::string Parser::ErrorMessageFormatLn(std::string message) {

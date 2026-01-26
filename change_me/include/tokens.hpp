@@ -81,8 +81,6 @@ struct Void {};
 using TokenValue = std::variant<std::string, int, float, Void>;
 
 struct Token {
-  Token(TokenType token_type, size_t line_num)
-      : token_type(token_type), line_num(line_num), value_type(VT_NULL) {}
   Token(TokenType token_type, size_t line_num, std::string lexeme,
         ValueType value_type, TokenValue value)
       : token_type(token_type),

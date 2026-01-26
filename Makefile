@@ -17,7 +17,10 @@ INCLUDE_FLAGS := -I$(INCLUDE_DIR)
 LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ \
 	-L/opt/homebrew/opt/llvm/lib/unwind -lunwind\
 	$(shell llvm-config --cxxflags --ldflags --libs) \
+	-lclang \
+
+OPTS := -DCXXOPTS_NO_EXCEPTIONS
 
 $(BUILD_DIR)/$(TARGET):
 	@mkdir -p $(@D)
-	$(CXX) $(INCLUDE_FLAGS) $(WFLAGS) $(LDFLAGS) -o $@ $(SRC_FILES)
+	$(CXX) $(INCLUDE_FLAGS) $(WFLAGS) $(LDFLAGS) $(OPTS) -o $@ $(SRC_FILES)

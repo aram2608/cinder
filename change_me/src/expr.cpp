@@ -23,15 +23,15 @@ std::string Literal::ToString() {
   }
 }
 
-Boolean::Boolean(bool boolean) : boolean(boolean) {}
+BoolLiteral::BoolLiteral(bool boolean) : boolean(boolean) {}
 
-Value* Boolean::Accept(ExprVisitor& visitor) {
+Value* BoolLiteral::Accept(ExprVisitor& visitor) {
   return visitor.VisitBoolean(*this);
 }
 
-std::string Boolean::ToString() {
+std::string BoolLiteral::ToString() {
   std::string temp = boolean ? "true" : "false";
-  return "(" + temp + ")";
+  return temp;
 }
 
 Variable::Variable(Token name) : name(name) {}
@@ -41,7 +41,7 @@ Value* Variable::Accept(ExprVisitor& visitor) {
 }
 
 std::string Variable::ToString() {
-  return "(" + name.lexeme + ")";
+  return name.lexeme;
 }
 
 Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
@@ -54,15 +54,15 @@ std::string Grouping::ToString() {
   return "(" + expr->ToString() + ")";
 }
 
-PreInc::PreInc(Token op, std::unique_ptr<Expr> var)
+PreFixOp::PreFixOp(Token op, std::unique_ptr<Expr> var)
     : op(op), var(std::move(var)) {}
 
-Value* PreInc::Accept(ExprVisitor& visitor) {
+Value* PreFixOp::Accept(ExprVisitor& visitor) {
   return visitor.VisitPreIncrement(*this);
 }
 
-std::string PreInc::ToString() {
-  std::string temp = "PreIncrement " + op.lexeme;
+std::string PreFixOp::ToString() {
+  std::string temp = "PreFixOp: " + op.lexeme;
   temp += var->ToString();
   return temp;
 }
@@ -93,7 +93,7 @@ std::string Binary::ToString() {
     default:
       temp_op = "UNREACHABLE";
   }
-  return "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
+  return left->ToString() + " " + temp_op + " " + right->ToString();
 }
 
 Assign::Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value)
@@ -104,8 +104,7 @@ Value* Assign::Accept(ExprVisitor& visitor) {
 }
 
 std::string Assign::ToString() {
-  std::string temp = "Assignment: " + name->ToString() + " ";
-  return temp + value->ToString();
+  return "Assignment: " + name->ToString() + " = " + value->ToString();
 }
 
 Conditional::Conditional(std::unique_ptr<Expr> left,
@@ -134,7 +133,7 @@ std::string Conditional::ToString() {
     default:
       temp_op = "UNREACHABLE";
   }
-  return "(" + left->ToString() + " " + temp_op + " " + right->ToString() + ")";
+  return left->ToString() + " " + temp_op + " " + right->ToString();
 }
 
 CallExpr::CallExpr(std::unique_ptr<Expr> callee,
@@ -146,9 +145,9 @@ Value* CallExpr::Accept(ExprVisitor& visitor) {
 }
 
 std::string CallExpr::ToString() {
-  std::string temp = callee->ToString();
+  std::string temp = callee->ToString() + "(";
   for (auto& arg : args) {
     temp += arg->ToString();
   }
-  return temp;
+  return temp += ")";
 }

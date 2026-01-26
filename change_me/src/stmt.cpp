@@ -10,7 +10,7 @@ Value* ModuleStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ModuleStmt::ToString() {
-  std::string temp = name.lexeme;
+  std::string temp = "Module: " + name.lexeme + "\n\n\n";
   for (auto& stmt : stmts) {
     temp += stmt->ToString();
   }
@@ -35,17 +35,18 @@ FunctionProto::FunctionProto(Token name, Token return_type,
 Value* FunctionProto::Accept(StmtVisitor& visitor) {
   return visitor.VisitFunctionProto(*this);
 }
+
 std::string FunctionProto::ToString() {
-  std::string temp = return_type.lexeme + " ";
+  std::string temp = "Func: " + return_type.lexeme + " ";
   temp += name.lexeme;
-  temp += " Args( ";
+  temp += " Args: ( ";
   for (auto& tok : args) {
     // temp += tok.type;
     // temp += " ";
     temp += tok.identifier.lexeme;
-    temp += " ";
+    temp += ", ";
   }
-  temp += ") {\n";
+  temp += ")";
   return temp;
 }
 
@@ -58,13 +59,13 @@ Value* FunctionStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string FunctionStmt::ToString() {
-  std::string temp = proto->ToString();
+  std::string temp = proto->ToString() + "\n";
+  temp += "{\n";
   for (auto& stmt : body) {
     temp += stmt->ToString();
     temp += "\n";
   }
-  temp += "}";
-  return temp;
+  return temp += "}\n";
 }
 
 ReturnStmt::ReturnStmt(std::unique_ptr<Expr> value) : value(std::move(value)) {}

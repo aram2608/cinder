@@ -16,10 +16,10 @@
 #include "llvm/IR/Verifier.h"
 
 struct Literal;
-struct Boolean;
+struct BoolLiteral;
 struct Variable;
 struct Grouping;
-struct PreInc;
+struct PreFixOp;
 struct Binary;
 struct CallExpr;
 struct Assign;
@@ -28,10 +28,10 @@ struct Conditional;
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
   virtual llvm::Value* VisitLiteral(Literal& expr) = 0;
-  virtual llvm::Value* VisitBoolean(Boolean& expr) = 0;
+  virtual llvm::Value* VisitBoolean(BoolLiteral& expr) = 0;
   virtual llvm::Value* VisitVariable(Variable& expr) = 0;
   virtual llvm::Value* VisitGrouping(Grouping& expr) = 0;
-  virtual llvm::Value* VisitPreIncrement(PreInc& expr) = 0;
+  virtual llvm::Value* VisitPreIncrement(PreFixOp& expr) = 0;
   virtual llvm::Value* VisitBinary(Binary& expr) = 0;
   virtual llvm::Value* VisitCall(CallExpr& expr) = 0;
   virtual llvm::Value* VisitAssignment(Assign& expr) = 0;
@@ -84,10 +84,10 @@ struct Literal : Expr {
 
 /// @struct Boolean
 /// @brief Boolean node
-struct Boolean : Expr {
+struct BoolLiteral : Expr {
   bool boolean; /** The boolean value */
 
-  Boolean(bool boolean);
+  BoolLiteral(bool boolean);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -148,12 +148,12 @@ struct Grouping : Expr {
   std::string ToString() override;
 };
 
-struct PreInc : Expr {
+struct PreFixOp : Expr {
   Token op; /**< The operator token */
   std::unique_ptr<Expr>
       var; /**< The parsed variable, should resolve to Variable */
 
-  PreInc(Token op, std::unique_ptr<Expr> var);
+  PreFixOp(Token op, std::unique_ptr<Expr> var);
 
   /**
    * @brief Method used to emply the visitor pattern
