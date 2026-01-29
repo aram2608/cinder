@@ -19,10 +19,11 @@ static std::unique_ptr<StandardInstrumentations> TheSI;
 static std::unordered_map<std::string, Value*> NamedValues;
 static ExitOnError ExitOnErr;
 
-#define UNREACHABLE(x, y)                                   \
-  do {                                                      \
-    std::cout << "UNREACHABLE " << #x << " " << #y << "\n"; \
-    exit(1);                                                \
+#define UNREACHABLE(x, y)                                     \
+  do {                                                        \
+    std::cout << "UNREACHABLE " << #x << " " << #y << "\n";   \
+    std::cout << "at" << __FILE__ << " " << __LINE__ << "\n"; \
+    exit(1);                                                  \
   } while (0)
 
 /// TODO: Declare the printf method early on to make it visible to all mods
@@ -43,26 +44,55 @@ Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
        */
       context(std::make_unique<LLVMContext>()) {}
 
-void Compiler::GenerateIR() {
-  /// TODO: Find a way to set target triple during IR gene
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
-  InitializeNativeTargetAsmParser();
-  TheContext = std::make_unique<LLVMContext>();
-  TheJIT = ExitOnErr(JIT::Create());
-  mod->Accept(*this);
+bool Compiler::Compile() {
+  InitializeAllTargetInfos();
+  InitializeAllTargets();
+  InitializeAllTargetMCs();
+  InitializeAllAsmParsers();
+  InitializeAllAsmPrinters();
+
+  GenerateIR();
+  auto TargetTriple = sys::getDefaultTargetTriple();
+  TheModule->setTargetTriple(Triple(TargetTriple));
+
+  std::string Error;
+  auto Target =
+      TargetRegistry::lookupTarget(TheModule->getTargetTriple(), Error);
+
+  if (!Target) {
+    std::cout << "Failed to create target";
+    return true;
+  }
+
+  auto CPU = "generic";
+  auto Features = "";
+  TargetOptions opt;
+  auto TheTargetMachine = Target->createTargetMachine(
+      Triple(TargetTriple), CPU, Features, opt, Reloc::PIC_);
 
   switch (opts.mode) {
     case CompilerMode::COMPILE:
-      CompileBinary();
-      break;
+      TheModule->setDataLayout(TheTargetMachine->createDataLayout());
+
+      CompileBinary(TheTargetMachine);
+      return true;
     case CompilerMode::EMIT_LLVM:
+      TheModule->setDataLayout(TheTargetMachine->createDataLayout());
       EmitLLVM();
-      break;
+      return true;
     case CompilerMode::RUN:
+      TheModule->setDataLayout(TheJIT->GetDataLayout());
       CompileRun();
-      break;
+      return true;
+    default:
+      UNREACHABLE(COMPILER_MODE, "Unknown compile type");
   }
+}
+
+void Compiler::GenerateIR() {
+  TheContext = std::make_unique<LLVMContext>();
+  TheJIT = ExitOnErr(JIT::Create());
+  mod->Accept(*this);
 }
 
 void Compiler::EmitLLVM() {
@@ -81,12 +111,23 @@ void Compiler::CompileRun() {
   fprintf(stderr, "Exit code %d\n", FP());
 }
 
-void Compiler::CompileBinary() {
+void Compiler::CompileBinary(TargetMachine* target_machine) {
   std::error_code EC;
-  std::string temp = "." + opts.out_path + ".ll";
+  std::string temp = "." + opts.out_path + ".o";
   StringRef name{temp};
-  raw_fd_ostream OS(name, EC, sys::fs::OF_None);
-  TheModule->print(OS, nullptr);
+  raw_fd_ostream object_file(name, EC, sys::fs::OF_None);
+
+  legacy::PassManager pass;
+  auto FileType = CodeGenFileType::ObjectFile;
+
+  if (target_machine->addPassesToEmitFile(pass, object_file, nullptr,
+                                          FileType)) {
+    errs() << "TheTargetMachine can't emit a file of this type";
+    return;
+  }
+
+  pass.run(*TheModule);
+  object_file.flush();
 
   std::string linker_flags{};
   for (auto opt : opts.linker_flags) {
@@ -101,8 +142,7 @@ void Compiler::CompileBinary() {
 }
 
 Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
-  TheModule = MakeNewModule(stmt, *TheContext);
-  TheModule->setDataLayout(TheJIT->GetDataLayout());
+  TheModule = CreateModule(stmt, *TheContext);
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
   TheFPM = std::make_unique<FunctionPassManager>();
   TheLAM = std::make_unique<LoopAnalysisManager>();
@@ -174,7 +214,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
       return_type = Type::getVoidTy(*TheContext);
       break;
     default:
-      UNREACHABLE(FunctionProto, RETURN);
+      UNREACHABLE(FunctionProto, "Unknown return type");
   }
 
   std::vector<Type*> arg_types;
@@ -197,7 +237,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
         arg_types.push_back(Type::getVoidTy(*TheContext));
         break;
       default:
-        UNREACHABLE(FunctionProto, ARGTYPES);
+        UNREACHABLE(FunctionProto, "Unknown argument type");
     }
   }
 
@@ -249,7 +289,7 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
       exit(1);
       break;
     default:
-      UNREACHABLE(VarDeclarationStmt, TYPE);
+      UNREACHABLE(VarDeclarationStmt, "Unknown variable type");
   }
   Value* value = stmt.value->Accept(*this);
   AllocaInst* value_ptr = Builder->CreateAlloca(type, nullptr, name);
@@ -280,7 +320,7 @@ Value* Compiler::VisitConditional(Conditional& expr) {
       case TT_GREATER_EQ:
         return Builder->CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
       default:
-        UNREACHABLE(Conditional, IntegerType);
+        UNREACHABLE(Conditional, "Unknown integer operation");
     }
   } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
     switch (expr.op.token_type) {
@@ -297,7 +337,7 @@ Value* Compiler::VisitConditional(Conditional& expr) {
       case TT_GREATER_EQ:
         return Builder->CreateFCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
       default:
-        UNREACHABLE(Conditional, FloatType);
+        UNREACHABLE(Conditional, "Unknown floating point operation");
     }
   } else {
     std::cout << "incompatible types in '" << expr.op.lexeme
@@ -330,7 +370,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
       case TT_SLASH:
         return Builder->CreateSDiv(left, right, "divtmp");
       default:
-        UNREACHABLE(Binary, IntegerType);
+        UNREACHABLE(Binary, "Unknown integer operation");
     }
   } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
     switch (expr.op.token_type) {
@@ -343,7 +383,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
       case TT_SLASH:
         return Builder->CreateFDiv(left, right, "divtmp");
       default:
-        UNREACHABLE(Binary, FloatType);
+        UNREACHABLE(Binary, "Unknown floating point operation");
     }
   } else {
     std::cout << "incompatible types in '" << expr.op.lexeme
@@ -375,7 +415,7 @@ Value* Compiler::VisitPreIncrement(PreFixOp& expr) {
         inc = ConstantFP::get(*TheContext, APFloat(1.0f));
         value = Builder->CreateFAdd(var, inc, "addtmp");
       } else {
-        UNREACHABLE(PreInc, UNKNOWN_VALUE_TYPE);
+        UNREACHABLE(PreInc, "Unknown value type");
       }
       break;
     case TT_MINUS_MINUS:
@@ -386,11 +426,11 @@ Value* Compiler::VisitPreIncrement(PreFixOp& expr) {
         inc = ConstantFP::get(*TheContext, APFloat(1.0f));
         value = Builder->CreateFSub(var, inc, "subtmp");
       } else {
-        UNREACHABLE(PreInc, UNKNOWN_VALUE_TYPE);
+        UNREACHABLE(PreInc, "Unknown value type");
       }
       break;
     default:
-      UNREACHABLE(PreInc, UNKNOWN_TOKEN_TYPE);
+      UNREACHABLE(PreInc, "Unknown value type");
   }
   Builder->CreateStore(value, var_ptr);
   return nullptr;
@@ -477,13 +517,14 @@ Value* Compiler::VisitLiteral(Literal& expr) {
     case VT_FLT:
       return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
     case VT_STR:
-      return ConstantDataArray::getString(*TheContext,
-                                          std::get<std::string>(expr.value));
+      /// TODO: No clue if this will work
+      return Builder->CreateGlobalString(std::get<std::string>(expr.value), "",
+                                         true);
     case VT_VOID:
       return nullptr;  // This is a horrible hack for void return types
                        // I need to think of a better solution
     default:
-      UNREACHABLE(Literal, ValueType);
+      UNREACHABLE(Literal, "Unknown literal value");
   }
 }
 
@@ -497,7 +538,7 @@ CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,
   }
 }
 
-std::unique_ptr<llvm::Module> Compiler::MakeNewModule(ModuleStmt& stmt,
-                                                      llvm::LLVMContext& ctx) {
+std::unique_ptr<llvm::Module> Compiler::CreateModule(ModuleStmt& stmt,
+                                                     llvm::LLVMContext& ctx) {
   return std::make_unique<Module>(stmt.name.lexeme, *TheContext);
 }

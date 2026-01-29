@@ -15,7 +15,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
-#include <llvm/Linker/Linker.h>
+#include "llvm/Linker/Linker.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -38,6 +38,13 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/IR/LegacyPassManager.h"
 
 /// @enum @class CompilerMode
 /// @brief The compilation mode, whether to emit LLVM, run, or compile
@@ -83,10 +90,11 @@ struct Compiler : ExprVisitor, StmtVisitor {
 
   Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
+  bool Compile();
   void GenerateIR();
   void EmitLLVM();
   void CompileRun();
-  void CompileBinary();
+  void CompileBinary(llvm::TargetMachine* target_machine);
 
   llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
@@ -105,8 +113,8 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* VisitBoolean(BoolLiteral& expr) override;
   llvm::Value* VisitLiteral(Literal& expr) override;
 
-  std::unique_ptr<llvm::Module> MakeNewModule(ModuleStmt& stmt,
-                                              llvm::LLVMContext& ctx);
+  std::unique_ptr<llvm::Module> CreateModule(ModuleStmt& stmt,
+                                             llvm::LLVMContext& ctx);
 };
 
 #endif
