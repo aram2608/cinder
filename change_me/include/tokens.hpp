@@ -3,6 +3,8 @@
 
 #include "common.hpp"
 
+/// @enum TokenType
+/// @brief The token types allowed during lexical analysis
 enum TokenType {
   // Binops
   TT_PLUS, /** "+" */
@@ -69,9 +71,9 @@ enum TokenType {
   TT_COUNT, /** The number of tokens available */
 };
 
-// TODO: Fix the typing system so it is more ergonomic
-// This acts as a tagged union with the std::variant, this is really
-// awkward during parse and IR gen time
+/// @enum ValueType
+/// @brief Enum type used to store the underling value types
+/// TODO: Fix the typing system so it is more ergonomic
 enum ValueType {
   VT_INT32, /** Integer */
   VT_INT64,
@@ -85,6 +87,13 @@ struct Void {};
 
 using TokenValue = std::variant<std::string, int, float, Void>;
 
+/**
+ * @struct Token
+ * @brief The structure used to store source string info during lexical analysis
+ * A simple POD
+ * TODO: Fix the type information, it is really awkward during parse and IR gen
+ * time
+ */
 struct Token {
   Token(TokenType token_type, size_t line_num, std::string lexeme,
         ValueType value_type, TokenValue value)
@@ -100,9 +109,11 @@ struct Token {
   TokenValue value;
 };
 
+/// @struct FuncArg
+/// @brief A simple data container to store function arguments
 struct FuncArg {
-  ValueType type;
-  Token identifier;
+  ValueType type;   /**< The argument type */
+  Token identifier; /**< The identifer for the argument */
   FuncArg(ValueType type, Token identifier)
       : type(type), identifier(identifier) {}
 };

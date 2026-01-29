@@ -3,6 +3,7 @@
 
 using namespace llvm;
 using namespace llvm::orc;
+
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
@@ -24,17 +25,26 @@ static ExitOnError ExitOnErr;
     exit(1);                                                \
   } while (0)
 
+/// TODO: Declare the printf method early on to make it visible to all mods
+/// This will allow us to see output prior to getting a stdlib set up
+
+/// TODO: Set up global string constants so they can be used in printf as well
+/// as variables/function arguments
+
 Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
     : mod(std::move(mod)),
       symbol_table{},
       opts(opts),
-      // TODO: Find a way to have the context stored as a member var
-      // For now the module outlives the context leading a seg fault during cleanup
-      // At least thats what I think is happening since I don't have debug info for LLVM
+      /**
+       * TODO: Find a way to have the context stored as a member var
+       * For now the module outlives the context leading a seg fault during
+       * cleanup At least thats what I think is happening since I don't have
+       * debug info for LLVM
+       */
       context(std::make_unique<LLVMContext>()) {}
 
 void Compiler::GenerateIR() {
-  // TODO: Find a way to set target triple during IR gene
+  /// TODO: Find a way to set target triple during IR gene
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   InitializeNativeTargetAsmParser();

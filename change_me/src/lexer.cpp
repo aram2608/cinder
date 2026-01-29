@@ -1,7 +1,7 @@
 #include "../include/lexer.hpp"
 
-// TODO: Fix the typing system so it is more ergonomic to work with
-// Handling the types at parse time and IR gen time is a bit awkward
+/// TODO: Fix the typing system so it is more ergonomic to work with
+/// Handling the types at parse time and IR gen time is a bit awkward
 static const std::unordered_map<std::string, TokenType> key_words = {
     {"int32", TT_INT32_SPECIFIER},
     {"int64", TT_INT64_SPECIFIER},

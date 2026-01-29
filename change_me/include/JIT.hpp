@@ -17,78 +17,61 @@
 #include "llvm/IR/LLVMContext.h"
 #include <memory>
 
+/// @brief JIT, co-opted from LLVM kaleidoscope tutorial
 class JIT {
  private:
-  std::unique_ptr<llvm::orc::ExecutionSession> ES;
-
-  llvm::DataLayout DL;
-  llvm::orc::MangleAndInterner Mangle;
-
-  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer;
-  llvm::orc::IRCompileLayer CompileLayer;
-
-  llvm::orc::JITDylib& MainJD;
+  std::unique_ptr<llvm::orc::ExecutionSession>
+      exec_session; /**< The running JIT program */
+  llvm::DataLayout
+      data_layout; /**< The target data layout string for IR gene */
+  llvm::orc::MangleAndInterner mangler; /**< Symbol name mangler */
+  llvm::orc::RTDyldObjectLinkingLayer
+      object_layer;                        /**< The internal object layer */
+  llvm::orc::IRCompileLayer compile_layer; /**< The internal compiler layer */
+  llvm::orc::JITDylib& main_jd;            /**< The JIT dynamic library */
 
  public:
-  JIT(std::unique_ptr<llvm::orc::ExecutionSession> ES,
-      llvm::orc::JITTargetMachineBuilder JTMB, llvm::DataLayout DL)
-      : ES(std::move(ES)),
-        DL(std::move(DL)),
-        Mangle(*this->ES, this->DL),
-        ObjectLayer(*this->ES,
-                    [](const llvm::MemoryBuffer&) {
-                      return std::make_unique<llvm::SectionMemoryManager>();
-                    }),
-        CompileLayer(
-            *this->ES, ObjectLayer,
-            std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))),
-        MainJD(this->ES->createBareJITDylib("<main>")) {
-    MainJD.addGenerator(
-        cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-            DL.getGlobalPrefix())));
-    if (JTMB.getTargetTriple().isOSBinFormatCOFF()) {
-      ObjectLayer.setOverrideObjectFlagsWithResponsibilityFlags(true);
-      ObjectLayer.setAutoClaimResponsibilityForObjectSymbols(true);
-    }
-  }
+  JIT(std::unique_ptr<llvm::orc::ExecutionSession> exec_session,
+      llvm::orc::JITTargetMachineBuilder JTMB, llvm::DataLayout data_layout);
 
-  ~JIT() {
-    if (auto Err = ES->endSession()) ES->reportError(std::move(Err));
-  }
+  ~JIT();
 
-  static llvm::Expected<std::unique_ptr<JIT>> Create() {
-    auto EPC = llvm::orc::SelfExecutorProcessControl::Create();
-    if (!EPC) return EPC.takeError();
+  /**
+   * @brief A factory method to create a new JIT compiler
+   * @return The expected JIT compiler or an error
+   */
+  static llvm::Expected<std::unique_ptr<JIT>> Create();
 
-    auto ES = std::make_unique<llvm::orc::ExecutionSession>(std::move(*EPC));
+  /**
+   *  @brief Getter method for the data layout
+   * @return A const data layout
+   */
+  const llvm::DataLayout& GetDataLayout() const;
 
-    llvm::orc::JITTargetMachineBuilder JTMB(
-        ES->getExecutorProcessControl().getTargetTriple());
-
-    auto DL = JTMB.getDefaultDataLayoutForTarget();
-    if (!DL) return DL.takeError();
-
-    return std::make_unique<JIT>(std::move(ES), std::move(JTMB),
-                                 std::move(*DL));
-  }
-
-  const llvm::DataLayout& GetDataLayout() const {
-    return DL;
-  }
-
+  /**
+   * @brief Getter method for the MainJD
+   * @return The MainJD
+   */
   llvm::orc::JITDylib& GetMainJITDylib() {
-    return MainJD;
+    return main_jd;
   }
 
-  llvm::Error AddModule(llvm::orc::ThreadSafeModule TSM,
-                        llvm::orc::ResourceTrackerSP RT = nullptr) {
-    if (!RT) RT = MainJD.getDefaultResourceTracker();
-    return CompileLayer.add(RT, std::move(TSM));
-  }
+  /**
+   * @brief Method to add a module to the JIT compiler
+   * @param thread_safe_module A thread safe module to be added, from llvm::orc
+   *  @param resource_tracker A resource tracker from llvm::orc
+   * @return An error if it occured
+   */
+  llvm::Error AddModule(
+      llvm::orc::ThreadSafeModule thread_safe_module,
+      llvm::orc::ResourceTrackerSP resource_tracker = nullptr);
 
-  llvm::Expected<llvm::orc::ExecutorSymbolDef> Lookup(llvm::StringRef Name) {
-    return ES->lookup({&MainJD}, Mangle(Name.str()));
-  }
+  /**
+   * @brief Method to look up a function in the JIT session
+   *  @param name The name of the function
+   * @return An expected type, could be an error or the expected symbol
+   */
+  llvm::Expected<llvm::orc::ExecutorSymbolDef> Lookup(llvm::StringRef name);
 };
 
 #endif

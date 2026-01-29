@@ -6,10 +6,8 @@
 #include "expr.hpp"
 #include "stmt.hpp"
 
-/**
- * @struct Parser
- * @brief Main class for parsing tokens in a program
- */
+/// @struct Parser
+/// @brief Main class for parsing tokens in a program
 struct Parser {
   std::vector<Token> tokens; /**< The vector of tokens */
   size_t current_tok;        /**< The current token position */

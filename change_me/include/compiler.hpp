@@ -39,28 +39,47 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
+/// @enum @class CompilerMode
+/// @brief The compilation mode, whether to emit LLVM, run, or compile
 enum class CompilerMode {
   EMIT_LLVM,
   RUN,
   COMPILE,
 };
 
+/**
+ * @struct CompilerOptions
+ * @brief A simple data container for the compiler options
+ * Populated during CLI argument parse time and used during the final stages of
+ * compilation.
+ */
 struct CompilerOptions {
-  std::string out_path;
-  CompilerMode mode;
-  std::string linker_flags;
-  bool debug_info;
+  std::string out_path; /**< The desired outpath */
+  CompilerMode mode;    /** The compiler mode, can emit-llvm, run, or compile */
+  std::string linker_flags; /**< Flags to pass to the clang linker */
+  bool debug_info; /**< TODO: Implement debug information, its a bit of a ritual
+                    */
   CompilerOptions(std::string out_path, CompilerMode mode, bool debug_info,
                   std::vector<std::string> linker_flags_list);
 };
 
+/**
+ * @struct Compiler
+ * @brief The main compiler structure
+ * Employs the visitor method to resolve the different nodes of the AST
+ */
 struct Compiler : ExprVisitor, StmtVisitor {
-  std::unique_ptr<Stmt> mod;
-  std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
-  std::unordered_map<std::string, llvm::Argument*> argument_table;
-  std::unordered_map<std::string, size_t> func_table;
-  CompilerOptions opts;
-  std::unique_ptr<llvm::LLVMContext> context;
+  std::unique_ptr<Stmt>
+      mod; /**< TODO: make this a vector or a map of mods to handle imports */
+  std::unordered_map<std::string, llvm::AllocaInst*>
+      symbol_table; /**< Symbol table to store local vars */
+  std::unordered_map<std::string, llvm::Argument*>
+      argument_table; /**< Table to store function arguments */
+  std::unordered_map<std::string, size_t>
+      func_table;       /**< Table to store the funcs in a module */
+  CompilerOptions opts; /**< The compiler options */
+  std::unique_ptr<llvm::LLVMContext>
+      context; /**< TODO: Let the compiler store the context */
 
   Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 

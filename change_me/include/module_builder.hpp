@@ -40,13 +40,13 @@
 // TODO: Abstract the modules into a dedicated ModuleBuilder
 // so we can support multiple modules
 struct ModuleBuilder {
-    std::unique_ptr<llvm::Module> mod;
-    std::unique_ptr<llvm::IRBuilder<>> builder;
-    std::unique_ptr<llvm::FunctionPassManager> fpm;
+  std::unique_ptr<llvm::Module> mod;
+  std::unique_ptr<llvm::IRBuilder<>> builder;
+  std::unique_ptr<llvm::FunctionPassManager> fpm;
 
-    ModuleBuilder(std::unique_ptr<llvm::Module> mod,
-    std::unique_ptr<llvm::IRBuilder<>> builder,
-    std::unique_ptr<llvm::FunctionPassManager> fpm);
+  ModuleBuilder(std::unique_ptr<llvm::Module> mod,
+                std::unique_ptr<llvm::IRBuilder<>> builder,
+                std::unique_ptr<llvm::FunctionPassManager> fpm);
 };
 
 #endif

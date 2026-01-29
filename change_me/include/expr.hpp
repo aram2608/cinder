@@ -87,7 +87,7 @@ struct Literal : Expr {
 struct BoolLiteral : Expr {
   bool boolean; /** The boolean value */
 
-  BoolLiteral(bool boolean);
+  explicit BoolLiteral(bool boolean);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -109,7 +109,7 @@ struct BoolLiteral : Expr {
 struct Variable : Expr {
   Token name; /** Name of the variable */
 
-  Variable(Token name);
+  explicit Variable(Token name);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -131,7 +131,7 @@ struct Variable : Expr {
 struct Grouping : Expr {
   std::unique_ptr<Expr> expr; /** Expression inside of the paren, '( expr )' */
 
-  Grouping(std::unique_ptr<Expr> expr);
+  explicit Grouping(std::unique_ptr<Expr> expr);
 
   /**
    * @brief Method used to emply the visitor pattern

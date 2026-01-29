@@ -24,14 +24,10 @@ struct Lexer {
   /// @param source_str
   Lexer(const char* source_str);
 
-  /**
-   * @brief Method to tokenize the source code
-   */
+  /// @brief Method to tokenize the source code
   void ScanTokens();
 
-  /**
-   * @brief Method to scan an individual char
-   */
+  /// @brief Method to scan an individual char
   void Scan();
 
   /**

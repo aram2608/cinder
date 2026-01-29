@@ -21,11 +21,15 @@ struct FunctionStmt;
 struct FunctionProto;
 struct ReturnStmt;
 struct VarDeclarationStmt;
+/// TODO: Implement loops
 struct ForStmt;
+/// TODO: Implement If statements
+struct IfStmt;
 
+/// @struct StmtVisitor
+/// @brief The statement visitor interface
 struct StmtVisitor {
   virtual ~StmtVisitor() = default;
-
   virtual llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) = 0;
   virtual llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) = 0;
   virtual llvm::Value* VisitReturnStmt(ReturnStmt& stmt) = 0;
@@ -35,6 +39,8 @@ struct StmtVisitor {
   // virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
 };
 
+/// @struct Stmt
+/// @brief The abstract class used to define stmts
 struct Stmt {
   virtual ~Stmt() = default;
 
@@ -53,9 +59,11 @@ struct Stmt {
   virtual std::string ToString() = 0;
 };
 
+/// @struct ModuleStmt
+/// @brief The top level statement in a program
 struct ModuleStmt : Stmt {
-  Token name;
-  std::vector<std::unique_ptr<Stmt>> stmts;
+  Token name;                               /**< Name of the module */
+  std::vector<std::unique_ptr<Stmt>> stmts; /**< Statements in the module */
 
   ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts);
 
@@ -74,8 +82,10 @@ struct ModuleStmt : Stmt {
   std::string ToString() override;
 };
 
+/// @struct ExpressionStmt
+/// @brief Basic expression statement node
 struct ExpressionStmt : Stmt {
-  std::unique_ptr<Expr> expr;
+  std::unique_ptr<Expr> expr; /*< The underlying expression to evalute */
 
   ExpressionStmt(std::unique_ptr<Expr> expr);
 
@@ -94,10 +104,12 @@ struct ExpressionStmt : Stmt {
   std::string ToString() override;
 };
 
+/// @struct FunctionProto
+/// @brief Function prototype node
 struct FunctionProto : Stmt {
-  Token name;
-  Token return_type;
-  std::vector<FuncArg> args;
+  Token name;                /**< The name of the function */
+  Token return_type;         /**< The return type of the method */
+  std::vector<FuncArg> args; /**< The function arguments */
 
   FunctionProto(Token name, Token return_type, std::vector<FuncArg> args);
 
@@ -116,6 +128,8 @@ struct FunctionProto : Stmt {
   std::string ToString() override;
 };
 
+/// @struct FunctionStmt
+/// @brief Function statement node
 struct FunctionStmt : Stmt {
   std::unique_ptr<Stmt> proto;
   std::vector<std::unique_ptr<Stmt>> body;
@@ -138,6 +152,8 @@ struct FunctionStmt : Stmt {
   std::string ToString() override;
 };
 
+/// @struct ReturnStmt
+/// @brief Return stmt node
 struct ReturnStmt : Stmt {
   std::unique_ptr<Expr> value;
 
@@ -158,6 +174,8 @@ struct ReturnStmt : Stmt {
   std::string ToString() override;
 };
 
+/// @struct VarDeclarationStmt
+/// @brief Variable declaration node
 struct VarDeclarationStmt : Stmt {
   Token type;
   Token name;
@@ -180,6 +198,7 @@ struct VarDeclarationStmt : Stmt {
   std::string ToString() override;
 };
 
+/// TODO: Implement for stmt
 struct ForStmt : Stmt {
   std::unique_ptr<Stmt> intializer;
   std::unique_ptr<Stmt> condition;

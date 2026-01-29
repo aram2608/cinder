@@ -1,5 +1,8 @@
 - [] Come up with name
 - [] Solidify syntax
-- [] Create a lexer
-- [] Create a parser
-- [] Create a compiler to clang compatible Assembly
+- [] Clean up LLVM code gene *Urgent* Currently very sloppy
+- [] Find a way to resolve imports/multiple modules
+- [] Create a basic stdlib, printf etc..
+- [x] Create a lexer
+- [x] Create a parser
+- [x] Genereate LLVM IR
