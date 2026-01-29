@@ -74,7 +74,20 @@ std::unique_ptr<Stmt> Parser::Statement() {
   if (MatchType({TT_RETURN})) {
     return ReturnStatement();
   }
+  if (MatchType({TT_IF})) {
+    return IfStatement();
+  }
   return ExpressionStatement();
+}
+
+std::unique_ptr<Stmt> Parser::IfStatement() {
+  std::unique_ptr<Expr> condition = Expression();
+  std::unique_ptr<Stmt> then = Statement();
+  std::unique_ptr<Stmt> otherwise =
+      MatchType({TT_ELSE}) ? Statement() : nullptr;
+  Consume(TT_END, "Expected 'end' after if statement");
+  return std::make_unique<IfStmt>(std::move(condition), std::move(then),
+                                  std::move(otherwise));
 }
 
 std::unique_ptr<Stmt> Parser::ReturnStatement() {

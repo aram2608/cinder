@@ -21,10 +21,10 @@ struct FunctionStmt;
 struct FunctionProto;
 struct ReturnStmt;
 struct VarDeclarationStmt;
-/// TODO: Implement loops
-struct ForStmt;
 /// TODO: Implement If statements
 struct IfStmt;
+/// TODO: Implement loops
+struct ForStmt;
 
 /// @struct StmtVisitor
 /// @brief The statement visitor interface
@@ -36,6 +36,7 @@ struct StmtVisitor {
   virtual llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) = 0;
   virtual llvm::Value* VisitFunctionProto(FunctionProto& stmt) = 0;
   virtual llvm::Value* VisitModuleStmt(ModuleStmt& stmt) = 0;
+  virtual llvm::Value* VisitIfStmt(IfStmt& stmt) = 0;
   // virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
 };
 
@@ -198,10 +199,33 @@ struct VarDeclarationStmt : Stmt {
   std::string ToString() override;
 };
 
+struct IfStmt : Stmt {
+  std::unique_ptr<Expr> cond;
+  std::unique_ptr<Stmt> then;
+  std::unique_ptr<Stmt> otherwise;
+
+  IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
+         std::unique_ptr<Stmt> otherwise);
+
+  /**
+   * @brief Method used to emply the visitor pattern
+   * All derived classes must implement this method
+   * @param visitor The expression visitor
+   * @return The appropiate visitor method
+   */
+  llvm::Value* Accept(StmtVisitor& visitor) override;
+
+  /**
+   * @brief Method to return the string representation of the node
+   * @return The string represention
+   */
+  std::string ToString() override;
+};
+
 /// TODO: Implement for stmt
 struct ForStmt : Stmt {
   std::unique_ptr<Stmt> intializer;
-  std::unique_ptr<Stmt> condition;
+  std::unique_ptr<Expr> condition;
   std::unique_ptr<Expr> increment;
   std::vector<std::unique_ptr<Stmt>> body;
 

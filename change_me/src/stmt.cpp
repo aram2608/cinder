@@ -85,7 +85,25 @@ VarDeclarationStmt::VarDeclarationStmt(Token type, Token name,
 Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
   return visitor.VisitVarDeclarationStmt(*this);
 }
+
 std::string VarDeclarationStmt::ToString() {
   std::string temp{};
   return "Var Declaration: " + name.lexeme + " = " + value->ToString();
+}
+
+IfStmt::IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
+               std::unique_ptr<Stmt> otherwise)
+    : cond(std::move(cond)),
+      then(std::move(then)),
+      otherwise(std::move(otherwise)) {}
+
+Value* IfStmt::Accept(StmtVisitor& visitor) {
+  return visitor.VisitIfStmt(*this);
+}
+
+std::string IfStmt::ToString() {
+  std::string temp = "if: " + cond->ToString() + "\n";
+  temp += "then: " + then->ToString() + "\n";
+  temp += "else: " + otherwise->ToString() + "\n";
+  return temp;
 }

@@ -98,6 +98,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
   void CompileBinary(llvm::TargetMachine* target_machine);
 
   llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
+  llvm::Value* VisitIfStmt(IfStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
   llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
   llvm::Value* VisitFunctionProto(FunctionProto& stmt) override;

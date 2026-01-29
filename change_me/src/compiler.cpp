@@ -89,6 +89,7 @@ bool Compiler::Compile() {
       EmitLLVM();
       return true;
     case CompilerMode::RUN:
+      TheJIT = ExitOnErr(JIT::Create());
       TheModule->setDataLayout(TheJIT->GetDataLayout());
       CompileRun();
       return true;
@@ -99,7 +100,6 @@ bool Compiler::Compile() {
 
 void Compiler::GenerateIR() {
   TheContext = std::make_unique<LLVMContext>();
-  TheJIT = ExitOnErr(JIT::Create());
   mod->Accept(*this);
 }
 
@@ -116,7 +116,7 @@ void Compiler::CompileRun() {
   ExitOnErr(TheJIT->AddModule(std::move(TSM), RT));
   auto ExprSymbol = ExitOnErr(TheJIT->Lookup("main"));
   int (*FP)() = ExprSymbol.toPtr<int (*)()>();
-  fprintf(stderr, "Exit code %d\n", FP());
+  FP();
 }
 
 void Compiler::CompileBinary(TargetMachine* target_machine) {
@@ -182,6 +182,46 @@ Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
 
 Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
   stmt.expr->Accept(*this);
+  return nullptr;
+}
+
+Value* Compiler::VisitIfStmt(IfStmt& stmt) {
+  Value* condition = stmt.cond->Accept(*this);
+
+  Type* cond_type = condition->getType();
+  if (cond_type->isFloatTy()) {
+    condition = Builder->CreateFCmpONE(
+        condition, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+  } else if (cond_type->isIntegerTy()) {
+    ConstantInt* comp = ConstantInt::get(*TheContext, APInt(64, 0));
+    condition = Builder->CreateCmp(CmpInst::ICMP_NE, condition, comp);
+  } else {
+    UNREACHABLE(IfStmt, "Type not supported yet");
+  }
+
+  Function* Func = Builder->GetInsertBlock()->getParent();
+
+  BasicBlock* then_block = BasicBlock::Create(*TheContext, "then", Func);
+  BasicBlock* else_block = BasicBlock::Create(*TheContext, "else");
+  BasicBlock* merge = BasicBlock::Create(*TheContext, "ifcont");
+
+  Builder->CreateCondBr(condition, then_block, else_block);
+
+  Builder->SetInsertPoint(then_block);
+  stmt.then->Accept(*this);
+
+  Builder->CreateBr(merge);
+  then_block = Builder->GetInsertBlock();
+
+  Func->insert(Func->end(), else_block);
+  Builder->SetInsertPoint(else_block);
+  stmt.otherwise->Accept(*this);
+
+  Builder->CreateBr(merge);
+  else_block = Builder->GetInsertBlock();
+
+  Func->insert(Func->end(), merge);
+  Builder->SetInsertPoint(merge);
   return nullptr;
 }
 

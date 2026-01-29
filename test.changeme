@@ -9,6 +9,10 @@ def main() -> int32
     int64: a = 4;
     bool: flag = 1 > 4;
     str: test = "hello world";
-    printf("%s\n", test);
+    if 2 > 0
+        printf("%d", 1);
+    else
+        printf("%d", 0);
+    end
     return 0;
 end
