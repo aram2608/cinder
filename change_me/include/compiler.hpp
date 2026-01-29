@@ -90,6 +90,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
 
   Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
+  void AddPrintf();
   bool Compile();
   void GenerateIR();
   void EmitLLVM();

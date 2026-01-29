@@ -8,5 +8,7 @@ def main() -> int32
     int32: b = get(1, 4);
     int64: a = 4;
     bool: flag = 1 > 4;
-    return 69;
+    str: test = "hello world";
+    printf("%s\n", test);
+    return 0;
 end

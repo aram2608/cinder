@@ -24,7 +24,7 @@ static const std::unordered_map<std::string, TokenType> key_words = {
 };
 
 Lexer::Lexer(std::string source_str)
-    : start_pos(0), current_pos(0), line_count(0), source_str(source_str) {}
+    : start_pos(0), current_pos(0), line_count(1), source_str(source_str) {}
 
 Lexer::Lexer(const char* source_str)
     : start_pos(0), current_pos(0), line_count(0), source_str(source_str) {}

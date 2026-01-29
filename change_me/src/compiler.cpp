@@ -19,18 +19,28 @@ static std::unique_ptr<StandardInstrumentations> TheSI;
 static std::unordered_map<std::string, Value*> NamedValues;
 static ExitOnError ExitOnErr;
 
+void Compiler::AddPrintf() {
+  /// HACK: This should let us use printf for now
+  // I need to find a way to support variadics, we check for arity at call time
+  // and variadics obviously can take an arbitrary number
+  // For now we expect only 2 arguments
+  // Another issue this may cause is with the JIT since it has predefined c funcs to begin with
+  // so creating a new one is likely to cause problem
+  Type* type = Type::getInt32Ty(*TheContext);
+  PointerType* char_ptr_type = PointerType::getUnqual(*TheContext);
+  FunctionType* printf_type = FunctionType::get(type, char_ptr_type, true);
+  Function* printfFunc = Function::Create(
+      printf_type, GlobalValue::ExternalLinkage, "printf", *TheModule);
+  verifyFunction(*printfFunc);
+  func_table["printf"] = 2;
+}
+
 #define UNREACHABLE(x, y)                                     \
   do {                                                        \
     std::cout << "UNREACHABLE " << #x << " " << #y << "\n";   \
     std::cout << "at" << __FILE__ << " " << __LINE__ << "\n"; \
     exit(1);                                                  \
   } while (0)
-
-/// TODO: Declare the printf method early on to make it visible to all mods
-/// This will allow us to see output prior to getting a stdlib set up
-
-/// TODO: Set up global string constants so they can be used in printf as well
-/// as variables/function arguments
 
 Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
     : mod(std::move(mod)),
@@ -73,7 +83,6 @@ bool Compiler::Compile() {
   switch (opts.mode) {
     case CompilerMode::COMPILE:
       TheModule->setDataLayout(TheTargetMachine->createDataLayout());
-
       CompileBinary(TheTargetMachine);
       return true;
     case CompilerMode::EMIT_LLVM:
@@ -163,6 +172,8 @@ Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
   PB.registerModuleAnalyses(*TheMAM);
   PB.registerFunctionAnalyses(*TheFAM);
   PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
+
+  AddPrintf();
 
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
@@ -285,8 +296,7 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
       type = Type::getInt1Ty(*TheContext);
       break;
     case TT_STR_SPECIFIER:
-      std::cout << "IMPLEMENT STRING TYPES\n";
-      exit(1);
+      type = Type::getInt8Ty(*TheContext);
       break;
     default:
       UNREACHABLE(VarDeclarationStmt, "Unknown variable type");
@@ -518,6 +528,7 @@ Value* Compiler::VisitLiteral(Literal& expr) {
       return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
     case VT_STR:
       /// TODO: No clue if this will work
+      /// it works but i need to figure out a way to escape characters
       return Builder->CreateGlobalString(std::get<std::string>(expr.value), "",
                                          true);
     case VT_VOID:

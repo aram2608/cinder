@@ -68,7 +68,7 @@ std::unique_ptr<Stmt> Parser::Function() {
 
 std::unique_ptr<Stmt> Parser::Statement() {
   if (MatchType({TT_INT32_SPECIFIER, TT_INT64_SPECIFIER, TT_FLT_SPECIFIER,
-                 TT_BOOL_SPECIFIER})) {
+                 TT_BOOL_SPECIFIER, TT_STR_SPECIFIER})) {
     return VarDeclaration();
   }
   if (MatchType({TT_RETURN})) {
