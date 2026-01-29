@@ -21,11 +21,10 @@ static ExitOnError ExitOnErr;
 
 void Compiler::AddPrintf() {
   /// HACK: This should let us use printf for now
-  // I need to find a way to support variadics, we check for arity at call time
-  // and variadics obviously can take an arbitrary number
-  // For now we expect only 2 arguments
-  // Another issue this may cause is with the JIT since it has predefined c funcs to begin with
-  // so creating a new one is likely to cause problem
+  /// I need to find a way to support variadics, we check for arity at call time
+  /// and variadics obviously can take an arbitrary number
+  /// For now we expect only 2 arguments
+  /// TODO: Fix strings in JIT, i dont think it likes the global strings
   Type* type = Type::getInt32Ty(*TheContext);
   PointerType* char_ptr_type = PointerType::getUnqual(*TheContext);
   FunctionType* printf_type = FunctionType::get(type, char_ptr_type, true);
@@ -499,7 +498,7 @@ Value* Compiler::VisitVariable(Variable& expr) {
 
   auto temp = symbol_table.find(lex);
   if (temp == symbol_table.end()) {
-    std::cout << "Variables is undefined " << lex;
+    std::cout << "Variables is undefined: '" << lex << "'\n";
     exit(1);
   }
 

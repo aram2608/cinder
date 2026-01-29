@@ -97,6 +97,8 @@ struct Lexer {
   void AddToken(TokenType tok_type, std::string lexeme, ValueType value_type,
                 TokenValue value);
 
+  void ParseComment();
+
   /**
    * @brief Method to help during debugging, prints the tokens incrementally
    */

@@ -88,13 +88,7 @@ void Lexer::Scan() {
       }
       break;
     case '/':
-      if (Match('/')) {
-        while (PeekChar() != '\n') {
-          Advance();
-        }
-        break;
-      }
-      AddToken(TT_SLASH);
+      Match('/') ? ParseComment() : AddToken(TT_SLASH);
       break;
     case '%':
       AddToken(TT_MODULO);
@@ -192,6 +186,12 @@ void Lexer::AddToken(TokenType tok_type) {
 void Lexer::AddToken(TokenType tok_type, std::string lexeme,
                      ValueType value_type, TokenValue value) {
   tokens.emplace_back(tok_type, line_count, lexeme, value_type, value);
+}
+
+void Lexer::ParseComment() {
+  while (PeekChar() != '\n' && !IsEnd()) {
+    Advance();
+  }
 }
 
 void Lexer::EmitTokens() {
