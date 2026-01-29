@@ -188,17 +188,6 @@ Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
 Value* Compiler::VisitIfStmt(IfStmt& stmt) {
   Value* condition = stmt.cond->Accept(*this);
 
-  Type* cond_type = condition->getType();
-  if (cond_type->isFloatTy()) {
-    condition = Builder->CreateFCmpONE(
-        condition, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
-  } else if (cond_type->isIntegerTy()) {
-    ConstantInt* comp = ConstantInt::get(*TheContext, APInt(64, 0));
-    condition = Builder->CreateCmp(CmpInst::ICMP_NE, condition, comp);
-  } else {
-    UNREACHABLE(IfStmt, "Type not supported yet");
-  }
-
   Function* Func = Builder->GetInsertBlock()->getParent();
 
   BasicBlock* then_block = BasicBlock::Create(*TheContext, "then", Func);

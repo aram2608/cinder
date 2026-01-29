@@ -9,7 +9,7 @@ def main() -> int32
     int64: a = 4;
     bool: flag = 1 > 4;
     str: test = "hello world";
-    if 2 > 0
+    if 2 == 2
         printf("%d", 1);
     else
         printf("%d", 0);

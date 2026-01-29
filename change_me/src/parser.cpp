@@ -140,8 +140,8 @@ std::unique_ptr<Expr> Parser::Assignment() {
 
 std::unique_ptr<Expr> Parser::Comparison() {
   std::unique_ptr<Expr> expr = Term();
-  while (MatchType(
-      {TT_LESSER, TT_LESSER_EQ, TT_GREATER, TT_GREATER_EQ, TT_BANGEQ})) {
+  while (MatchType({TT_LESSER, TT_LESSER_EQ, TT_GREATER, TT_GREATER_EQ,
+                    TT_BANGEQ, TT_EQEQ})) {
     Token op = Previous();
     std::unique_ptr<Expr> right = Term();
     expr = std::make_unique<Conditional>(std::move(expr), std::move(right), op);
