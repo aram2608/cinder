@@ -10,7 +10,7 @@ Value* Literal::Accept(ExprVisitor& visitor) {
 
 std::string Literal::ToString() {
   switch (value_type) {
-    case VT_INT:
+    case VT_INT32:
       return std::to_string(std::get<int>(value));
     case VT_FLT:
       return std::to_string(std::get<float>(value));

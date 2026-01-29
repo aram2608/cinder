@@ -30,8 +30,8 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
       }
       Token type = Advance();
       Token identifier = Consume(TT_IDENTIFER, "expected arg name");
-      if (type.token_type == TT_INT_SPECIFIER) {
-        args.emplace_back(VT_INT, identifier);
+      if (type.token_type == TT_INT32_SPECIFIER) {
+        args.emplace_back(VT_INT32, identifier);
       } else if (type.token_type == TT_FLT_SPECIFIER) {
         args.emplace_back(VT_FLT, identifier);
       } else {
@@ -67,7 +67,8 @@ std::unique_ptr<Stmt> Parser::Function() {
 }
 
 std::unique_ptr<Stmt> Parser::Statement() {
-  if (MatchType({TT_INT_SPECIFIER, TT_FLT_SPECIFIER, TT_BOOL_SPECIFIER})) {
+  if (MatchType({TT_INT32_SPECIFIER, TT_INT64_SPECIFIER, TT_FLT_SPECIFIER,
+                 TT_BOOL_SPECIFIER})) {
     return VarDeclaration();
   }
   if (MatchType({TT_RETURN})) {
@@ -276,8 +277,8 @@ std::string Parser::GetTokenTypeString(Token tok) {
   switch (tok.value_type) {
     case VT_FLT:
       return "flt";
-    case VT_INT:
-      return "int";
+    case VT_INT32:
+      return "int32";
     case VT_STR:
       return "str";
     case VT_VOID:

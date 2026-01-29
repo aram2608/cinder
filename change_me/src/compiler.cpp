@@ -24,17 +24,17 @@ static ExitOnError ExitOnErr;
     exit(1);                                                \
   } while (0)
 
-Compiler::Compiler(std::unique_ptr<Stmt> mod, std::string out_path,
-                   bool emit_llvm, bool run, bool compile)
+Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
     : mod(std::move(mod)),
       symbol_table{},
-      out_path(out_path),
-      compiled_program{},
-      emit_llvm(emit_llvm),
-      run(run),
-      compile(compile) {}
+      opts(opts),
+      // TODO: Find a way to have the context stored as a member var
+      // For now the module outlives the context leading a seg fault during cleanup
+      // At least thats what I think is happening since I don't have debug info for LLVM
+      context(std::make_unique<LLVMContext>()) {}
 
-void Compiler::Compile() {
+void Compiler::GenerateIR() {
+  // TODO: Find a way to set target triple during IR gene
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   InitializeNativeTargetAsmParser();
@@ -42,37 +42,56 @@ void Compiler::Compile() {
   TheJIT = ExitOnErr(JIT::Create());
   mod->Accept(*this);
 
-  if (emit_llvm) {
-    std::error_code EC;
-    StringRef name{out_path};
-    raw_fd_ostream OS(name, EC, sys::fs::OF_None);
-    TheModule->print(OS, nullptr);
-  }
-  if (run) {
-    // std::string out_str{};
-    // raw_string_ostream OS{out_str};
-    // TheModule->print(OS, nullptr);
-    // compiled_program = OS.str();
-    auto RT = TheJIT->GetMainJITDylib().createResourceTracker();
-    auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
-    ExitOnErr(TheJIT->AddModule(std::move(TSM), RT));
-  }
-
-  if (compile) {
-    std::error_code EC;
-    std::string temp = "." + out_path + ".ll";
-    StringRef name{temp};
-    raw_fd_ostream OS(name, EC, sys::fs::OF_None);
-    TheModule->print(OS, nullptr);
-    std::string CMD = "clang " + temp + " -o " + out_path;
-    std::string CLEANUP = "rm " + temp;
-    system(CMD.c_str());
-    system(CLEANUP.c_str());
+  switch (opts.mode) {
+    case CompilerMode::COMPILE:
+      CompileBinary();
+      break;
+    case CompilerMode::EMIT_LLVM:
+      EmitLLVM();
+      break;
+    case CompilerMode::RUN:
+      CompileRun();
+      break;
   }
 }
 
+void Compiler::EmitLLVM() {
+  std::error_code EC;
+  StringRef name{opts.out_path};
+  raw_fd_ostream OS(name, EC, sys::fs::OF_None);
+  TheModule->print(OS, nullptr);
+}
+
+void Compiler::CompileRun() {
+  auto RT = TheJIT->GetMainJITDylib().createResourceTracker();
+  auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+  ExitOnErr(TheJIT->AddModule(std::move(TSM), RT));
+  auto ExprSymbol = ExitOnErr(TheJIT->Lookup("main"));
+  int (*FP)() = ExprSymbol.toPtr<int (*)()>();
+  fprintf(stderr, "Exit code %d\n", FP());
+}
+
+void Compiler::CompileBinary() {
+  std::error_code EC;
+  std::string temp = "." + opts.out_path + ".ll";
+  StringRef name{temp};
+  raw_fd_ostream OS(name, EC, sys::fs::OF_None);
+  TheModule->print(OS, nullptr);
+
+  std::string linker_flags{};
+  for (auto opt : opts.linker_flags) {
+    linker_flags += opt;
+  }
+
+  std::string CMD =
+      "clang " + temp + " " + linker_flags + " -o " + opts.out_path;
+  std::string CLEANUP = "rm " + temp;
+  system(CMD.c_str());
+  system(CLEANUP.c_str());
+}
+
 Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
-  TheModule = std::make_unique<Module>(stmt.name.lexeme, *TheContext);
+  TheModule = MakeNewModule(stmt, *TheContext);
   TheModule->setDataLayout(TheJIT->GetDataLayout());
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
   TheFPM = std::make_unique<FunctionPassManager>();
@@ -112,8 +131,8 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
   BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", Func);
   Builder->SetInsertPoint(BB);
 
-  for (auto& stmt : stmt.body) {
-    stmt->Accept(*this);
+  for (auto& body_stmt : stmt.body) {
+    body_stmt->Accept(*this);
   }
 
   verifyFunction(*Func);
@@ -131,27 +150,44 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   }
 
   Type* return_type;
-  if (stmt.return_type.token_type == TT_INT_SPECIFIER) {
-    return_type = Type::getInt32Ty(*TheContext);
-  } else if (stmt.return_type.token_type == TT_FLT_SPECIFIER) {
-    return_type = Type::getDoubleTy(*TheContext);
-  } else if (stmt.return_type.token_type == TT_VOID_SPECIFIER) {
-    return_type = Type::getVoidTy(*TheContext);
-  } else {
-    UNREACHABLE(FunctionProto, RETURN);
+  switch (stmt.return_type.token_type) {
+    case TT_INT32_SPECIFIER:
+      return_type = Type::getInt32Ty(*TheContext);
+      break;
+    case TT_INT64_SPECIFIER:
+      return_type = Type::getInt64Ty(*TheContext);
+      break;
+    case TT_FLT_SPECIFIER:
+      return_type = Type::getDoubleTy(*TheContext);
+      break;
+    case TT_VOID_SPECIFIER:
+      return_type = Type::getVoidTy(*TheContext);
+      break;
+    default:
+      UNREACHABLE(FunctionProto, RETURN);
   }
 
   std::vector<Type*> arg_types;
   for (auto& arg : stmt.args) {
-    if (arg.type == VT_INT) {
-      arg_types.push_back(Type::getInt32Ty(*TheContext));
-    } else if (arg.type == VT_FLT) {
-      arg_types.push_back(Type::getFloatTy(*TheContext));
-    } else if (arg.type == VT_STR) {
-      std::cout << "Implement me compiler.cpp line 47\n";
-      exit(1);
-    } else {
-      UNREACHABLE(FunctionProto, ARGTYPES);
+    switch (arg.type) {
+      case VT_INT32:
+        arg_types.push_back(Type::getInt32Ty(*TheContext));
+        break;
+      case VT_INT64:
+        arg_types.push_back(Type::getInt64Ty(*TheContext));
+        break;
+      case VT_FLT:
+        arg_types.push_back(Type::getFloatTy(*TheContext));
+        break;
+      case VT_STR:
+        std::cout
+            << "Implement me compiler.cpp VisitFUnctionProto string arg type\n";
+        exit(1);
+      case VT_VOID:
+        arg_types.push_back(Type::getVoidTy(*TheContext));
+        break;
+      default:
+        UNREACHABLE(FunctionProto, ARGTYPES);
     }
   }
 
@@ -186,8 +222,11 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
   }
   Type* type;
   switch (stmt.type.token_type) {
-    case TT_INT_SPECIFIER:
+    case TT_INT32_SPECIFIER:
       type = Type::getInt32Ty(*TheContext);
+      break;
+    case TT_INT64_SPECIFIER:
+      type = Type::getInt64Ty(*TheContext);
       break;
     case TT_FLT_SPECIFIER:
       type = Type::getFloatTy(*TheContext);
@@ -251,9 +290,13 @@ Value* Compiler::VisitConditional(Conditional& expr) {
         UNREACHABLE(Conditional, FloatType);
     }
   } else {
+    std::cout << "incompatible types in '" << expr.op.lexeme
+              << "' expression.\n";
+    std::cout << left->getName().str();
     l_type->print(errs(), true);
+    std::cout << "\n";
     r_type->print(errs(), true);
-    std::cout << "incompatible types\n";
+    std::cout << "\n";
     exit(1);
   }
   return nullptr;
@@ -293,9 +336,12 @@ Value* Compiler::VisitBinary(Binary& expr) {
         UNREACHABLE(Binary, FloatType);
     }
   } else {
+    std::cout << "incompatible types in '" << expr.op.lexeme
+              << "' expression.\n";
     l_type->print(errs(), true);
+    std::cout << "\n";
     r_type->print(errs(), true);
-    std::cout << "incompatible types\n";
+    std::cout << "\n";
     exit(1);
   }
   return nullptr;
@@ -412,9 +458,12 @@ Value* Compiler::VisitBoolean(BoolLiteral& expr) {
 
 Value* Compiler::VisitLiteral(Literal& expr) {
   switch (expr.value_type) {
-    case VT_INT:
+    case VT_INT32:
       return ConstantInt::get(*TheContext,
                               APInt(32, std::get<int>(expr.value)));
+    case VT_INT64:
+      return ConstantInt::get(*TheContext,
+                              APInt(64, std::get<int>(expr.value)));
     case VT_FLT:
       return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
     case VT_STR:
@@ -426,4 +475,19 @@ Value* Compiler::VisitLiteral(Literal& expr) {
     default:
       UNREACHABLE(Literal, ValueType);
   }
+}
+
+CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,
+                                 bool debug_info,
+                                 std::vector<std::string> linker_flags_list)
+    : out_path(out_path), mode(mode), debug_info(debug_info) {
+  for (auto it = linker_flags_list.begin(); it != linker_flags_list.end();
+       ++it) {
+    linker_flags += *it;
+  }
+}
+
+std::unique_ptr<llvm::Module> Compiler::MakeNewModule(ModuleStmt& stmt,
+                                                      llvm::LLVMContext& ctx) {
+  return std::make_unique<Module>(stmt.name.lexeme, *TheContext);
 }

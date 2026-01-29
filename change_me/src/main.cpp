@@ -28,6 +28,8 @@ bool ParseCLI(int argc, char** argv) {
   options.set_width(70).set_tab_expansion();
   options.allow_unrecognised_options();
 
+  options.add_options()("g", "Debug information");
+  options.add_options()("l", "Linker option");
   options.add_options()("emit-tokens", "Emits the lexers tokens");
   options.add_options()("emit-ast", "Emits the scanners ast");
   options.add_options()("emit-llvm", "Emits llvm output");
@@ -87,19 +89,30 @@ bool ParseCLI(int argc, char** argv) {
       lexer.ScanTokens();
       Parser parser{lexer.tokens};
       std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{std::move(mod), out_path, true, false, false};
-      compiler.Compile();
-      std::cout << compiler.compiled_program << "\n";
+      Compiler compiler{
+          std::move(mod),
+          CompilerOptions{out_path, CompilerMode::EMIT_LLVM, false, {}}};
+      compiler.GenerateIR();
     }
     return true;
   }
 
   if (result.contains("compile")) {
+    bool debug_info = false;
+    std::vector<std::string> linker_flags;
     std::vector<std::string> file_paths =
         result["src"].as<std::vector<std::string>>();
     std::string out_path = "main";
     if (result.contains("o")) {
       out_path = result["o"].as<std::string>();
+    }
+    if (result.contains("l")) {
+      linker_flags.push_back("-l");
+      linker_flags.push_back(result["l"].as<std::string>());
+    }
+    if (result.contains("g")) {
+      debug_info = true;
+      linker_flags.push_back("-g");
     }
     for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
       std::string source = ReadEntireFile(*it);
@@ -107,8 +120,10 @@ bool ParseCLI(int argc, char** argv) {
       lexer.ScanTokens();
       Parser parser{lexer.tokens};
       std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{std::move(mod), out_path, false, false, true};
-      compiler.Compile();
+      Compiler compiler{std::move(mod),
+                        CompilerOptions{out_path, CompilerMode::COMPILE,
+                                        debug_info, linker_flags}};
+      compiler.GenerateIR();
     }
     return true;
   }
@@ -126,8 +141,10 @@ bool ParseCLI(int argc, char** argv) {
       lexer.ScanTokens();
       Parser parser{lexer.tokens};
       std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{std::move(mod), out_path, false, true, false};
-      compiler.Compile();
+      Compiler compiler{
+          std::move(mod),
+          CompilerOptions{out_path, CompilerMode::RUN, false, {}}};
+      compiler.GenerateIR();
     }
     return true;
   }

@@ -28,6 +28,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/TargetSelect.h"
@@ -38,21 +39,35 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
+enum class CompilerMode {
+  EMIT_LLVM,
+  RUN,
+  COMPILE,
+};
+
+struct CompilerOptions {
+  std::string out_path;
+  CompilerMode mode;
+  std::string linker_flags;
+  bool debug_info;
+  CompilerOptions(std::string out_path, CompilerMode mode, bool debug_info,
+                  std::vector<std::string> linker_flags_list);
+};
+
 struct Compiler : ExprVisitor, StmtVisitor {
   std::unique_ptr<Stmt> mod;
   std::unordered_map<std::string, llvm::AllocaInst*> symbol_table;
   std::unordered_map<std::string, llvm::Argument*> argument_table;
   std::unordered_map<std::string, size_t> func_table;
-  std::string out_path;
-  std::string compiled_program;
-  bool emit_llvm;
-  bool run;
-  bool compile;
+  CompilerOptions opts;
+  std::unique_ptr<llvm::LLVMContext> context;
 
-  Compiler(std::unique_ptr<Stmt> mod, std::string out_path, bool emit_llvm,
-           bool run, bool compile);
+  Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
-  void Compile();
+  void GenerateIR();
+  void EmitLLVM();
+  void CompileRun();
+  void CompileBinary();
 
   llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
@@ -70,6 +85,9 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* VisitVariable(Variable& expr) override;
   llvm::Value* VisitBoolean(BoolLiteral& expr) override;
   llvm::Value* VisitLiteral(Literal& expr) override;
+
+  std::unique_ptr<llvm::Module> MakeNewModule(ModuleStmt& stmt,
+                                              llvm::LLVMContext& ctx);
 };
 
 #endif

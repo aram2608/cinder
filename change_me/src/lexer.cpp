@@ -1,7 +1,10 @@
 #include "../include/lexer.hpp"
 
+// TODO: Fix the typing system so it is more ergonomic to work with
+// Handling the types at parse time and IR gen time is a bit awkward
 static const std::unordered_map<std::string, TokenType> key_words = {
-    {"int", TT_INT_SPECIFIER},
+    {"int32", TT_INT32_SPECIFIER},
+    {"int64", TT_INT64_SPECIFIER},
     {"flt", TT_FLT_SPECIFIER},
     {"str", TT_STR_SPECIFIER},
     {"bool", TT_BOOL_SPECIFIER},
@@ -226,7 +229,6 @@ void Lexer::TokenizeIdentifier() {
   AddToken(TT_IDENTIFER, temp, VT_NULL, temp);
 }
 
-// TODO: Implement floats
 void Lexer::TokenizeNumber() {
   while (!IsEnd() && IsNumeric(PeekChar())) {
     Advance();
@@ -242,7 +244,7 @@ void Lexer::TokenizeNumber() {
   } else {
     size_t index = current_pos - start_pos;
     std::string temp = source_str.substr(start_pos, index);
-    AddToken(TT_INT, temp, VT_INT, std::stoi(temp));
+    AddToken(TT_INT, temp, VT_INT32, std::stoi(temp));
   }
 }
 
@@ -326,8 +328,10 @@ std::string Lexer::TokenToString(Token tok) {
       return "END";
     case TT_EOF:
       return "EOF";
-    case TT_INT_SPECIFIER:
-      return "INT TYPE";
+    case TT_INT32_SPECIFIER:
+      return "INT32 TYPE";
+    case TT_INT64_SPECIFIER:
+      return "INT64 TYPE";
     case TT_FLT_SPECIFIER:
       return "FLOAT TYPE";
     case TT_STR_SPECIFIER:

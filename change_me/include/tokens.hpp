@@ -51,7 +51,8 @@ enum TokenType {
 
   // Types
   TT_BOOL_SPECIFIER,
-  TT_INT_SPECIFIER,
+  TT_INT32_SPECIFIER,
+  TT_INT64_SPECIFIER,
   TT_FLT_SPECIFIER,
   TT_STR_SPECIFIER,
   TT_VOID_SPECIFIER,
@@ -68,8 +69,12 @@ enum TokenType {
   TT_COUNT, /** The number of tokens available */
 };
 
+// TODO: Fix the typing system so it is more ergonomic
+// This acts as a tagged union with the std::variant, this is really
+// awkward during parse and IR gen time
 enum ValueType {
-  VT_INT, /** Integer */
+  VT_INT32, /** Integer */
+  VT_INT64,
   VT_STR, /** String */
   VT_FLT, /** Float */
   VT_VOID,

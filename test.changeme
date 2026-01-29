@@ -1,14 +1,12 @@
 mod main;
 
-def get(int a, int b) -> int
+def get(int32 a, int32 b) -> int32
     return a + b;
 end
 
-def main() -> int
-    int: b = get(1, 4);
+def main() -> int32
+    int32: b = get(1, 4);
+    int64: a = 4;
     bool: flag = 1 > 4;
-    b = 4;
-    --b;
-    b = get(1, 6);
-    return 0;
+    return 1;
 end
