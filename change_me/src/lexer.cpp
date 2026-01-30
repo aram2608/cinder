@@ -239,7 +239,6 @@ void Lexer::EscapeCharacters(std::string& str) {
       temp += *c;
     }
   }
-  std::cout << temp << "\n";
   str = temp;
 }
 
