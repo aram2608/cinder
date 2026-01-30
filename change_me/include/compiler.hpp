@@ -82,6 +82,9 @@ struct Compiler : ExprVisitor, StmtVisitor {
       symbol_table; /**< Symbol table to store local vars */
   std::unordered_map<std::string, llvm::Argument*>
       argument_table; /**< Table to store function arguments */
+  /// TODO: Fix function arity, currently we store it in the table so we can
+  /// check at call time but that is restrictive for variadic funcs. I think I
+  /// can probably just ignore the arity and have clang yell at the user
   std::unordered_map<std::string, size_t>
       func_table;       /**< Table to store the funcs in a module */
   CompilerOptions opts; /**< The compiler options */
@@ -98,6 +101,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
   void CompileBinary(llvm::TargetMachine* target_machine);
 
   llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
+  llvm::Value* VisitForStmt(ForStmt& stmt) override;
   llvm::Value* VisitIfStmt(IfStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
   llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;

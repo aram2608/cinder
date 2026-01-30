@@ -185,18 +185,56 @@ Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
   return nullptr;
 }
 
+Value* Compiler::VisitForStmt(ForStmt& stmt) {
+  if (stmt.initializer) {
+    stmt.initializer->Accept(*this);
+  }
+
+  Function* func = Builder->GetInsertBlock()->getParent();
+  BasicBlock* cond_block = BasicBlock::Create(*TheContext, "loop.cond", func);
+  BasicBlock* loop_block = BasicBlock::Create(*TheContext, "loop.body", func);
+  BasicBlock* step_block = BasicBlock::Create(*TheContext, "loop.step", func);
+  BasicBlock* after_block = BasicBlock::Create(*TheContext, "loop.end", func);
+
+  Builder->CreateBr(cond_block);
+
+  Builder->SetInsertPoint(cond_block);
+  Value* condition = stmt.condition->Accept(*this);
+
+  Builder->CreateCondBr(condition, loop_block, after_block);
+
+  Builder->SetInsertPoint(loop_block);
+  for (auto& stmt : stmt.body) {
+    stmt->Accept(*this);
+  }
+
+  Builder->CreateBr(step_block);
+
+  Builder->SetInsertPoint(step_block);
+  if (stmt.step) {
+    stmt.step->Accept(*this);
+  }
+  Builder->CreateBr(cond_block);
+
+  Builder->SetInsertPoint(after_block);
+  return nullptr;
+}
+
 Value* Compiler::VisitIfStmt(IfStmt& stmt) {
   Value* condition = stmt.cond->Accept(*this);
 
   Function* Func = Builder->GetInsertBlock()->getParent();
 
-  BasicBlock* then_block = BasicBlock::Create(*TheContext, "then", Func);
-  BasicBlock* else_block = BasicBlock::Create(*TheContext, "else");
-  BasicBlock* merge = BasicBlock::Create(*TheContext, "ifcont");
+  BasicBlock* then_block = BasicBlock::Create(*TheContext, "if.then", Func);
+  BasicBlock* else_block = BasicBlock::Create(*TheContext, "if.else");
+  BasicBlock* merge = BasicBlock::Create(*TheContext, "if.cont");
 
   Builder->CreateCondBr(condition, then_block, else_block);
 
   Builder->SetInsertPoint(then_block);
+  /// TODO: Add multiple statements in the body of the then and else branches
+  /// We do not have block statements so passing a bunch of stuff at once
+  /// probably needs a vector for now
   stmt.then->Accept(*this);
 
   Builder->CreateBr(merge);

@@ -2,6 +2,7 @@
 - [] Solidify syntax
 - [] Clean up LLVM code gene *Urgent* Currently very sloppy
 - [] Fix the JIT compiler, some stuff seg faults
+- [] Fix function arity, currently variadic arguments are not supported
 - [] Find a way to resolve imports/multiple modules
 - [] Create a basic stdlib, printf etc..
 - [x] Create a lexer

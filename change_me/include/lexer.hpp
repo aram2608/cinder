@@ -16,12 +16,16 @@ struct Lexer {
   std::string source_str; /** The source string provided */
   std::vector<Token> tokens; /** A flexible array member for the tokens */
 
-  /// @brief Constructor for std::string
-  /// @param source_str Source string
+  /**
+   * @brief Constructor for std::string
+   * @param source_str Source string
+   */
   Lexer(std::string source_str);
 
-  /// @brief Constructor for const char*
-  /// @param source_str
+  /**
+   * @brief Constructor for const char*
+   * @param source_str
+   */
   Lexer(const char* source_str);
 
   /// @brief Method to tokenize the source code
@@ -97,30 +101,38 @@ struct Lexer {
   void AddToken(TokenType tok_type, std::string lexeme, ValueType value_type,
                 TokenValue value);
 
+  /// @brief Method to parse comments
   void ParseComment();
 
-  /**
-   * @brief Method to help during debugging, prints the tokens incrementally
-   */
+  /// @brief Method to help during debugging, prints the tokens incrementally
   void EmitTokens();
+
+  /// @brief Method to tokenize string literals
+  void TokenizeString();
+
+  /**
+   * @brief Method to escape characters in a tokenized string
+   *
+   * This method is somewhat of a hack since the way I currently tokenize a
+   * string is by checking for the final quotation. This is probably inefficient
+   * but most C++ project take 5 minutes to compile anyways so its not like my
+   * compile time really matters.
+   *
+   * @param str String to be reanalyzed for
+   */
+  void EscapeCharacters(std::string& str);
+
+  /// @brief Method to lex identifiers and key words
+  void TokenizeIdentifier();
+
+  /// @brief Method to lex numeric types
+  void TokenizeNumber();
 
   /**
    * @brief A simple helper method to parse token types into strings
    * @param tok_type The token to be formatted
    */
   std::string TokenToString(Token tok);
-
-  void TokenizeString();
-
-  /**
-   * @brief Method to lex identifiers and key words
-   */
-  void TokenizeIdentifier();
-
-  /**
-   * @brief Method to lex numeric types
-   */
-  void TokenizeNumber();
 };
 
 #endif

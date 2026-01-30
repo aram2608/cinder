@@ -107,3 +107,24 @@ std::string IfStmt::ToString() {
   temp += "else: " + otherwise->ToString() + "\n";
   return temp;
 }
+
+ForStmt::ForStmt(std::unique_ptr<Stmt> intializer,
+                 std::unique_ptr<Expr> condition, std::unique_ptr<Expr> step,
+                 std::vector<std::unique_ptr<Stmt>> body)
+    : initializer(std::move(intializer)),
+      condition(std::move(condition)),
+      step(std::move(step)),
+      body(std::move(body)) {}
+
+Value* ForStmt::Accept(StmtVisitor& visitor) {
+  return visitor.VisitForStmt(*this);
+}
+
+std::string ForStmt::ToString() {
+  std::string temp = "for: " + initializer->ToString() + " ";
+  temp += condition->ToString() + " " + step->ToString() + "\n";
+  for (auto& stmt : body) {
+    temp += stmt->ToString() + "\n";
+  }
+  return temp;
+}

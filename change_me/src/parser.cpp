@@ -77,7 +77,24 @@ std::unique_ptr<Stmt> Parser::Statement() {
   if (MatchType({TT_IF})) {
     return IfStatement();
   }
+  if (MatchType({TT_FOR})) {
+    return ForStatement();
+  }
   return ExpressionStatement();
+}
+
+std::unique_ptr<Stmt> Parser::ForStatement() {
+  std::unique_ptr<Stmt> initializer = Statement();
+  std::unique_ptr<Expr> condition = Expression();
+  Consume(TT_SEMICOLON, "';' expected after condition");
+  std::unique_ptr<Expr> step = Expression();
+  std::vector<std::unique_ptr<Stmt>> body;
+  while (!CheckType(TT_END) && !IsEnd()) {
+    body.push_back(Statement());
+  }
+  Consume(TT_END, "expected 'end' after the loop");
+  return std::make_unique<ForStmt>(std::move(initializer), std::move(condition),
+                                   std::move(step), std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::IfStatement() {
@@ -120,7 +137,7 @@ std::unique_ptr<Stmt> Parser::VarDeclaration() {
 
 std::unique_ptr<Stmt> Parser::ExpressionStatement() {
   std::unique_ptr<Expr> expr = Expression();
-  Consume(TT_SEMICOLON, "Expected ';' after statement");
+  Consume(TT_SEMICOLON, "Expected ';' after expression statement");
   return std::make_unique<ExpressionStmt>(std::move(expr));
 }
 

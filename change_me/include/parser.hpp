@@ -38,6 +38,10 @@ struct Parser {
   /// @return A pointer to a statement
   std::unique_ptr<Stmt> Statement();
 
+  /// @brief Method to parse a for statement
+  /// @return A pointer to a for statement
+  std::unique_ptr<Stmt> ForStatement();
+
   /// @brief Method to parse an if statement
   /// @return A pointer to an if statement
   std::unique_ptr<Stmt> IfStatement();

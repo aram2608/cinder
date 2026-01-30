@@ -21,9 +21,7 @@ struct FunctionStmt;
 struct FunctionProto;
 struct ReturnStmt;
 struct VarDeclarationStmt;
-/// TODO: Implement If statements
 struct IfStmt;
-/// TODO: Implement loops
 struct ForStmt;
 
 /// @struct StmtVisitor
@@ -37,7 +35,7 @@ struct StmtVisitor {
   virtual llvm::Value* VisitFunctionProto(FunctionProto& stmt) = 0;
   virtual llvm::Value* VisitModuleStmt(ModuleStmt& stmt) = 0;
   virtual llvm::Value* VisitIfStmt(IfStmt& stmt) = 0;
-  // virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
+  virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
 };
 
 /// @struct Stmt
@@ -224,10 +222,13 @@ struct IfStmt : Stmt {
 
 /// TODO: Implement for stmt
 struct ForStmt : Stmt {
-  std::unique_ptr<Stmt> intializer;
+  std::unique_ptr<Stmt> initializer;
   std::unique_ptr<Expr> condition;
-  std::unique_ptr<Expr> increment;
+  std::unique_ptr<Expr> step;
   std::vector<std::unique_ptr<Stmt>> body;
+
+  ForStmt(std::unique_ptr<Stmt> initializer, std::unique_ptr<Expr> condition,
+          std::unique_ptr<Expr> step, std::vector<std::unique_ptr<Stmt>> body);
 
   /**
    * @brief Method used to emply the visitor pattern

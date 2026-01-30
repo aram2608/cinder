@@ -9,10 +9,16 @@ def main() -> int32
     int64: a = 4;
     bool: flag = 1 > 4;
     str: test = "hello world";
+
     if 2 == 2
-        printf("%d", 1);
+        printf("%d\n", 1);
     else
-        printf("%d", 0);
+        printf("%d\n", 0);
     end
+
+    for int32: it = 0; it < 4; ++it
+        printf("Hello world! %d\n", 4);
+    end
+
     return 0;
 end

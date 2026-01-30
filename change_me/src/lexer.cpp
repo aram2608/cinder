@@ -201,6 +201,7 @@ void Lexer::EmitTokens() {
 }
 
 void Lexer::TokenizeString() {
+  /// TODO: Find a way to escape characters
   while (!IsEnd() && PeekChar() != '"') {
     Advance();
   }
@@ -211,7 +212,35 @@ void Lexer::TokenizeString() {
   Advance();
   size_t index = current_pos - start_pos - 2;
   std::string value = source_str.substr(start_pos + 1, index);
+  EscapeCharacters(value);
   AddToken(TT_STR, value, VT_STR, value);
+}
+
+void Lexer::EscapeCharacters(std::string& str) {
+  std::string temp = "";
+  for (auto c = str.begin(); c != str.end(); c++) {
+    if (*c == '\\') {
+      c++;
+      switch (*c) {
+        case '"':
+          temp += '"';
+          break;
+        case 'n':
+          temp += '\n';
+          break;
+        case 't':
+          temp += '\t';
+          break;
+        default:
+          temp += *c;
+          break;
+      }
+    } else {
+      temp += *c;
+    }
+  }
+  std::cout << temp << "\n";
+  str = temp;
 }
 
 void Lexer::TokenizeIdentifier() {

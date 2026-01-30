@@ -24,3 +24,8 @@ OPTS := -DCXXOPTS_NO_EXCEPTIONS
 $(BUILD_DIR)/$(TARGET):
 	@mkdir -p $(@D)
 	$(CXX) $(INCLUDE_FLAGS) $(WFLAGS) $(LDFLAGS) $(OPTS) -o $@ $(SRC_FILES)
+
+LLVM:
+	./build/main --emit-llvm -o test.ll test.changeme
+TEST:
+	./build/main --compile -o test test.changeme
