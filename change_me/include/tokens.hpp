@@ -31,6 +31,7 @@ enum TokenType {
   TT_ELSEIF, /** Then branch */
   TT_ELSE,   /** Else branch */
   TT_FOR,    /** For loop */
+  TT_WHILE,
   TT_TRUE,
   TT_FALSE,
   TT_RETURN,

@@ -1,4 +1,7 @@
 #include "../include/stmt.hpp"
+#include <memory>
+#include <string>
+#include "llvm/IR/Value.h"
 
 using namespace llvm;
 
@@ -123,6 +126,22 @@ Value* ForStmt::Accept(StmtVisitor& visitor) {
 std::string ForStmt::ToString() {
   std::string temp = "for: " + initializer->ToString() + " ";
   temp += condition->ToString() + " " + step->ToString() + "\n";
+  for (auto& stmt : body) {
+    temp += stmt->ToString() + "\n";
+  }
+  return temp;
+}
+
+WhileStmt::WhileStmt(std::unique_ptr<Expr> condition,
+                     std::vector<std::unique_ptr<Stmt>> body)
+    : condition(std::move(condition)), body(std::move(body)) {}
+
+Value* WhileStmt::Accept(StmtVisitor& visitor) {
+  return visitor.VisitWhileStmt(*this);
+}
+
+std::string WhileStmt::ToString() {
+  std::string temp = "while: " + condition->ToString() + "\n";
   for (auto& stmt : body) {
     temp += stmt->ToString() + "\n";
   }

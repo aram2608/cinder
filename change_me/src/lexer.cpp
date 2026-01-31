@@ -14,6 +14,7 @@ static const std::unordered_map<std::string, TokenType> key_words = {
     {"elif", TT_ELSEIF},
     {"else", TT_ELSE},
     {"for", TT_FOR},
+    {"while", TT_WHILE},
     {"true", TT_TRUE},
     {"false", TT_FALSE},
     {"return", TT_RETURN},
@@ -201,12 +202,12 @@ void Lexer::EmitTokens() {
 }
 
 void Lexer::TokenizeString() {
-  /// TODO: Find a way to escape characters
   while (!IsEnd() && PeekChar() != '"') {
     Advance();
   }
   if (IsEnd()) {
-    std::cout << std::to_string(start_pos) << "\n";
+    std::cout << "Unterminated string at " << std::to_string(line_count)
+              << "\n";
     exit(1);
   }
   Advance();

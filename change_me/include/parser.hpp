@@ -38,6 +38,8 @@ struct Parser {
   /// @return A pointer to a statement
   std::unique_ptr<Stmt> Statement();
 
+  std::unique_ptr<Stmt> WhileStatement();
+
   /// @brief Method to parse a for statement
   /// @return A pointer to a for statement
   std::unique_ptr<Stmt> ForStatement();

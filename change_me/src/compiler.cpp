@@ -1,5 +1,8 @@
 #include "../include/compiler.hpp"
 #include "../include/JIT.hpp"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Value.h"
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -182,6 +185,28 @@ Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
 
 Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
   stmt.expr->Accept(*this);
+  return nullptr;
+}
+
+Value* Compiler::VisitWhileStmt(WhileStmt& stmt) {
+  Function* func = Builder->GetInsertBlock()->getParent();
+  BasicBlock* cond_block = BasicBlock::Create(*TheContext, "loop.cond", func);
+  BasicBlock* loop_block = BasicBlock::Create(*TheContext, "loop.body", func);
+  BasicBlock* after_block = BasicBlock::Create(*TheContext, "loop.body", func);
+
+  Builder->CreateBr(cond_block);
+  Builder->SetInsertPoint(cond_block);
+  Value* condition = stmt.condition->Accept(*this);
+
+  Builder->CreateCondBr(condition, loop_block, after_block);
+
+  Builder->SetInsertPoint(loop_block);
+  for (auto& stmt : stmt.body) {
+    stmt->Accept(*this);
+  }
+
+  Builder->CreateBr(cond_block);
+  Builder->SetInsertPoint(after_block);
   return nullptr;
 }
 

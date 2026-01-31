@@ -20,5 +20,10 @@ def main() -> int32
         printf("Hello world! %d\n", 4);
     end
 
+    int32: val = 0;
+    while val < 4
+        printf("Hello %d\n", val);
+        ++val;
+    end
     return 0;
 end

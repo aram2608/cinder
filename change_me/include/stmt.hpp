@@ -1,6 +1,9 @@
 #ifndef STMT_H_
 #define STMT_H_
 
+#include <algorithm>
+#include <memory>
+#include <string>
 #include "common.hpp"
 #include "expr.hpp"
 #include "llvm/ADT/APFloat.h"
@@ -13,6 +16,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
 
 struct ModuleStmt;
@@ -23,6 +27,7 @@ struct ReturnStmt;
 struct VarDeclarationStmt;
 struct IfStmt;
 struct ForStmt;
+struct WhileStmt;
 
 /// @struct StmtVisitor
 /// @brief The statement visitor interface
@@ -36,6 +41,7 @@ struct StmtVisitor {
   virtual llvm::Value* VisitModuleStmt(ModuleStmt& stmt) = 0;
   virtual llvm::Value* VisitIfStmt(IfStmt& stmt) = 0;
   virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
+  virtual llvm::Value* VisitWhileStmt(WhileStmt& stmt) = 0;
 };
 
 /// @struct Stmt
@@ -197,6 +203,8 @@ struct VarDeclarationStmt : Stmt {
   std::string ToString() override;
 };
 
+/// @IfStmt
+/// @brief If statement node
 struct IfStmt : Stmt {
   std::unique_ptr<Expr> cond;
   std::unique_ptr<Stmt> then;
@@ -220,7 +228,8 @@ struct IfStmt : Stmt {
   std::string ToString() override;
 };
 
-/// TODO: Implement for stmt
+/// @struct ForStmt
+/// @brief For statement node
 struct ForStmt : Stmt {
   std::unique_ptr<Stmt> initializer;
   std::unique_ptr<Expr> condition;
@@ -242,6 +251,19 @@ struct ForStmt : Stmt {
    * @brief Method to return the string representation of the node
    * @return The string represention
    */
+  std::string ToString() override;
+};
+
+/// @struct WhileStmt
+/// @brief While stmt node
+struct WhileStmt : Stmt {
+  std::unique_ptr<Expr> condition;
+  std::vector<std::unique_ptr<Stmt>> body;
+
+  WhileStmt(std::unique_ptr<Expr> condition,
+            std::vector<std::unique_ptr<Stmt>> body);
+
+  llvm::Value* Accept(StmtVisitor& visitor) override;
   std::string ToString() override;
 };
 

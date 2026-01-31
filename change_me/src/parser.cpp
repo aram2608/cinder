@@ -80,7 +80,20 @@ std::unique_ptr<Stmt> Parser::Statement() {
   if (MatchType({TT_FOR})) {
     return ForStatement();
   }
+  if (MatchType({TT_WHILE})) {
+    return WhileStatement();
+  }
   return ExpressionStatement();
+}
+
+std::unique_ptr<Stmt> Parser::WhileStatement() {
+  std::unique_ptr<Expr> condition = Expression();
+  std::vector<std::unique_ptr<Stmt>> body;
+  while (!(CheckType(TT_END) && !IsEnd())) {
+    body.push_back(Statement());
+  }
+  Consume(TT_END, "'end' expected after loop");
+  return std::make_unique<WhileStmt>(std::move(condition), std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::ForStatement() {

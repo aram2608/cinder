@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "expr.hpp"
+#include "llvm/IR/Value.h"
 #include "stmt.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -102,6 +103,7 @@ struct Compiler : ExprVisitor, StmtVisitor {
 
   llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
   llvm::Value* VisitForStmt(ForStmt& stmt) override;
+  llvm::Value* VisitWhileStmt(WhileStmt& stmt) override;
   llvm::Value* VisitIfStmt(IfStmt& stmt) override;
   llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
   llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
