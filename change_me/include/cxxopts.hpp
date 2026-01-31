@@ -27,12 +27,14 @@ THE SOFTWARE.
 #ifndef CXXOPTS_HPP_INCLUDED
 #define CXXOPTS_HPP_INCLUDED
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <limits>
 #include <initializer_list>
+#include <limits>
+#include <locale>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -41,8 +43,6 @@ THE SOFTWARE.
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <algorithm>
-#include <locale>
 
 #ifdef CXXOPTS_NO_EXCEPTIONS
 #include <iostream>

@@ -1,9 +1,9 @@
-#include "../include/lexer.hpp"
-#include "../include/parser.hpp"
+#include <fstream>
+
 #include "../include/compiler.hpp"
 #include "../include/cxxopts.hpp"
-
-#include <fstream>
+#include "../include/lexer.hpp"
+#include "../include/parser.hpp"
 
 std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};

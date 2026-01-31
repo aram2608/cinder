@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+
 #include "common.hpp"
 #include "expr.hpp"
 #include "llvm/ADT/APFloat.h"

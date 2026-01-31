@@ -9,4 +9,4 @@ PointerAlignment: Left
 AllowShortFunctionsOnASingleLine: Empty
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
-SortIncludes: false
+SortIncludes: true

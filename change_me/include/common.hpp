@@ -1,18 +1,18 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <cassert>
-#include <vector>
-#include <variant>
-#include <unordered_map>
-#include <string>
-#include <memory>
-#include <initializer_list>
-#include <exception>
-#include <utility>
-#include <any>
-#include <typeinfo>
-#include <iostream>
 #include <algorithm>
+#include <any>
+#include <cassert>
+#include <exception>
+#include <initializer_list>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <typeinfo>
+#include <unordered_map>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #endif

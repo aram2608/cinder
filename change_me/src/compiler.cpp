@@ -1,16 +1,14 @@
 #include "../include/compiler.hpp"
-#include "../include/JIT.hpp"
+
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Value.h"
 
 using namespace llvm;
-using namespace llvm::orc;
 
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
-static std::unique_ptr<JIT> TheJIT;
 static std::unique_ptr<FunctionPassManager>
     TheFPM; /**< Function pass optimizer */
 static std::unique_ptr<LoopAnalysisManager> TheLAM; /** Loop optimizer */
@@ -36,13 +34,6 @@ void Compiler::AddPrintf() {
   verifyFunction(*printfFunc);
   func_table["printf"] = 2;
 }
-
-#define UNREACHABLE(x, y)                                     \
-  do {                                                        \
-    std::cout << "UNREACHABLE " << #x << " " << #y << "\n";   \
-    std::cout << "at" << __FILE__ << " " << __LINE__ << "\n"; \
-    exit(1);                                                  \
-  } while (0)
 
 Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
     : mod(std::move(mod)),
@@ -92,10 +83,8 @@ bool Compiler::Compile() {
       EmitLLVM();
       return true;
     case CompilerMode::RUN:
-      TheJIT = ExitOnErr(JIT::Create());
-      TheModule->setDataLayout(TheJIT->GetDataLayout());
       CompileRun();
-      return true;
+      return false;
     default:
       UNREACHABLE(COMPILER_MODE, "Unknown compile type");
   }
@@ -114,12 +103,7 @@ void Compiler::EmitLLVM() {
 }
 
 void Compiler::CompileRun() {
-  auto RT = TheJIT->GetMainJITDylib().createResourceTracker();
-  auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
-  ExitOnErr(TheJIT->AddModule(std::move(TSM), RT));
-  auto ExprSymbol = ExitOnErr(TheJIT->Lookup("main"));
-  int (*FP)() = ExprSymbol.toPtr<int (*)()>();
-  FP();
+  IMPLEMENT(CompileRun);
 }
 
 void Compiler::CompileBinary(TargetMachine* target_machine) {
@@ -332,8 +316,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
         arg_types.push_back(Type::getFloatTy(*TheContext));
         break;
       case VT_STR:
-        std::cout
-            << "Implement me compiler.cpp VisitFUnctionProto string arg type\n";
+        IMPLEMENT(VT_STR);
         exit(1);
       case VT_VOID:
         arg_types.push_back(Type::getVoidTy(*TheContext));
