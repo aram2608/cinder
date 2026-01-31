@@ -1,44 +1,164 @@
 [
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/compiler.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/compiler.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/compiler.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/compiler.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/expr.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/expr.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/expr.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/expr.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/JIT.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/JIT.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/JIT.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/JIT.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/lexer.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/lexer.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/lexer.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/lexer.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/main.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/main.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/main.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/main.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/parser.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/parser.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/parser.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/parser.cpp.o"
-},
-{
-  "directory": "/Users/ja1473/no-name-lang/build/change_me",
-  "command": "/usr/bin/c++  -I/Users/ja1473/no-name-lang/change_me/include -std=gnu++17 -arch arm64 -Wall -Wextra -pedantic -I/opt/homebrew/Cellar/llvm/21.1.8/include -std=c++17 -stdlib=libc++ -fno-exceptions -funwind-tables -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -L/opt/homebrew/Cellar/llvm/21.1.8/lib -Wl,-search_paths_first -Wl,-headerpad_max_install_names -lLLVM-21 -DCXXOPTS_NO_EXCEPTIONS -o CMakeFiles/name-me.dir/src/stmt.cpp.o -c /Users/ja1473/no-name-lang/change_me/src/stmt.cpp",
-  "file": "/Users/ja1473/no-name-lang/change_me/src/stmt.cpp",
-  "output": "change_me/CMakeFiles/name-me.dir/src/stmt.cpp.o"
-}
+  {
+    "file": "./change_me/src/compiler.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/compiler.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/expr.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/expr.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/lexer.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/lexer.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/main.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/main.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/parser.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/parser.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/stmt.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/stmt.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  }
 ]
