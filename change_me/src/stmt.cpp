@@ -11,7 +11,7 @@ ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
     : name(name), stmts(std::move(stmts)) {}
 
 Value* ModuleStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitModuleStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string ModuleStmt::ToString() {
@@ -26,7 +26,7 @@ ExpressionStmt::ExpressionStmt(std::unique_ptr<Expr> expr)
     : expr(std::move(expr)) {}
 
 Value* ExpressionStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitExpressionStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string ExpressionStmt::ToString() {
@@ -38,7 +38,7 @@ FunctionProto::FunctionProto(Token name, Token return_type,
     : name(name), return_type(return_type), args(args) {}
 
 Value* FunctionProto::Accept(StmtVisitor& visitor) {
-  return visitor.VisitFunctionProto(*this);
+  return visitor.Visit(*this);
 }
 
 std::string FunctionProto::ToString() {
@@ -60,7 +60,7 @@ FunctionStmt::FunctionStmt(std::unique_ptr<Stmt> proto,
     : proto(std::move(proto)), body(std::move(body)) {}
 
 Value* FunctionStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitFunctionStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string FunctionStmt::ToString() {
@@ -76,7 +76,7 @@ std::string FunctionStmt::ToString() {
 ReturnStmt::ReturnStmt(std::unique_ptr<Expr> value) : value(std::move(value)) {}
 
 Value* ReturnStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitReturnStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string ReturnStmt::ToString() {
@@ -88,7 +88,7 @@ VarDeclarationStmt::VarDeclarationStmt(Token type, Token name,
     : type(type), name(name), value(std::move(value)) {}
 
 Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitVarDeclarationStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string VarDeclarationStmt::ToString() {
@@ -103,7 +103,7 @@ IfStmt::IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
       otherwise(std::move(otherwise)) {}
 
 Value* IfStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitIfStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string IfStmt::ToString() {
@@ -122,7 +122,7 @@ ForStmt::ForStmt(std::unique_ptr<Stmt> intializer,
       body(std::move(body)) {}
 
 Value* ForStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitForStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string ForStmt::ToString() {
@@ -139,7 +139,7 @@ WhileStmt::WhileStmt(std::unique_ptr<Expr> condition,
     : condition(std::move(condition)), body(std::move(body)) {}
 
 Value* WhileStmt::Accept(StmtVisitor& visitor) {
-  return visitor.VisitWhileStmt(*this);
+  return visitor.Visit(*this);
 }
 
 std::string WhileStmt::ToString() {

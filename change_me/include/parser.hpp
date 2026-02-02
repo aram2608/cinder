@@ -156,13 +156,6 @@ struct Parser {
    * @return Formatted string
    */
   std::string ErrorMessageFormatLn(std::string message);
-
-  /**
-   * @brief Method to return a tokens underlying string type
-   * @param type The token of interest
-   * @return String representation
-   */
-  std::string GetTokenTypeString(Token type);
 };
 
 #endif

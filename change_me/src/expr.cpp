@@ -1,32 +1,20 @@
 #include "../include/expr.hpp"
 using namespace llvm;
 
-Literal::Literal(ValueType value_type, TokenValue value)
-    : value_type(value_type), value(value) {}
+Literal::Literal(TokenValue value) : value(value) {}
 
 Value* Literal::Accept(ExprVisitor& visitor) {
-  return visitor.VisitLiteral(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Literal::ToString() {
-  switch (value_type) {
-    case VT_INT32:
-      return std::to_string(std::get<int>(value));
-    case VT_FLT:
-      return std::to_string(std::get<float>(value));
-    case VT_STR:
-      return std::get<std::string>(value);
-    case VT_VOID:
-      return "void";
-    default:
-      return "UNREACHABLE";
-  }
+  return " ";
 }
 
 BoolLiteral::BoolLiteral(bool boolean) : boolean(boolean) {}
 
 Value* BoolLiteral::Accept(ExprVisitor& visitor) {
-  return visitor.VisitBoolean(*this);
+  return visitor.Visit(*this);
 }
 
 std::string BoolLiteral::ToString() {
@@ -37,7 +25,7 @@ std::string BoolLiteral::ToString() {
 Variable::Variable(Token name) : name(name) {}
 
 Value* Variable::Accept(ExprVisitor& visitor) {
-  return visitor.VisitVariable(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Variable::ToString() {
@@ -47,23 +35,21 @@ std::string Variable::ToString() {
 Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
 
 Value* Grouping::Accept(ExprVisitor& visitor) {
-  return visitor.VisitGrouping(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Grouping::ToString() {
   return "(" + expr->ToString() + ")";
 }
 
-PreFixOp::PreFixOp(Token op, std::unique_ptr<Expr> var)
-    : op(op), var(std::move(var)) {}
+PreFixOp::PreFixOp(Token op, Token name) : op(op), name(name) {}
 
 Value* PreFixOp::Accept(ExprVisitor& visitor) {
-  return visitor.VisitPreIncrement(*this);
+  return visitor.Visit(*this);
 }
 
 std::string PreFixOp::ToString() {
   std::string temp = "PreFixOp: " + op.lexeme;
-  temp += var->ToString();
   return temp;
 }
 
@@ -72,12 +58,12 @@ Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
     : left(std::move(left)), right(std::move(right)), op(op) {}
 
 Value* Binary::Accept(ExprVisitor& visitor) {
-  return visitor.VisitBinary(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Binary::ToString() {
   std::string temp_op{};
-  switch (op.token_type) {
+  switch (op.type) {
     case TT_PLUS:
       temp_op = "+";
       break;
@@ -96,15 +82,15 @@ std::string Binary::ToString() {
   return left->ToString() + " " + temp_op + " " + right->ToString();
 }
 
-Assign::Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value)
-    : name(std::move(name)), value(std::move(value)) {}
+Assign::Assign(Token name, std::unique_ptr<Expr> value)
+    : name(name), value(std::move(value)) {}
 
 Value* Assign::Accept(ExprVisitor& visitor) {
-  return visitor.VisitAssignment(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Assign::ToString() {
-  return "Assignment: " + name->ToString() + " = " + value->ToString();
+  return "Assignment: " + name.lexeme + " = " + value->ToString();
 }
 
 Conditional::Conditional(std::unique_ptr<Expr> left,
@@ -112,12 +98,12 @@ Conditional::Conditional(std::unique_ptr<Expr> left,
     : left(std::move(left)), right(std::move(right)), op(op) {}
 
 Value* Conditional::Accept(ExprVisitor& visitor) {
-  return visitor.VisitConditional(*this);
+  return visitor.Visit(*this);
 }
 
 std::string Conditional::ToString() {
   std::string temp_op{};
-  switch (op.token_type) {
+  switch (op.type) {
     case TT_LESSER:
       temp_op = "<";
       break;
@@ -141,7 +127,7 @@ CallExpr::CallExpr(std::unique_ptr<Expr> callee,
     : callee(std::move(callee)), args(std::move(args)) {}
 
 Value* CallExpr::Accept(ExprVisitor& visitor) {
-  return visitor.VisitCall(*this);
+  return visitor.Visit(*this);
 }
 
 std::string CallExpr::ToString() {

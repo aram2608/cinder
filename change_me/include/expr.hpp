@@ -14,6 +14,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include "tokens.hpp"
+#include "types.hpp"
 
 struct Literal;
 struct BoolLiteral;
@@ -27,20 +28,21 @@ struct Conditional;
 
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
-  virtual llvm::Value* VisitLiteral(Literal& expr) = 0;
-  virtual llvm::Value* VisitBoolean(BoolLiteral& expr) = 0;
-  virtual llvm::Value* VisitVariable(Variable& expr) = 0;
-  virtual llvm::Value* VisitGrouping(Grouping& expr) = 0;
-  virtual llvm::Value* VisitPreIncrement(PreFixOp& expr) = 0;
-  virtual llvm::Value* VisitBinary(Binary& expr) = 0;
-  virtual llvm::Value* VisitCall(CallExpr& expr) = 0;
-  virtual llvm::Value* VisitAssignment(Assign& expr) = 0;
-  virtual llvm::Value* VisitConditional(Conditional& expr) = 0;
+  virtual llvm::Value* Visit(Literal& expr) = 0;
+  virtual llvm::Value* Visit(BoolLiteral& expr) = 0;
+  virtual llvm::Value* Visit(Variable& expr) = 0;
+  virtual llvm::Value* Visit(Grouping& expr) = 0;
+  virtual llvm::Value* Visit(PreFixOp& expr) = 0;
+  virtual llvm::Value* Visit(Binary& expr) = 0;
+  virtual llvm::Value* Visit(CallExpr& expr) = 0;
+  virtual llvm::Value* Visit(Assign& expr) = 0;
+  virtual llvm::Value* Visit(Conditional& expr) = 0;
 };
 
 /// @struct Expr
 /// @brief Base class for the AST nodes for expressions
 struct Expr {
+  types::Type* type = nullptr;
   /// @brief Virtual destructor, set to default
   virtual ~Expr() = default;
 
@@ -62,10 +64,8 @@ struct Expr {
 /// @struct Literal
 /// @brief Numeric Node, stores floats and ints as of now
 struct Literal : Expr {
-  ValueType value_type; /**< Value type for the literal */
-  TokenValue value;     /**< Appropriate value for the given value type */
-
-  Literal(ValueType value_type, TokenValue value);
+  TokenValue value; /**< Appropriate value for the given value type */
+  explicit Literal(TokenValue value);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -149,11 +149,10 @@ struct Grouping : Expr {
 };
 
 struct PreFixOp : Expr {
-  Token op; /**< The operator token */
-  std::unique_ptr<Expr>
-      var; /**< The parsed variable, should resolve to Variable */
+  Token op;
+  Token name;
 
-  PreFixOp(Token op, std::unique_ptr<Expr> var);
+  PreFixOp(Token op, Token name);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -218,10 +217,10 @@ struct Conditional : Expr {
 };
 
 struct Assign : Expr {
-  std::unique_ptr<Expr> name;  /**< Variable name, should resolve to Variable */
+  Token name;                  /**< Variable name, should resolve to Variable */
   std::unique_ptr<Expr> value; /**< The variables new value */
 
-  Assign(std::unique_ptr<Expr> name, std::unique_ptr<Expr> value);
+  Assign(Token name, std::unique_ptr<Expr> value);
 
   /**
    * @brief Method used to emply the visitor pattern

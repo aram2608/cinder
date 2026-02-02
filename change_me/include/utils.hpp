@@ -1,8 +1,7 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-/// @brief Simple utility macro to error out in unreachable points of source
-/// code
+/// @brief Simple utility macro to error out at unreachable points in source
 #define UNREACHABLE(x, y)                                     \
   do {                                                        \
     std::cout << "UNREACHABLE " << #x << " " << #y << "\n";   \
@@ -10,7 +9,7 @@
     exit(1);                                                  \
   } while (0)
 
-/// @brief Simple utility macro to error for unimplemented components
+/// @brief Simple utility macro to error out for unimplemented components
 #define IMPLEMENT(x)                              \
   do {                                            \
     std::cout << "Implement me.\n";               \

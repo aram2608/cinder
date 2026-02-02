@@ -136,7 +136,7 @@ void Compiler::CompileBinary(TargetMachine* target_machine) {
   system(CLEANUP.c_str());
 }
 
-Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
+Value* Compiler::Visit(ModuleStmt& stmt) {
   TheModule = CreateModule(stmt, *TheContext);
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
   TheFPM = std::make_unique<FunctionPassManager>();
@@ -167,12 +167,12 @@ Value* Compiler::VisitModuleStmt(ModuleStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitExpressionStmt(ExpressionStmt& stmt) {
+Value* Compiler::Visit(ExpressionStmt& stmt) {
   stmt.expr->Accept(*this);
   return nullptr;
 }
 
-Value* Compiler::VisitWhileStmt(WhileStmt& stmt) {
+Value* Compiler::Visit(WhileStmt& stmt) {
   Function* func = Builder->GetInsertBlock()->getParent();
   BasicBlock* cond_block = BasicBlock::Create(*TheContext, "loop.cond", func);
   BasicBlock* loop_block = BasicBlock::Create(*TheContext, "loop.body", func);
@@ -194,7 +194,7 @@ Value* Compiler::VisitWhileStmt(WhileStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitForStmt(ForStmt& stmt) {
+Value* Compiler::Visit(ForStmt& stmt) {
   if (stmt.initializer) {
     stmt.initializer->Accept(*this);
   }
@@ -229,7 +229,7 @@ Value* Compiler::VisitForStmt(ForStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitIfStmt(IfStmt& stmt) {
+Value* Compiler::Visit(IfStmt& stmt) {
   Value* condition = stmt.cond->Accept(*this);
 
   Function* Func = Builder->GetInsertBlock()->getParent();
@@ -261,7 +261,7 @@ Value* Compiler::VisitIfStmt(IfStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
+Value* Compiler::Visit(FunctionStmt& stmt) {
   Function* Func = dyn_cast<Function>(stmt.proto->Accept(*this));
 
   BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", Func);
@@ -277,7 +277,7 @@ Value* Compiler::VisitFunctionStmt(FunctionStmt& stmt) {
   return Func;
 }
 
-Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
+Value* Compiler::Visit(FunctionProto& stmt) {
   std::string func_name = stmt.name.lexeme;
   auto func = func_table.find(func_name);
   if (func != func_table.end()) {
@@ -286,7 +286,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   }
 
   Type* return_type;
-  switch (stmt.return_type.token_type) {
+  switch (stmt.return_type.type) {
     case TT_INT32_SPECIFIER:
       return_type = Type::getInt32Ty(*TheContext);
       break;
@@ -341,7 +341,7 @@ Value* Compiler::VisitFunctionProto(FunctionProto& stmt) {
   return Func;
 }
 
-Value* Compiler::VisitReturnStmt(ReturnStmt& stmt) {
+Value* Compiler::Visit(ReturnStmt& stmt) {
   Value* ret = stmt.value->Accept(*this);
   if (!ret) {
     return Builder->CreateRetVoid();
@@ -349,14 +349,14 @@ Value* Compiler::VisitReturnStmt(ReturnStmt& stmt) {
   return Builder->CreateRet(ret);
 }
 
-Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
+Value* Compiler::Visit(VarDeclarationStmt& stmt) {
   std::string name = stmt.name.lexeme;
   if (symbol_table.find(name) != symbol_table.end()) {
     std::cout << "redeclaration of variable" << name << "\n";
     exit(1);
   }
   Type* type;
-  switch (stmt.type.token_type) {
+  switch (stmt.type.type) {
     case TT_INT32_SPECIFIER:
       type = Type::getInt32Ty(*TheContext);
       break;
@@ -382,7 +382,7 @@ Value* Compiler::VisitVarDeclarationStmt(VarDeclarationStmt& stmt) {
   return nullptr;
 }
 
-Value* Compiler::VisitConditional(Conditional& expr) {
+Value* Compiler::Visit(Conditional& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -390,7 +390,7 @@ Value* Compiler::VisitConditional(Conditional& expr) {
   Type* r_type = right->getType();
 
   if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
-    switch (expr.op.token_type) {
+    switch (expr.op.type) {
       case TT_BANGEQ:
         return Builder->CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
       case TT_EQEQ:
@@ -407,7 +407,7 @@ Value* Compiler::VisitConditional(Conditional& expr) {
         UNREACHABLE(Conditional, "Unknown integer operation");
     }
   } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
-    switch (expr.op.token_type) {
+    switch (expr.op.type) {
       case TT_BANGEQ:
         return Builder->CreateFCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
       case TT_EQEQ:
@@ -436,7 +436,7 @@ Value* Compiler::VisitConditional(Conditional& expr) {
   return nullptr;
 }
 
-Value* Compiler::VisitBinary(Binary& expr) {
+Value* Compiler::Visit(Binary& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -444,7 +444,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
   Type* r_type = right->getType();
 
   if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
-    switch (expr.op.token_type) {
+    switch (expr.op.type) {
       case TT_PLUS:
         return Builder->CreateAdd(left, right, "addtmp");
       case TT_MINUS:
@@ -457,7 +457,7 @@ Value* Compiler::VisitBinary(Binary& expr) {
         UNREACHABLE(Binary, "Unknown integer operation");
     }
   } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
-    switch (expr.op.token_type) {
+    switch (expr.op.type) {
       case TT_PLUS:
         return Builder->CreateFAdd(left, right, "addtmp");
       case TT_MINUS:
@@ -481,54 +481,54 @@ Value* Compiler::VisitBinary(Binary& expr) {
   return nullptr;
 }
 
-Value* Compiler::VisitPreIncrement(PreFixOp& expr) {
-  LoadInst* var = dyn_cast<LoadInst>(expr.var->Accept(*this));
-  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+Value* Compiler::Visit(PreFixOp& expr) {
+  // // LoadInst* var = dyn_cast<LoadInst>(expr.var->Accept(*this));
+  // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
 
-  Type* type = var_ptr->getAllocatedType();
+  // Type* type = var_ptr->getAllocatedType();
 
-  Value* inc;
-  Value* value;
+  // Value* inc;
+  // Value* value;
 
-  switch (expr.op.token_type) {
-    case TT_PLUS_PLUS:
-      if (type->isIntegerTy()) {
-        inc = ConstantInt::get(*TheContext, APInt(32, 1));
-        value = Builder->CreateAdd(var, inc, "addtmp");
-      } else if (type->isFloatTy()) {
-        inc = ConstantFP::get(*TheContext, APFloat(1.0f));
-        value = Builder->CreateFAdd(var, inc, "addtmp");
-      } else {
-        UNREACHABLE(PreInc, "Unknown value type");
-      }
-      break;
-    case TT_MINUS_MINUS:
-      if (type->isIntegerTy()) {
-        inc = ConstantInt::get(*TheContext, APInt(32, 1));
-        value = Builder->CreateSub(var, inc, "subtmp");
-      } else if (type->isFloatTy()) {
-        inc = ConstantFP::get(*TheContext, APFloat(1.0f));
-        value = Builder->CreateFSub(var, inc, "subtmp");
-      } else {
-        UNREACHABLE(PreInc, "Unknown value type");
-      }
-      break;
-    default:
-      UNREACHABLE(PreInc, "Unknown value type");
-  }
-  Builder->CreateStore(value, var_ptr);
+  // switch (expr.op.type) {
+  //   case TT_PLUS_PLUS:
+  //     if (type->isIntegerTy()) {
+  //       inc = ConstantInt::get(*TheContext, APInt(32, 1));
+  //       value = Builder->CreateAdd(var, inc, "addtmp");
+  //     } else if (type->isFloatTy()) {
+  //       inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+  //       value = Builder->CreateFAdd(var, inc, "addtmp");
+  //     } else {
+  //       UNREACHABLE(PreInc, "Unknown value type");
+  //     }
+  //     break;
+  //   case TT_MINUS_MINUS:
+  //     if (type->isIntegerTy()) {
+  //       inc = ConstantInt::get(*TheContext, APInt(32, 1));
+  //       value = Builder->CreateSub(var, inc, "subtmp");
+  //     } else if (type->isFloatTy()) {
+  //       inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+  //       value = Builder->CreateFSub(var, inc, "subtmp");
+  //     } else {
+  //       UNREACHABLE(PreInc, "Unknown value type");
+  //     }
+  //     break;
+  //   default:
+  //     UNREACHABLE(PreInc, "Unknown value type");
+  // }
+  // Builder->CreateStore(value, var_ptr);
   return nullptr;
 }
 
-Value* Compiler::VisitAssignment(Assign& expr) {
+Value* Compiler::Visit(Assign& expr) {
   Value* value = expr.value->Accept(*this);
-  LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
-  AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
-  Builder->CreateStore(value, var_ptr);
+  // LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
+  // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+  // Builder->CreateStore(value, var_ptr);
   return nullptr;
 }
 
-Value* Compiler::VisitCall(CallExpr& expr) {
+Value* Compiler::Visit(CallExpr& expr) {
   Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
   if (!callee) {
     std::cout << "callee is not a function\n";
@@ -555,11 +555,11 @@ Value* Compiler::VisitCall(CallExpr& expr) {
   return Builder->CreateCall(callee, call_args, callee->getName());
 }
 
-Value* Compiler::VisitGrouping(Grouping& expr) {
+Value* Compiler::Visit(Grouping& expr) {
   return expr.expr->Accept(*this);
 }
 
-Value* Compiler::VisitVariable(Variable& expr) {
+Value* Compiler::Visit(Variable& expr) {
   std::string lex = expr.name.lexeme;
   auto func = func_table.find(lex);
   if (func != func_table.end()) {
@@ -583,34 +583,36 @@ Value* Compiler::VisitVariable(Variable& expr) {
   return value;
 }
 
-Value* Compiler::VisitBoolean(BoolLiteral& expr) {
+Value* Compiler::Visit(BoolLiteral& expr) {
   if (expr.boolean) {
     return ConstantInt::getTrue(*TheContext);
   }
   return ConstantInt::getFalse(*TheContext);
 }
 
-Value* Compiler::VisitLiteral(Literal& expr) {
-  switch (expr.value_type) {
-    case VT_INT32:
-      return ConstantInt::get(*TheContext,
-                              APInt(32, std::get<int>(expr.value)));
-    case VT_INT64:
-      return ConstantInt::get(*TheContext,
-                              APInt(64, std::get<int>(expr.value)));
-    case VT_FLT:
-      return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
-    case VT_STR:
-      /// TODO: No clue if this will work
-      /// it works but i need to figure out a way to escape characters
-      return Builder->CreateGlobalString(std::get<std::string>(expr.value), "",
-                                         true);
-    case VT_VOID:
-      return nullptr;  // This is a horrible hack for void return types
-                       // I need to think of a better solution
-    default:
-      UNREACHABLE(Literal, "Unknown literal value");
-  }
+Value* Compiler::Visit(Literal& expr) {
+  // switch (expr.value_type) {
+  //   case VT_INT32:
+  //     return ConstantInt::get(*TheContext,
+  //                             APInt(32, std::get<int>(expr.value)));
+  //   case VT_INT64:
+  //     return ConstantInt::get(*TheContext,
+  //                             APInt(64, std::get<int>(expr.value)));
+  //   case VT_FLT:
+  //     return ConstantFP::get(*TheContext,
+  //     APFloat(std::get<float>(expr.value)));
+  //   case VT_STR:
+  //     /// TODO: Need to make this a little better
+  //     /// This appears to be an imperfect solution
+  //     return Builder->CreateGlobalString(std::get<std::string>(expr.value),
+  //     "",
+  //                                        true);
+  //   case VT_VOID:
+  //     return nullptr;  // This is a horrible hack for void return types
+  //                      // I need to think of a better solution
+  //   default:
+  //     UNREACHABLE(Literal, "Unknown literal value");
+  // }
 }
 
 CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,

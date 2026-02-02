@@ -34,15 +34,15 @@ struct WhileStmt;
 /// @brief The statement visitor interface
 struct StmtVisitor {
   virtual ~StmtVisitor() = default;
-  virtual llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) = 0;
-  virtual llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) = 0;
-  virtual llvm::Value* VisitReturnStmt(ReturnStmt& stmt) = 0;
-  virtual llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) = 0;
-  virtual llvm::Value* VisitFunctionProto(FunctionProto& stmt) = 0;
-  virtual llvm::Value* VisitModuleStmt(ModuleStmt& stmt) = 0;
-  virtual llvm::Value* VisitIfStmt(IfStmt& stmt) = 0;
-  virtual llvm::Value* VisitForStmt(ForStmt& stmt) = 0;
-  virtual llvm::Value* VisitWhileStmt(WhileStmt& stmt) = 0;
+  virtual llvm::Value* Visit(ExpressionStmt& stmt) = 0;
+  virtual llvm::Value* Visit(FunctionStmt& stmt) = 0;
+  virtual llvm::Value* Visit(ReturnStmt& stmt) = 0;
+  virtual llvm::Value* Visit(VarDeclarationStmt& stmt) = 0;
+  virtual llvm::Value* Visit(FunctionProto& stmt) = 0;
+  virtual llvm::Value* Visit(ModuleStmt& stmt) = 0;
+  virtual llvm::Value* Visit(IfStmt& stmt) = 0;
+  virtual llvm::Value* Visit(ForStmt& stmt) = 0;
+  virtual llvm::Value* Visit(WhileStmt& stmt) = 0;
 };
 
 /// @struct Stmt

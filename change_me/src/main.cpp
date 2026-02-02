@@ -77,82 +77,80 @@ bool ParseCLI(int argc, char** argv) {
     return true;
   }
 
-  if (result.contains("emit-llvm")) {
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    std::string out_path = "main";
-    if (result.contains("o")) {
-      out_path = result["o"].as<std::string>();
-    }
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.tokens};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{
-          std::move(mod),
-          CompilerOptions{out_path, CompilerMode::EMIT_LLVM, false, {}}};
-      return compiler.Compile();
-    }
-  }
+  // if (result.contains("emit-llvm")) {
+  //   std::vector<std::string> file_paths =
+  //       result["src"].as<std::vector<std::string>>();
+  //   std::string out_path = "main";
+  //   if (result.contains("o")) {
+  //     out_path = result["o"].as<std::string>();
+  //   }
+  //   for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
+  //     std::string source = ReadEntireFile(*it);
+  //     Lexer lexer{source};
+  //     lexer.ScanTokens();
+  //     Parser parser{lexer.tokens};
+  //     std::unique_ptr<Stmt> mod = parser.Parse();
+  //     Compiler compiler{
+  //         std::move(mod),
+  //         CompilerOptions{out_path, CompilerMode::EMIT_LLVM, false, {}}};
+  //     return compiler.Compile();
+  //   }
+  // }
 
-  if (result.contains("compile")) {
-    bool debug_info = false;
-    std::vector<std::string> linker_flags;
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    std::string out_path = "main";
-    if (result.contains("o")) {
-      out_path = result["o"].as<std::string>();
-    }
-    if (result.contains("l")) {
-      linker_flags.push_back("-l");
-      linker_flags.push_back(result["l"].as<std::string>());
-    }
-    if (result.contains("g")) {
-      debug_info = true;
-      linker_flags.push_back("-g");
-    }
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.tokens};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{std::move(mod),
-                        CompilerOptions{out_path, CompilerMode::COMPILE,
-                                        debug_info, linker_flags}};
-      return compiler.Compile();
-    }
-  }
+  // if (result.contains("compile")) {
+  //   bool debug_info = false;
+  //   std::vector<std::string> linker_flags;
+  //   std::vector<std::string> file_paths =
+  //       result["src"].as<std::vector<std::string>>();
+  //   std::string out_path = "main";
+  //   if (result.contains("o")) {
+  //     out_path = result["o"].as<std::string>();
+  //   }
+  //   if (result.contains("l")) {
+  //     linker_flags.push_back("-l");
+  //     linker_flags.push_back(result["l"].as<std::string>());
+  //   }
+  //   if (result.contains("g")) {
+  //     debug_info = true;
+  //     linker_flags.push_back("-g");
+  //   }
+  //   for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
+  //     std::string source = ReadEntireFile(*it);
+  //     Lexer lexer{source};
+  //     lexer.ScanTokens();
+  //     Parser parser{lexer.tokens};
+  //     std::unique_ptr<Stmt> mod = parser.Parse();
+  //     Compiler compiler{std::move(mod),
+  //                       CompilerOptions{out_path, CompilerMode::COMPILE,
+  //                                       debug_info, linker_flags}};
+  //     return compiler.Compile();
+  //   }
+  // }
 
-  if (result.contains("run")) {
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    std::string out_path = "main";
-    if (result.contains("o")) {
-      out_path = result["o"].as<std::string>();
-    }
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.tokens};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      Compiler compiler{
-          std::move(mod),
-          CompilerOptions{out_path, CompilerMode::RUN, false, {}}};
-      return compiler.Compile();
-    }
-  }
+  // if (result.contains("run")) {
+  //   std::vector<std::string> file_paths =
+  //       result["src"].as<std::vector<std::string>>();
+  //   std::string out_path = "main";
+  //   if (result.contains("o")) {
+  //     out_path = result["o"].as<std::string>();
+  //   }
+  //   for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
+  //     std::string source = ReadEntireFile(*it);
+  //     Lexer lexer{source};
+  //     lexer.ScanTokens();
+  //     Parser parser{lexer.tokens};
+  //     std::unique_ptr<Stmt> mod = parser.Parse();
+  //     Compiler compiler{
+  //         std::move(mod),
+  //         CompilerOptions{out_path, CompilerMode::RUN, false, {}}};
+  //     return compiler.Compile();
+  //   }
+  // }
   std::cout << "Unknown arguments provided\n" << std::endl;
   std::cout << options.help() << std::endl;
   return false;
 }
 
 int main(int argc, char** argv) {
-  int res;
-  ParseCLI(argc, argv) ? res = 0 : res = 1;
-  return res;
+  return ParseCLI(argc, argv) ? 0 : 1;
 }

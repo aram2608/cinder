@@ -90,25 +90,27 @@ struct Compiler : ExprVisitor, StmtVisitor {
   void CompileRun();
   void CompileBinary(llvm::TargetMachine* target_machine);
 
-  llvm::Value* VisitModuleStmt(ModuleStmt& stmt) override;
-  llvm::Value* VisitForStmt(ForStmt& stmt) override;
-  llvm::Value* VisitWhileStmt(WhileStmt& stmt) override;
-  llvm::Value* VisitIfStmt(IfStmt& stmt) override;
-  llvm::Value* VisitExpressionStmt(ExpressionStmt& stmt) override;
-  llvm::Value* VisitFunctionStmt(FunctionStmt& stmt) override;
-  llvm::Value* VisitFunctionProto(FunctionProto& stmt) override;
-  llvm::Value* VisitReturnStmt(ReturnStmt& stmt) override;
-  llvm::Value* VisitVarDeclarationStmt(VarDeclarationStmt& stmt) override;
+  // Statements
+  llvm::Value* Visit(ModuleStmt& stmt) override;
+  llvm::Value* Visit(ForStmt& stmt) override;
+  llvm::Value* Visit(WhileStmt& stmt) override;
+  llvm::Value* Visit(IfStmt& stmt) override;
+  llvm::Value* Visit(ExpressionStmt& stmt) override;
+  llvm::Value* Visit(FunctionStmt& stmt) override;
+  llvm::Value* Visit(FunctionProto& stmt) override;
+  llvm::Value* Visit(ReturnStmt& stmt) override;
+  llvm::Value* Visit(VarDeclarationStmt& stmt) override;
 
-  llvm::Value* VisitAssignment(Assign& expr) override;
-  llvm::Value* VisitConditional(Conditional& expr) override;
-  llvm::Value* VisitBinary(Binary& expr) override;
-  llvm::Value* VisitPreIncrement(PreFixOp& expr) override;
-  llvm::Value* VisitCall(CallExpr& expr) override;
-  llvm::Value* VisitGrouping(Grouping& expr) override;
-  llvm::Value* VisitVariable(Variable& expr) override;
-  llvm::Value* VisitBoolean(BoolLiteral& expr) override;
-  llvm::Value* VisitLiteral(Literal& expr) override;
+  // Expressions
+  llvm::Value* Visit(Assign& expr) override;
+  llvm::Value* Visit(Conditional& expr) override;
+  llvm::Value* Visit(Binary& expr) override;
+  llvm::Value* Visit(PreFixOp& expr) override;
+  llvm::Value* Visit(CallExpr& expr) override;
+  llvm::Value* Visit(Grouping& expr) override;
+  llvm::Value* Visit(Variable& expr) override;
+  llvm::Value* Visit(BoolLiteral& expr) override;
+  llvm::Value* Visit(Literal& expr) override;
 
   std::unique_ptr<llvm::Module> CreateModule(ModuleStmt& stmt,
                                              llvm::LLVMContext& ctx);

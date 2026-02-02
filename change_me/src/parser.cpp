@@ -30,9 +30,9 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
       }
       Token type = Advance();
       Token identifier = Consume(TT_IDENTIFER, "expected arg name");
-      if (type.token_type == TT_INT32_SPECIFIER) {
+      if (type.type == TT_INT32_SPECIFIER) {
         args.emplace_back(VT_INT32, identifier);
-      } else if (type.token_type == TT_FLT_SPECIFIER) {
+      } else if (type.type == TT_FLT_SPECIFIER) {
         args.emplace_back(VT_FLT, identifier);
       } else {
         std::cout << "type not allowed\n";
@@ -57,7 +57,7 @@ std::unique_ptr<Stmt> Parser::Function() {
   if (MatchType({TT_DEF})) {
     std::unique_ptr<Stmt> proto = FunctionPrototype();
     std::vector<std::unique_ptr<Stmt>> stmts;
-    while (!(Peek().token_type == TT_END) && !IsEnd()) {
+    while (!(Peek().type == TT_END) && !IsEnd()) {
       stmts.push_back(Statement());
     }
     Consume(TT_END, "expected end after a function body");
@@ -123,9 +123,7 @@ std::unique_ptr<Stmt> Parser::IfStatement() {
 std::unique_ptr<Stmt> Parser::ReturnStatement() {
   if (CheckType(TT_SEMICOLON)) {
     Advance();
-    std::unique_ptr<Expr> void_literal =
-        std::make_unique<Literal>(VT_VOID, Void{});
-    return std::make_unique<ReturnStmt>(std::move(void_literal));
+    return std::make_unique<ReturnStmt>(nullptr);
   }
   std::unique_ptr<Expr> expr = Expression();
   Consume(TT_SEMICOLON, "expected ';' after return statement");
@@ -163,7 +161,9 @@ std::unique_ptr<Expr> Parser::Assignment() {
   if (MatchType({TT_EQ})) {
     Token eq = Previous();
     std::unique_ptr<Expr> value = Assignment();
-    return std::make_unique<Assign>(std::move(expr), std::move(value));
+    if (auto* var = dynamic_cast<Variable*>(expr.get())) {
+      return std::make_unique<Assign>(var->name, std::move(value));
+    }
   }
   return expr;
 }
@@ -202,8 +202,8 @@ std::unique_ptr<Expr> Parser::Factor() {
 std::unique_ptr<Expr> Parser::PreIncrement() {
   if (MatchType({TT_PLUS_PLUS, TT_MINUS_MINUS})) {
     Token op = Previous();
-    std::unique_ptr<Expr> var = Call();
-    return std::make_unique<PreFixOp>(op, std::move(var));
+    Token name = Advance();
+    return std::make_unique<PreFixOp>(op, name);
   }
   return Call();
 }
@@ -233,8 +233,8 @@ std::unique_ptr<Expr> Parser::Call() {
 }
 
 std::unique_ptr<Expr> Parser::Atom() {
-  if (MatchType({TT_INT, TT_FLT, TT_STR})) {
-    return std::make_unique<Literal>(Previous().value_type, Previous().value);
+  if (MatchType({TT_INT_LITERAL, TT_FLT_LITERAL, TT_STR_LITERAL})) {
+    return std::make_unique<Literal>(Previous().literal.value());
   }
 
   if (MatchType({TT_TRUE})) {
@@ -260,7 +260,7 @@ std::unique_ptr<Expr> Parser::Atom() {
 
 bool Parser::MatchType(std::initializer_list<TokenType> types) {
   for (TokenType type : types) {
-    if (Peek().token_type == type) {
+    if (Peek().type == type) {
       Advance();
       return true;
     }
@@ -276,7 +276,7 @@ bool Parser::CheckType(TokenType type) {
   if (IsEnd()) {
     return false;
   }
-  return Peek().token_type == type;
+  return Peek().type == type;
 }
 
 Token Parser::Previous() {
@@ -284,7 +284,7 @@ Token Parser::Previous() {
 }
 
 bool Parser::IsEnd() {
-  return tokens[current_tok].token_type == TT_EOF;
+  return tokens[current_tok].type == TT_EOF;
 }
 
 Token Parser::Advance() {
@@ -295,7 +295,7 @@ Token Parser::Advance() {
 }
 
 Token Parser::Consume(TokenType type, std::string message) {
-  if (Peek().token_type == type) {
+  if (Peek().type == type) {
     return Advance();
   }
   std::cout << ErrorMessageFormatLn(message);
@@ -314,19 +314,4 @@ void Parser::EmitAST(std::unique_ptr<Stmt> statement) {
 
 std::string Parser::ErrorMessageFormatLn(std::string message) {
   return message + "\nLine: " + std::to_string(Peek().line_num) + "\n";
-}
-
-std::string Parser::GetTokenTypeString(Token tok) {
-  switch (tok.value_type) {
-    case VT_FLT:
-      return "flt";
-    case VT_INT32:
-      return "int32";
-    case VT_STR:
-      return "str";
-    case VT_VOID:
-      return "void";
-    default:
-      return tok.lexeme;
-  }
 }

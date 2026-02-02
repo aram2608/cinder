@@ -1,6 +1,8 @@
 #ifndef TOKENS_H
 #define TOKENS_H
 
+#include <optional>
+
 #include "common.hpp"
 #include "utils.hpp"
 
@@ -61,9 +63,9 @@ enum TokenType {
   TT_STR_SPECIFIER,
   TT_VOID_SPECIFIER,
   // Types
-  TT_INT,
-  TT_FLT,
-  TT_STR,
+  TT_INT_LITERAL,
+  TT_FLT_LITERAL,
+  TT_STR_LITERAL,
   // Delimiters
   TT_COLON,     /** ":" */
   TT_SEMICOLON, /** ";" */
@@ -85,30 +87,21 @@ enum ValueType {
   VT_NULL, /** NULL */
 };
 
-struct Void {};
-
-using TokenValue = std::variant<std::string, int, float, Void>;
+using TokenValue = std::variant<std::string, int, float>;
 
 /**
  * @struct Token
  * @brief The structure used to store source string info during lexical analysis
  * A simple POD
- * TODO: Fix the type information, it is really awkward during parse and IR gen
- * time
  */
 struct Token {
-  Token(TokenType token_type, size_t line_num, std::string lexeme,
-        ValueType value_type, TokenValue value)
-      : token_type(token_type),
-        line_num(line_num),
-        lexeme(lexeme),
-        value_type(value_type),
-        value(value) {}
-  TokenType token_type;
+  TokenType type;
   size_t line_num;
   std::string lexeme;
-  ValueType value_type;
-  TokenValue value;
+  std::optional<TokenValue> literal;
+  Token(TokenType type, size_t line_num, std::string lexeme,
+        std::optional<TokenValue> literal = std::nullopt)
+      : type(type), line_num(line_num), lexeme(lexeme), literal(literal) {}
 };
 
 /// @struct FuncArg

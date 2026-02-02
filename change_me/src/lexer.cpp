@@ -181,12 +181,15 @@ bool Lexer::Match(char c) {
 void Lexer::AddToken(TokenType tok_type) {
   size_t index = current_pos - start_pos;
   std::string temp = source_str.substr(start_pos, index);
-  tokens.emplace_back(tok_type, line_count, temp, VT_NULL, temp);
+  tokens.emplace_back(tok_type, line_count, temp);
 }
 
-void Lexer::AddToken(TokenType tok_type, std::string lexeme,
-                     ValueType value_type, TokenValue value) {
-  tokens.emplace_back(tok_type, line_count, lexeme, value_type, value);
+void Lexer::AddToken(TokenType tok_type, std::string lexeme, TokenValue value) {
+  tokens.emplace_back(tok_type, line_count, lexeme, value);
+}
+
+void Lexer::AddToken(TokenType tok_type, std::string lexeme) {
+  tokens.emplace_back(tok_type, line_count, lexeme);
 }
 
 void Lexer::ParseComment() {
@@ -214,7 +217,7 @@ void Lexer::TokenizeString() {
   size_t index = current_pos - start_pos - 2;
   std::string value = source_str.substr(start_pos + 1, index);
   EscapeCharacters(value);
-  AddToken(TT_STR, value, VT_STR, value);
+  AddToken(TT_STR_LITERAL, value, value);
 }
 
 void Lexer::EscapeCharacters(std::string& str) {
@@ -252,10 +255,10 @@ void Lexer::TokenizeIdentifier() {
 
   auto match = key_words.find(temp);
   if (match != key_words.end()) {
-    AddToken(match->second, temp, VT_NULL, temp);
+    AddToken(match->second, temp, temp);
     return;
   }
-  AddToken(TT_IDENTIFER, temp, VT_NULL, temp);
+  AddToken(TT_IDENTIFER, temp);
 }
 
 void Lexer::TokenizeNumber() {
@@ -269,16 +272,16 @@ void Lexer::TokenizeNumber() {
     }
     size_t index = current_pos - start_pos;
     std::string temp = source_str.substr(start_pos, index);
-    AddToken(TT_FLT, temp, VT_FLT, std::stof(temp));
+    AddToken(TT_FLT_LITERAL, temp, std::stof(temp));
   } else {
     size_t index = current_pos - start_pos;
     std::string temp = source_str.substr(start_pos, index);
-    AddToken(TT_INT, temp, VT_INT32, std::stoi(temp));
+    AddToken(TT_INT_LITERAL, temp, std::stoi(temp));
   }
 }
 
 std::string Lexer::TokenToString(Token tok) {
-  switch (tok.token_type) {
+  switch (tok.type) {
     case TT_QUOTE:
       return "\"";
     case TT_PLUS:
@@ -349,6 +352,8 @@ std::string Lexer::TokenToString(Token tok) {
       return "EXTERN";
     case TT_FOR:
       return "FOR";
+    case TT_WHILE:
+      return "WHILE";
     case TT_IDENTIFER:
       return "IDENTIFIER: " + tok.lexeme;
     case TT_DEF:
@@ -367,16 +372,16 @@ std::string Lexer::TokenToString(Token tok) {
       return "STR TYPE";
     case TT_BOOL_SPECIFIER:
       return "BOOL TYPE";
-    case TT_INT:
+    case TT_INT_LITERAL:
       return "INT LITERAL: " + tok.lexeme;
-    case TT_FLT:
+    case TT_FLT_LITERAL:
       return "FLT LITERAL: " + tok.lexeme;
-    case TT_STR:
+    case TT_STR_LITERAL:
       return "STR LITERAL: " + tok.lexeme;
     case TT_COUNT:
       return "Number of tokens";
     default:
-      std::cout << "UNREACHABLE " << tok.token_type << "\n";
+      std::cout << "UNREACHABLE " << tok.type << " " << tok.lexeme << "\n";
       exit(1);
   }
 }
