@@ -107,10 +107,9 @@ struct Token {
 /// @struct FuncArg
 /// @brief A simple data container to store function arguments
 struct FuncArg {
-  ValueType type;   /**< The argument type */
+  Token type;       /**< The argument type */
   Token identifier; /**< The identifer for the argument */
-  FuncArg(ValueType type, Token identifier)
-      : type(type), identifier(identifier) {}
+  FuncArg(Token type, Token identifier) : type(type), identifier(identifier) {}
 };
 
 #endif

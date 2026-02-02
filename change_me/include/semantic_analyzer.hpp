@@ -60,14 +60,25 @@ struct Scope {
   }
 };
 
-struct SemanticAnalyzer : ExprVisitor {
+struct SemanticAnalyzer : ExprVisitor, StmtVisitor {
   SemanticAnalyzer(TypeContext& tc) : types(tc), scope(nullptr) {}
 
   void Analyze(Expr& expr) {
     expr.Accept(*this);
   }
 
-  // Expr visitors
+  // Statements
+  llvm::Value* Visit(ModuleStmt& stmt) override;
+  llvm::Value* Visit(ForStmt& stmt) override;
+  llvm::Value* Visit(WhileStmt& stmt) override;
+  llvm::Value* Visit(IfStmt& stmt) override;
+  llvm::Value* Visit(ExpressionStmt& stmt) override;
+  llvm::Value* Visit(FunctionStmt& stmt) override;
+  llvm::Value* Visit(FunctionProto& stmt) override;
+  llvm::Value* Visit(ReturnStmt& stmt) override;
+  llvm::Value* Visit(VarDeclarationStmt& stmt) override;
+
+  // Expressions
   llvm::Value* Visit(Literal& expr) override;
   llvm::Value* Visit(BoolLiteral& expr) override;
   llvm::Value* Visit(Variable& expr) override;

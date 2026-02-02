@@ -2,6 +2,41 @@
 
 /// TODO: Better error handling
 
+llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
+  return nullptr;
+}
+llvm::Value* SemanticAnalyzer::Visit(ForStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(WhileStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(IfStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(ReturnStmt& stmt) {
+  return nullptr;
+}
+
+llvm::Value* SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
+  return nullptr;
+}
+
 llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
   if (std::holds_alternative<int>(expr.value)) {
     expr.type = types.Int32();

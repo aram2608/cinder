@@ -30,14 +30,7 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
       }
       Token type = Advance();
       Token identifier = Consume(TT_IDENTIFER, "expected arg name");
-      if (type.type == TT_INT32_SPECIFIER) {
-        args.emplace_back(VT_INT32, identifier);
-      } else if (type.type == TT_FLT_SPECIFIER) {
-        args.emplace_back(VT_FLT, identifier);
-      } else {
-        std::cout << "type not allowed\n";
-        exit(1);
-      }
+      args.emplace_back(type, identifier);
     } while (MatchType({TT_COMMA}));
   }
   Consume(TT_RPAREN, "expected ')' after end of function declaration");
@@ -57,7 +50,7 @@ std::unique_ptr<Stmt> Parser::Function() {
   if (MatchType({TT_DEF})) {
     std::unique_ptr<Stmt> proto = FunctionPrototype();
     std::vector<std::unique_ptr<Stmt>> stmts;
-    while (!(Peek().type == TT_END) && !IsEnd()) {
+    while (!CheckType(TT_END) && !IsEnd()) {
       stmts.push_back(Statement());
     }
     Consume(TT_END, "expected end after a function body");
