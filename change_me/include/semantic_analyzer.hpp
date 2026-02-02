@@ -2,12 +2,12 @@
 #define SEMANTIC_ANALYZER_H_
 
 #include "common.hpp"
-#include "utils.hpp"
-#include "types.hpp"
 #include "expr.hpp"
+#include "llvm/IR/Value.h"
 #include "stmt.hpp"
 #include "tokens.hpp"
-#include "llvm/IR/Value.h"
+#include "types.hpp"
+#include "utils.hpp"
 
 struct TypeContext {
   types::IntType int32{32, true};
@@ -19,14 +19,21 @@ struct TypeContext {
 
   std::unordered_map<types::Type*, std::unique_ptr<types::PointerType>> ptrs;
 
-  types::Type* Int32()  { return &int32; }
-  types::Type* Float32(){ return &float32; }
-  types::Type* Void()   { return &voidTy; }
+  types::Type* Int32() {
+    return &int32;
+  }
+  types::Type* Float32() {
+    return &float32;
+  }
+  types::Type* Void() {
+    return &voidTy;
+  }
 
   types::Type* PointerTo(types::Type* base) {
     auto& p = ptrs[base];
-    if (!p)
+    if (!p) {
       p = std::make_unique<types::PointerType>(base);
+    }
     return p.get();
   }
 };
@@ -46,15 +53,15 @@ struct Scope {
   }
 
   Symbol* Lookup(const std::string& name) {
-    if (auto it = table.find(name); it != table.end())
+    if (auto it = table.find(name); it != table.end()) {
       return &it->second;
+    }
     return parent ? parent->Lookup(name) : nullptr;
   }
 };
 
 struct SemanticAnalyzer : ExprVisitor {
-  SemanticAnalyzer(TypeContext& tc)
-      : types(tc), scope(nullptr) {}
+  SemanticAnalyzer(TypeContext& tc) : types(tc), scope(nullptr) {}
 
   void Analyze(Expr& expr) {
     expr.Accept(*this);
@@ -71,6 +78,5 @@ struct SemanticAnalyzer : ExprVisitor {
   TypeContext& types;
   Scope* scope;
 };
-
 
 #endif

@@ -31,8 +31,7 @@ struct IntType : Type {
 struct FloatType : Type {
   unsigned int bits;
 
-  explicit FloatType(unsigned bits)
-      : Type(TypeKind::Float), bits(bits) {}
+  explicit FloatType(unsigned bits) : Type(TypeKind::Float), bits(bits) {}
 };
 
 struct PointerType : Type {
@@ -47,9 +46,7 @@ struct FunctionType : Type {
   std::vector<Type*> params;
 
   FunctionType(Type* ret, std::vector<Type*> params)
-      : Type(TypeKind::Function),
-        return_type(ret),
-        params(std::move(params)) {}
+      : Type(TypeKind::Function), return_type(ret), params(std::move(params)) {}
 };
 
 struct StructType : Type {
@@ -62,5 +59,5 @@ struct StructType : Type {
         fields(std::move(fields)) {}
 };
 
-}
+}  // namespace types
 #endif

@@ -58,11 +58,12 @@ llvm::Value* SemanticAnalyzer::Visit(Binary& expr) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
-   expr.value->Accept(*this);
+  expr.value->Accept(*this);
 
   auto* sym = scope->Lookup(expr.name.lexeme);
   if (!sym) {
-    std::cout << "Assignment to undeclared variable: " << expr.name.lexeme << "\n";
+    std::cout << "Assignment to undeclared variable: " << expr.name.lexeme
+              << "\n";
     exit(1);
   }
 
@@ -76,8 +77,7 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
-  for (auto& arg : expr.args)
-    arg->Accept(*this);
+  for (auto& arg : expr.args) arg->Accept(*this);
 
   /// TODO: Figures out a type for this
   expr.type = types.Int32();
