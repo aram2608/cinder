@@ -3,12 +3,13 @@
 /// TODO: Better error handling
 
 llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
-  if (std::holds_alternative<int>(expr.value))
+  if (std::holds_alternative<int>(expr.value)) {
     expr.type = types.Int32();
-  else if (std::holds_alternative<float>(expr.value))
+  } else if (std::holds_alternative<float>(expr.value)) {
     expr.type = types.Float32();
-  else
+  } else {
     UNREACHABLE(VisitLiteral, "Unknown value type");
+  }
   return nullptr;
 }
 
@@ -21,7 +22,6 @@ llvm::Value* SemanticAnalyzer::Visit(BoolLiteral& expr) {
 llvm::Value* SemanticAnalyzer::Visit(Variable& expr) {
   auto* sym = scope->Lookup(expr.name.lexeme);
   if (!sym) {
-    // Error(expr.name, "Undeclared variable");
     std::cout << "Undeclared variable: " << expr.name.lexeme << "\n";
     exit(1);
   }
