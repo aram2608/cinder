@@ -1,45 +1,10 @@
 #include "../include/semantic_analyzer.hpp"
 
+#include "../include/errors.hpp"
+#include "../include/utils.hpp"
+
 /// Global error handler
 static errs::RawOutStream errors{};
-
-types::Type* TypeContext::Int32() {
-  return &int32;
-}
-
-types::Type* TypeContext::Float32() {
-  return &float32;
-}
-
-types::Type* TypeContext::Void() {
-  return &voidTy;
-}
-
-types::Type* TypeContext::Bool() {
-  return &int1;
-}
-
-/// Leaks memory, fix somehow, maybe an arena
-types::Type* TypeContext::Function(types::Type* ret,
-                                   std::vector<types::Type*> params) {
-  return new types::FunctionType{ret, params};
-}
-
-Scope::Scope(std::shared_ptr<Scope> parent) : parent(parent) {}
-
-void Scope::Declare(const std::string& name, types::Type* type) {
-  if (table.find(name) != table.end()) {
-    errs::ErrorOutln(errors, "Redefinition of variable:", name);
-  }
-  table[name] = Symbol{type};
-}
-
-Symbol* Scope::Lookup(const std::string& name) {
-  if (auto it = table.find(name); it != table.end()) {
-    return &it->second;
-  }
-  return parent ? parent->Lookup(name) : nullptr;
-}
 
 SemanticAnalyzer::SemanticAnalyzer(TypeContext& tc)
     : types(tc), scope(nullptr) {}

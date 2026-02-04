@@ -1,6 +1,8 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
+#include <iostream>
+
 /// @brief Simple utility macro to error out at unreachable points in source
 #define UNREACHABLE(x, y)                                     \
   do {                                                        \
@@ -18,5 +20,7 @@
     std::cout << "At line: " << __LINE__ << "\n"; \
     exit(1);                                      \
   } while (0);
+
+#define UNUSED(x) (void)(x)
 
 #endif

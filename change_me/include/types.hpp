@@ -1,7 +1,8 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
-#include "common.hpp"
+#include <memory>
+#include <vector>
 
 namespace types {
 

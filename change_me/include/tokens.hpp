@@ -2,9 +2,7 @@
 #define TOKENS_H
 
 #include <optional>
-
-#include "common.hpp"
-#include "utils.hpp"
+#include <string>
 
 /// @enum TokenType
 /// @brief The token types allowed during lexical analysis

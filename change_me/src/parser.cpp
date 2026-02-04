@@ -1,5 +1,8 @@
 #include "../include/parser.hpp"
 
+#include "../include/errors.hpp"
+// #include "../include/utils.hpp"
+
 static errs::RawOutStream errors{};
 
 Parser::Parser(std::vector<Token> tokens) : tokens(tokens), current_tok(0) {}
@@ -294,6 +297,8 @@ Token Parser::Consume(TokenType type, std::string message) {
     return Advance();
   }
   errs::ErrorOutln(errors, message);
+  // Not used, simply to suppress compiler warning
+  return {type, 0, "", std::nullopt};
 }
 
 void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {

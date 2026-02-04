@@ -1,8 +1,18 @@
 #include "../include/compiler.hpp"
 
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Value.h"
+#include "../include/utils.hpp"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
 using namespace llvm;
 
@@ -305,6 +315,7 @@ Value* Compiler::Visit(FunctionProto& stmt) {
 
   std::vector<Type*> arg_types;
   for (auto& arg : stmt.args) {
+    UNUSED(arg);
     // switch (arg.type) {
     //   case VT_INT32:
     //     arg_types.push_back(Type::getInt32Ty(*TheContext));
@@ -522,6 +533,7 @@ Value* Compiler::Visit(PreFixOp& expr) {
 
 Value* Compiler::Visit(Assign& expr) {
   Value* value = expr.value->Accept(*this);
+  UNUSED(value);
   // LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
   // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
   // Builder->CreateStore(value, var_ptr);
@@ -591,6 +603,7 @@ Value* Compiler::Visit(BoolLiteral& expr) {
 }
 
 Value* Compiler::Visit(Literal& expr) {
+  UNUSED(expr);
   // switch (expr.value_type) {
   //   case VT_INT32:
   //     return ConstantInt::get(*TheContext,
@@ -613,6 +626,7 @@ Value* Compiler::Visit(Literal& expr) {
   //   default:
   //     UNREACHABLE(Literal, "Unknown literal value");
   // }
+  return nullptr;
 }
 
 CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,

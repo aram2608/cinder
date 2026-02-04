@@ -1,7 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "common.hpp"
+#include <vector>
+
 #include "tokens.hpp"
 
 #define LEXER_INIT 300

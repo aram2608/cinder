@@ -1,24 +1,13 @@
 #ifndef STMT_H_
 #define STMT_H_
 
-#include <algorithm>
 #include <memory>
 #include <string>
 
-#include "common.hpp"
+// #include "common.hpp"
 #include "expr.hpp"
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
-#include "llvm/IR/Verifier.h"
 
 struct ModuleStmt;
 struct ExpressionStmt;

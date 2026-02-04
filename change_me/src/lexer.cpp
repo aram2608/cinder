@@ -1,5 +1,9 @@
 #include "../include/lexer.hpp"
 
+#include <cassert>
+#include <iostream>
+#include <unordered_map>
+
 /// TODO: Fix the typing system so it is more ergonomic to work with
 /// Handling the types at parse time and IR gen time is a bit awkward
 static const std::unordered_map<std::string, TokenType> key_words = {

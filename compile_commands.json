@@ -27,6 +27,33 @@
     "output": "build/main"
   },
   {
+    "file": "./change_me/src/errors.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/errors.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
     "file": "./change_me/src/expr.cpp",
     "arguments": [
       "clang++",
@@ -135,6 +162,60 @@
     "output": "build/main"
   },
   {
+    "file": "./change_me/src/scope.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/scope.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/semantic_analyzer.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/semantic_analyzer.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
     "file": "./change_me/src/stmt.cpp",
     "arguments": [
       "clang++",
@@ -157,6 +238,33 @@
       "-o",
       "build/main",
       "./change_me/src/stmt.cpp"
+    ],
+    "directory": "/Users/ja1473/no-name-lang",
+    "output": "build/main"
+  },
+  {
+    "file": "./change_me/src/type_context.cpp",
+    "arguments": [
+      "clang++",
+      "-I./change_me/include",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-unused-parameter",
+      "-I/opt/homebrew/Cellar/llvm/21.1.8/include",
+      "-std=c++17",
+      "-stdlib=libc++",
+      "-fno-exceptions",
+      "-funwind-tables",
+      "-DEXPERIMENTAL_KEY_INSTRUCTIONS",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-DCXXOPTS_NO_EXCEPTIONS",
+      "-o",
+      "build/main",
+      "./change_me/src/type_context.cpp"
     ],
     "directory": "/Users/ja1473/no-name-lang",
     "output": "build/main"

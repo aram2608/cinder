@@ -1,12 +1,15 @@
 #ifndef PARSER_H_
 #define PARSER_H_
 
-#include "common.hpp"
-#include "errors.hpp"
+// #include "common.hpp"
+#include <initializer_list>
+#include <iostream>
+#include <memory>
+#include <vector>
+
 #include "expr.hpp"
 #include "stmt.hpp"
 #include "tokens.hpp"
-#include "utils.hpp"
 
 /// @struct Parser
 /// @brief Main class for parsing tokens in a program
