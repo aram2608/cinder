@@ -2,6 +2,7 @@
 #define SEMANTIC_ANALYZER_H_
 
 #include "common.hpp"
+#include "errors.hpp"
 #include "expr.hpp"
 #include "llvm/IR/Value.h"
 #include "stmt.hpp"
@@ -10,32 +11,20 @@
 #include "utils.hpp"
 
 struct TypeContext {
-  types::IntType int32{32, true};
+  types::IntType int32{32};
   types::FloatType float32{32};
   types::Type voidTy{types::TypeKind::Void};
+  types::BoolType int1{1};
+
   /// TODO: Extend types
-  /// BoolType
   /// FunctionType
+  /// StructType
 
-  std::unordered_map<types::Type*, std::unique_ptr<types::PointerType>> ptrs;
-
-  types::Type* Int32() {
-    return &int32;
-  }
-  types::Type* Float32() {
-    return &float32;
-  }
-  types::Type* Void() {
-    return &voidTy;
-  }
-
-  types::Type* PointerTo(types::Type* base) {
-    auto& p = ptrs[base];
-    if (!p) {
-      p = std::make_unique<types::PointerType>(base);
-    }
-    return p.get();
-  }
+  types::Type* Int32();
+  types::Type* Float32();
+  types::Type* Void();
+  types::Type* Bool();
+  types::Type* Function(types::Type* ret, std::vector<types::Type*> params);
 };
 
 struct Symbol {
@@ -44,28 +33,20 @@ struct Symbol {
 
 struct Scope {
   std::unordered_map<std::string, Symbol> table;
-  Scope* parent;
+  std::shared_ptr<Scope> parent;
 
-  explicit Scope(Scope* parent = nullptr) : parent(parent) {}
-
-  void Declare(const std::string& name, types::Type* type) {
-    table[name] = Symbol{type};
-  }
-
-  Symbol* Lookup(const std::string& name) {
-    if (auto it = table.find(name); it != table.end()) {
-      return &it->second;
-    }
-    return parent ? parent->Lookup(name) : nullptr;
-  }
+  explicit Scope(std::shared_ptr<Scope> parent = nullptr);
+  void Declare(const std::string& name, types::Type* type);
+  Symbol* Lookup(const std::string& name);
 };
 
 struct SemanticAnalyzer : ExprVisitor, StmtVisitor {
-  SemanticAnalyzer(TypeContext& tc) : types(tc), scope(nullptr) {}
+  SemanticAnalyzer(TypeContext& tc);
 
-  void Analyze(Expr& expr) {
-    expr.Accept(*this);
-  }
+  /// We need to declare we are using these so the compiler knows which methods
+  /// are available
+  using ExprVisitor::Visit;
+  using StmtVisitor::Visit;
 
   // Statements
   llvm::Value* Visit(ModuleStmt& stmt) override;
@@ -86,8 +67,11 @@ struct SemanticAnalyzer : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(Assign& expr) override;
   llvm::Value* Visit(CallExpr& expr) override;
 
+  types::Type* ResolveArgType(Token type);
+  types::Type* ResolveType(Token type);
+
   TypeContext& types;
-  Scope* scope;
+  std::shared_ptr<Scope> scope;
 };
 
 #endif

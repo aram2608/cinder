@@ -9,7 +9,7 @@ enum class TypeKind {
   Void,
   Int,
   Float,
-  Pointer,
+  Bool,
   Function,
   Struct,
 };
@@ -24,7 +24,7 @@ struct IntType : Type {
   unsigned int bits;
   bool is_signed;
 
-  IntType(unsigned bits, bool is_signed)
+  IntType(unsigned bits, bool is_signed = true)
       : Type(TypeKind::Int), bits(bits), is_signed(is_signed) {}
 };
 
@@ -34,11 +34,10 @@ struct FloatType : Type {
   explicit FloatType(unsigned bits) : Type(TypeKind::Float), bits(bits) {}
 };
 
-struct PointerType : Type {
-  Type* pointee;
+struct BoolType : Type {
+  unsigned int bits;
 
-  explicit PointerType(Type* pointee)
-      : Type(TypeKind::Pointer), pointee(pointee) {}
+  explicit BoolType(unsigned int bits) : Type(TypeKind::Bool), bits(bits) {}
 };
 
 struct FunctionType : Type {
@@ -49,6 +48,7 @@ struct FunctionType : Type {
       : Type(TypeKind::Function), return_type(ret), params(std::move(params)) {}
 };
 
+/// TODO: Find a way to implement this
 struct StructType : Type {
   std::string name;
   std::vector<Type*> fields;

@@ -305,25 +305,25 @@ Value* Compiler::Visit(FunctionProto& stmt) {
 
   std::vector<Type*> arg_types;
   for (auto& arg : stmt.args) {
-    switch (arg.type) {
-      case VT_INT32:
-        arg_types.push_back(Type::getInt32Ty(*TheContext));
-        break;
-      case VT_INT64:
-        arg_types.push_back(Type::getInt64Ty(*TheContext));
-        break;
-      case VT_FLT:
-        arg_types.push_back(Type::getFloatTy(*TheContext));
-        break;
-      case VT_STR:
-        IMPLEMENT(VT_STR);
-        exit(1);
-      case VT_VOID:
-        arg_types.push_back(Type::getVoidTy(*TheContext));
-        break;
-      default:
-        UNREACHABLE(FunctionProto, "Unknown argument type");
-    }
+    // switch (arg.type) {
+    //   case VT_INT32:
+    //     arg_types.push_back(Type::getInt32Ty(*TheContext));
+    //     break;
+    //   case VT_INT64:
+    //     arg_types.push_back(Type::getInt64Ty(*TheContext));
+    //     break;
+    //   case VT_FLT:
+    //     arg_types.push_back(Type::getFloatTy(*TheContext));
+    //     break;
+    //   case VT_STR:
+    //     IMPLEMENT(VT_STR);
+    //     exit(1);
+    //   case VT_VOID:
+    //     arg_types.push_back(Type::getVoidTy(*TheContext));
+    //     break;
+    //   default:
+    //     UNREACHABLE(FunctionProto, "Unknown argument type");
+    // }
   }
 
   FunctionType* FT = FunctionType::get(return_type, arg_types, false);

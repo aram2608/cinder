@@ -49,6 +49,7 @@ enum TokenType {
   TT_RBRACKET, /** "]" */
   TT_QUOTE,
   TT_COMMA, /**< "," */
+  TT_ELIPSIS,
 
   // Key words and identifiers
   TT_IDENTIFER, /** Any series of characters */

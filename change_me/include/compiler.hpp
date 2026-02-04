@@ -90,6 +90,9 @@ struct Compiler : ExprVisitor, StmtVisitor {
   void CompileRun();
   void CompileBinary(llvm::TargetMachine* target_machine);
 
+  using ExprVisitor::Visit;
+  using StmtVisitor::Visit;
+
   // Statements
   llvm::Value* Visit(ModuleStmt& stmt) override;
   llvm::Value* Visit(ForStmt& stmt) override;

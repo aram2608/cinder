@@ -2,6 +2,7 @@
 #define PARSER_H_
 
 #include "common.hpp"
+#include "errors.hpp"
 #include "expr.hpp"
 #include "stmt.hpp"
 #include "tokens.hpp"
@@ -149,13 +150,6 @@ struct Parser {
   /// @brief Method to print out the ast
   /// @param statement The statement to be printed
   void EmitAST(std::unique_ptr<Stmt> statement);
-
-  /**
-   * @brief Method to format a message for errors with a new line
-   * @param message The error message
-   * @return Formatted string
-   */
-  std::string ErrorMessageFormatLn(std::string message);
 };
 
 #endif

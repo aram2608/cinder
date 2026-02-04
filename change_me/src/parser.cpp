@@ -1,5 +1,7 @@
 #include "../include/parser.hpp"
 
+static errs::RawOutStream errors{};
+
 Parser::Parser(std::vector<Token> tokens) : tokens(tokens), current_tok(0) {}
 
 std::unique_ptr<Stmt> Parser::Parse() {
@@ -244,11 +246,11 @@ std::unique_ptr<Expr> Parser::Atom() {
 
   if (MatchType({TT_LPAREN})) {
     std::unique_ptr<Expr> expr = Expression();
-    Consume(TT_RPAREN, ErrorMessageFormatLn("Expected ')' after grouping"));
+    Consume(TT_RPAREN, "Expected ')' after grouping");
     return std::make_unique<Grouping>(std::move(expr));
   }
-  std::cout << ErrorMessageFormatLn("Expected expression: " + Peek().lexeme);
-  exit(1);
+  errs::ErrorOutln(errors, "Expected expression:", Peek().lexeme);
+  return nullptr;
 }
 
 bool Parser::MatchType(std::initializer_list<TokenType> types) {
@@ -291,8 +293,7 @@ Token Parser::Consume(TokenType type, std::string message) {
   if (Peek().type == type) {
     return Advance();
   }
-  std::cout << ErrorMessageFormatLn(message);
-  exit(1);
+  errs::ErrorOutln(errors, message);
 }
 
 void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {
@@ -303,8 +304,4 @@ void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {
 
 void Parser::EmitAST(std::unique_ptr<Stmt> statement) {
   std::cout << statement->ToString() << "\n";
-}
-
-std::string Parser::ErrorMessageFormatLn(std::string message) {
-  return message + "\nLine: " + std::to_string(Peek().line_num) + "\n";
 }

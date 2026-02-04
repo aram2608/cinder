@@ -91,6 +91,8 @@ struct Lexer {
    */
   void AddToken(TokenType tok_type);
 
+  void AddToken(TokenType tok_type, std::string lexeme);
+
   /**
    * @brief Method to add complex tokens
    * @param tok_type
@@ -98,9 +100,8 @@ struct Lexer {
    * @param value_type
    * @param value
    */
-  void AddToken(TokenType tok_type, std::string lexeme, TokenValue value);
-
-  void AddToken(TokenType tok_type, std::string lexeme);
+  void AddToken(TokenType tok_type, std::string lexeme,
+                std::optional<TokenValue> value);
 
   /// @brief Method to parse comments
   void ParseComment();

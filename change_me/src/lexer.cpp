@@ -184,7 +184,8 @@ void Lexer::AddToken(TokenType tok_type) {
   tokens.emplace_back(tok_type, line_count, temp);
 }
 
-void Lexer::AddToken(TokenType tok_type, std::string lexeme, TokenValue value) {
+void Lexer::AddToken(TokenType tok_type, std::string lexeme,
+                     std::optional<TokenValue> value) {
   tokens.emplace_back(tok_type, line_count, lexeme, value);
 }
 
@@ -217,7 +218,9 @@ void Lexer::TokenizeString() {
   size_t index = current_pos - start_pos - 2;
   std::string value = source_str.substr(start_pos + 1, index);
   EscapeCharacters(value);
-  AddToken(TT_STR_LITERAL, value, value);
+  std::optional<TokenValue> literal;
+  literal.emplace(std::in_place_type<std::string>, value);
+  AddToken(TT_STR_LITERAL, value, literal);
 }
 
 void Lexer::EscapeCharacters(std::string& str) {
@@ -255,7 +258,7 @@ void Lexer::TokenizeIdentifier() {
 
   auto match = key_words.find(temp);
   if (match != key_words.end()) {
-    AddToken(match->second, temp, temp);
+    AddToken(match->second, temp);
     return;
   }
   AddToken(TT_IDENTIFER, temp);
@@ -272,11 +275,15 @@ void Lexer::TokenizeNumber() {
     }
     size_t index = current_pos - start_pos;
     std::string temp = source_str.substr(start_pos, index);
-    AddToken(TT_FLT_LITERAL, temp, std::stof(temp));
+    std::optional<TokenValue> literal;
+    literal.emplace(std::in_place_type<float>, std::stof(temp));
+    AddToken(TT_FLT_LITERAL, temp, literal);
   } else {
     size_t index = current_pos - start_pos;
     std::string temp = source_str.substr(start_pos, index);
-    AddToken(TT_INT_LITERAL, temp, std::stoi(temp));
+    std::optional<TokenValue> literal;
+    literal.emplace(std::in_place_type<int>, std::stoi(temp));
+    AddToken(TT_INT_LITERAL, temp, literal);
   }
 }
 
