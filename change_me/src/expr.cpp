@@ -1,7 +1,6 @@
 #include "../include/expr.hpp"
 
 #include <sstream>
-#include <type_traits>
 #include <variant>
 
 using namespace llvm;
@@ -36,21 +35,26 @@ std::string EscapeString(const std::string& value) {
   return escaped;
 }
 
-std::string LiteralValueToString(const TokenValue& value) {
-  return std::visit(
-      [](const auto& v) -> std::string {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<T, std::string>) {
-          return "\"" + EscapeString(v) + "\"";
-        } else if constexpr (std::is_same_v<T, bool>) {
-          return v ? "true" : "false";
-        } else {
-          std::ostringstream out;
-          out << v;
-          return out.str();
-        }
-      },
-      value);
+template<class... Ts> 
+struct overloaded : Ts... { 
+    using Ts::operator()...; 
+};
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+static std::string LiteralValueToString(const TokenValue& value) {
+  return std::visit(overloaded {
+    [](bool v) -> std::string { 
+      return v ? "true" : "false"; 
+    },
+    [](const std::string& v) -> std::string { 
+      return "\"" + EscapeString(v) + "\""; 
+    },
+    [](auto v) -> std::string {
+      std::ostringstream out;
+      out << v;
+      return out.str();
+    }
+  }, value);
 }
 
 void AppendTreeBlock(std::string* out, const std::string& prefix, bool is_last,
@@ -95,7 +99,7 @@ std::string ExprNodeLabel(const Expr& expr) {
   return "Expr";
 }
 
-std::string RenderExpr(const Expr& expr) {
+static std::string RenderExpr(const Expr& expr) {
   std::string out = ExprNodeLabel(expr) + "\n";
 
   if (const auto* grouping = dynamic_cast<const Grouping*>(&expr)) {
