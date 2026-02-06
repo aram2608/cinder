@@ -1,6 +1,7 @@
 add_library(no_name_lang_core STATIC)
 add_executable(main)
 
+# TODO: Fix this so it works even if llvm-config is not found
 execute_process(
     COMMAND llvm-config --cxxflags
     OUTPUT_VARIABLE LLVM_CONFIG_CXXFLAGS

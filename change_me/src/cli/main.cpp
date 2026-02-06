@@ -1,12 +1,11 @@
 #include <fstream>
 
-#include "cxxopts.hpp"
+#include "../vendor/cxxopts.hpp"
 #include "no_name_lang/ast/stmt.hpp"
 #include "no_name_lang/codegen/compiler.hpp"
 #include "no_name_lang/frontend/lexer.hpp"
 #include "no_name_lang/frontend/parser.hpp"
 #include "no_name_lang/semantic/semantic_analyzer.hpp"
-#include "no_name_lang/semantic/type_context.hpp"
 
 std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};
@@ -80,6 +79,7 @@ bool ParseCLI(int argc, char** argv) {
       SemanticAnalyzer pass{};
       ModuleStmt* module = dynamic_cast<ModuleStmt*>(mod.get());
       pass.Analyze(*module);
+      pass.DumpErrors();
     }
     return true;
   }

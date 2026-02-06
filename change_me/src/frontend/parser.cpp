@@ -125,13 +125,14 @@ std::unique_ptr<Stmt> Parser::IfStatement() {
 }
 
 std::unique_ptr<Stmt> Parser::ReturnStatement() {
+  Token tok = Previous();
   if (CheckType(TT_SEMICOLON)) {
     Advance();
-    return std::make_unique<ReturnStmt>(nullptr);
+    return std::make_unique<ReturnStmt>(tok, nullptr);
   }
   std::unique_ptr<Expr> expr = Expression();
   Consume(TT_SEMICOLON, "expected ';' after return statement");
-  return std::make_unique<ReturnStmt>(std::move(expr));
+  return std::make_unique<ReturnStmt>(tok, std::move(expr));
 }
 
 std::unique_ptr<Stmt> Parser::VarDeclaration() {

@@ -194,7 +194,8 @@ std::string FunctionStmt::ToString() {
   return RenderStmt(*this);
 }
 
-ReturnStmt::ReturnStmt(std::unique_ptr<Expr> value) : value(std::move(value)) {}
+ReturnStmt::ReturnStmt(Token ret_token, std::unique_ptr<Expr> value)
+    : ret_token(ret_token), value(std::move(value)) {}
 
 Value* ReturnStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);

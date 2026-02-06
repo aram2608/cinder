@@ -11,11 +11,13 @@
 #include "no_name_lang/frontend/tokens.hpp"
 #include "no_name_lang/semantic/semantic_scope.hpp"
 #include "no_name_lang/semantic/type_context.hpp"
+#include "no_name_lang/support/diagnostic.hpp"
 
 class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   TypeContext types;
   std::shared_ptr<Scope> scope;
   types::Type* current_return;
+  DiagnosticEngine diagnose_;
 
   /// We need to declare we are using these so the compiler knows which methods
   /// are available
@@ -54,6 +56,8 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
  public:
   SemanticAnalyzer();
   void Analyze(ModuleStmt& mod);
+  bool HadError();
+  void DumpErrors();
 };
 
 #endif

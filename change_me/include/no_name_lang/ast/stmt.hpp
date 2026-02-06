@@ -9,6 +9,7 @@
 #include "llvm/IR/Value.h"
 #include "no_name_lang/ast/expr.hpp"
 #include "no_name_lang/ast/types.hpp"
+#include "no_name_lang/frontend/tokens.hpp"
 
 struct ModuleStmt;
 struct ExpressionStmt;
@@ -154,9 +155,10 @@ struct FunctionStmt : Stmt {
 /// @struct ReturnStmt
 /// @brief Return stmt node
 struct ReturnStmt : Stmt {
+  Token ret_token;
   std::unique_ptr<Expr> value;
 
-  ReturnStmt(std::unique_ptr<Expr> value);
+  ReturnStmt(Token ret_toke, std::unique_ptr<Expr> value);
 
   /**
    * @brief Method used to emply the visitor pattern
