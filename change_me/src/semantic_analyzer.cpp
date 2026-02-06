@@ -100,7 +100,7 @@ llvm::Value* SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
 
 llvm::Value* SemanticAnalyzer::Visit(ReturnStmt& stmt) {
   Resolve(*stmt.value);
-  if (stmt.value->type != current_return) {
+  if (stmt.value->type->kind != current_return->kind) {
     errs::ErrorOutln(errors, "Return value does not match current return type");
   }
   return nullptr;
@@ -133,7 +133,7 @@ llvm::Value* SemanticAnalyzer::Visit(Binary& expr) {
   Resolve(*expr.left);
   Resolve(*expr.right);
 
-  if (expr.left->type != expr.right->type) {
+  if (expr.left->type->kind != expr.right->type->kind) {
     errs::ErrorOutln(errors, "Type mismatch:", expr.op.lexeme, "at line",
                      expr.op.line_num);
   }
@@ -171,7 +171,11 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(PreFixOp& expr) {
-  /// TODO: implement this
+  auto* sym = scope->Lookup(expr.name.lexeme);
+  if (!sym) {
+    errs::ErrorOutln(errors,
+                     "Variable is not defined:", expr.name.lexeme);
+  }
   return nullptr;
 }
 
@@ -220,7 +224,7 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   for (size_t i = 0; i < num_args; i++) {
     Resolve(*expr.args[i]);
     if (i < num_params) {
-      if (expr.args[i]->type != func_type->params[i]) {
+      if (expr.args[i]->type->kind != func_type->params[i]->kind) {
         errs::ErrorOutln(errors, "Type mismatch in fixed argument", i);
       }
     } else {

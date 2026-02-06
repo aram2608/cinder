@@ -9,6 +9,8 @@ void SymbolTable::Declare(std::string name, InternalSymbol symb) {
 }
 
 InternalSymbol* SymbolTable::LookUp(std::string name) {
-  auto symb = symbols.find(name);
-  return &symb->second;
+  if (auto it = symbols.find(name); it != symbols.end()) {
+    return &it->second;
+  }
+  return parent ? parent->LookUp(name) : nullptr;
 }

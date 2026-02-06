@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include <cstdlib>
+#include <memory>
 
 #include "../include/utils.hpp"
 #include "errors.hpp"
@@ -14,6 +15,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IR/Value.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -24,6 +26,7 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "stmt.hpp"
 #include "symbol_table.hpp"
+#include "tokens.hpp"
 #include "types.hpp"
 
 using namespace llvm;
@@ -163,7 +166,6 @@ void Compiler::CompileBinary(TargetMachine* target_machine) {
 
 Value* Compiler::Visit(ModuleStmt& stmt) {
   SemanticPass(stmt);
-  exit(0);
   TheModule = CreateModule(stmt, *TheContext);
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
   TheFPM = std::make_unique<FunctionPassManager>();
@@ -186,9 +188,16 @@ Value* Compiler::Visit(ModuleStmt& stmt) {
   PB.registerFunctionAnalyses(*TheFAM);
   PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 
+  std::shared_ptr<SymbolTable> global_state =
+      std::make_shared<SymbolTable>(this->symbol_table);
+  std::shared_ptr<SymbolTable> previous = this->symbol_table;
+  this->symbol_table = global_state;
+
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
   }
+
+  this->symbol_table = previous;
   return nullptr;
 }
 
@@ -220,6 +229,11 @@ Value* Compiler::Visit(WhileStmt& stmt) {
 }
 
 Value* Compiler::Visit(ForStmt& stmt) {
+  std::shared_ptr<SymbolTable> for_scope =
+      std::make_shared<SymbolTable>(this->symbol_table);
+  std::shared_ptr<SymbolTable> previous = this->symbol_table;
+  this->symbol_table = for_scope;
+
   if (stmt.initializer) {
     stmt.initializer->Accept(*this);
   }
@@ -251,6 +265,7 @@ Value* Compiler::Visit(ForStmt& stmt) {
   Builder->CreateBr(cond_block);
 
   Builder->SetInsertPoint(after_block);
+  this->symbol_table = previous;
   return nullptr;
 }
 
@@ -288,6 +303,10 @@ Value* Compiler::Visit(IfStmt& stmt) {
 
 Value* Compiler::Visit(FunctionStmt& stmt) {
   Function* Func = dyn_cast<Function>(stmt.proto->Accept(*this));
+  std::shared_ptr<SymbolTable> function_scope =
+      std::make_shared<SymbolTable>(this->symbol_table);
+  std::shared_ptr<SymbolTable> previous = this->symbol_table;
+  this->symbol_table = function_scope;
 
   BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", Func);
   Builder->SetInsertPoint(BB);
@@ -298,7 +317,7 @@ Value* Compiler::Visit(FunctionStmt& stmt) {
 
   verifyFunction(*Func);
   TheFPM->run(*Func, *TheFAM);
-  // symbol_table.clear();
+  this->symbol_table = previous;
   return Func;
 }
 
@@ -308,7 +327,6 @@ Value* Compiler::Visit(FunctionProto& stmt) {
 
   std::vector<Type*> arg_types;
   for (auto& arg : stmt.args) {
-    UNUSED(arg);
     arg_types.push_back(ResolveArgType(arg.resolved_type));
   }
 
@@ -317,11 +335,12 @@ Value* Compiler::Visit(FunctionProto& stmt) {
   Function* Func =
       Function::Create(FT, Function::ExternalLinkage, func_name, *TheModule);
 
-  argument_table.clear();
   unsigned Idx = 0;
   for (auto& arg : Func->args()) {
     arg.setName(stmt.args[Idx].identifier.lexeme);
-    argument_table[stmt.args[Idx++].identifier.lexeme] = &arg;
+    InternalSymbol symb{nullptr, &arg};
+    std::string name = stmt.args[Idx++].identifier.lexeme;
+    symbol_table->Declare(name, symb);
   }
 
   InternalSymbol symb{nullptr, Func};
@@ -330,11 +349,17 @@ Value* Compiler::Visit(FunctionProto& stmt) {
 }
 
 Value* Compiler::Visit(ReturnStmt& stmt) {
-  // Value* ret = ResolveType(stmt.value->type);
-  // if (!ret) {
-    // return Builder->CreateRetVoid();
-  // }
-  // return Builder->CreateRet(ret);
+  Value* ret = stmt.value->Accept(*this);
+  switch (stmt.value->type->kind) {
+    case types::TypeKind::Void:
+      return Builder->CreateRetVoid();
+    case types::TypeKind::Bool:
+    case types::TypeKind::String:
+    case types::TypeKind::Int:
+    case types::TypeKind::Float:
+    default:
+      return Builder->CreateRet(ret);
+  }
   return nullptr;
 }
 
@@ -358,43 +383,43 @@ Value* Compiler::Visit(Conditional& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
-  Type* l_type = left->getType();
-  Type* r_type = right->getType();
-
-  if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
-    switch (expr.op.type) {
-      case TT_BANGEQ:
-        return Builder->CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
-      case TT_EQEQ:
-        return Builder->CreateCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
-      case TT_LESSER:
-        return Builder->CreateCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
-      case TT_LESSER_EQ:
-        return Builder->CreateCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
-      case TT_GREATER:
-        return Builder->CreateCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
-      case TT_GREATER_EQ:
-        return Builder->CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
-      default:
-        UNREACHABLE(Conditional, "Unknown integer operation");
-    }
-  } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
-    switch (expr.op.type) {
-      case TT_BANGEQ:
-        return Builder->CreateFCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
-      case TT_EQEQ:
-        return Builder->CreateFCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
-      case TT_LESSER:
-        return Builder->CreateFCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
-      case TT_LESSER_EQ:
-        return Builder->CreateFCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
-      case TT_GREATER:
-        return Builder->CreateFCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
-      case TT_GREATER_EQ:
-        return Builder->CreateFCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
-      default:
-        UNREACHABLE(Conditional, "Unknown floating point operation");
-    }
+  switch (expr.type->kind) {
+    case types::TypeKind::Int:
+      switch (expr.op.type) {
+        case TT_BANGEQ:
+          return Builder->CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+        case TT_EQEQ:
+          return Builder->CreateCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+        case TT_LESSER:
+          return Builder->CreateCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+        case TT_LESSER_EQ:
+          return Builder->CreateCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+        case TT_GREATER:
+          return Builder->CreateCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+        case TT_GREATER_EQ:
+          return Builder->CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+        default:
+          break;
+      }
+    case types::TypeKind::Float:
+      switch (expr.op.type) {
+        case TT_BANGEQ:
+          return Builder->CreateFCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+        case TT_EQEQ:
+          return Builder->CreateFCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+        case TT_LESSER:
+          return Builder->CreateFCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+        case TT_LESSER_EQ:
+          return Builder->CreateFCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+        case TT_GREATER:
+          return Builder->CreateFCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+        case TT_GREATER_EQ:
+          return Builder->CreateFCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+        default:
+          break;
+      }
+    default:
+      break;
   }
   return nullptr;
 }
@@ -403,112 +428,98 @@ Value* Compiler::Visit(Binary& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
-  Type* l_type = left->getType();
-  Type* r_type = right->getType();
-
-  if (l_type->isIntegerTy() && r_type->isIntegerTy()) {
-    switch (expr.op.type) {
-      case TT_PLUS:
-        return Builder->CreateAdd(left, right, "addtmp");
-      case TT_MINUS:
-        return Builder->CreateSub(left, right, "subtmp");
-      case TT_STAR:
-        return Builder->CreateMul(left, right, "multmp");
-      case TT_SLASH:
-        return Builder->CreateSDiv(left, right, "divtmp");
-      default:
-        UNREACHABLE(Binary, "Unknown integer operation");
-    }
-  } else if (l_type->isFloatTy() && r_type->isFloatTy()) {
-    switch (expr.op.type) {
-      case TT_PLUS:
-        return Builder->CreateFAdd(left, right, "addtmp");
-      case TT_MINUS:
-        return Builder->CreateFSub(left, right, "subtmp");
-      case TT_STAR:
-        return Builder->CreateFMul(left, right, "multmp");
-      case TT_SLASH:
-        return Builder->CreateFDiv(left, right, "divtmp");
-      default:
-        UNREACHABLE(Binary, "Unknown floating point operation");
-    }
+  switch (expr.type->kind) {
+    case types::TypeKind::Int:
+      switch (expr.op.type) {
+        case TT_PLUS:
+          return Builder->CreateAdd(left, right, "addtmp");
+        case TT_MINUS:
+          return Builder->CreateSub(left, right, "subtmp");
+        case TT_SLASH:
+          return Builder->CreateSDiv(left, right, "divtmp");
+        case TT_STAR:
+          return Builder->CreateMul(left, right, "multmp");
+        default:
+          break;
+      }
+    case types::TypeKind::Float:
+      switch (expr.op.type) {
+        case TT_PLUS:
+          return Builder->CreateFAdd(left, right, "addtmp");
+        case TT_MINUS:
+          return Builder->CreateFSub(left, right, "subtmp");
+        case TT_STAR:
+          return Builder->CreateFMul(left, right, "multmp");
+        case TT_SLASH:
+          return Builder->CreateFDiv(left, right, "divtmp");
+        default:
+          break;
+      }
+    default:
+      break;
   }
   return nullptr;
 }
 
 Value* Compiler::Visit(PreFixOp& expr) {
-  // // LoadInst* var = dyn_cast<LoadInst>(expr.var->Accept(*this));
-  // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
+  InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
+  LoadInst* var = dyn_cast<LoadInst>(symb->value);
 
-  // Type* type = var_ptr->getAllocatedType();
+  Value* inc;
+  Value* value;
 
-  // Value* inc;
-  // Value* value;
+  /// TODO: maybe refactor this, a but too complex
+  switch (expr.op.type) {
+    case TT_PLUS_PLUS:
+      switch (expr.type->kind) {
+        case types::TypeKind::Int:
+          inc = ConstantInt::get(*TheContext, APInt(32, 1));
+          value = Builder->CreateAdd(var, inc, "addtmp");
+          break;
+        case types::TypeKind::Float:
+          inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+          value = Builder->CreateFAdd(var, inc, "addtmp");
+          break;
+      }
+      break;
+    case TT_MINUS_MINUS:
+      switch (expr.type->kind) {
+        case types::TypeKind::Int:
+          inc = ConstantInt::get(*TheContext, APInt(32, 1));
+          value = Builder->CreateSub(var, inc, "subtmp");
+          break;
+        case types::TypeKind::Float:
+          inc = ConstantFP::get(*TheContext, APFloat(1.0f));
+          value = Builder->CreateFSub(var, inc, "subtmp");
+          break;
+      }
+      break;
+  }
 
-  // switch (expr.op.type) {
-  //   case TT_PLUS_PLUS:
-  //     if (type->isIntegerTy()) {
-  //       inc = ConstantInt::get(*TheContext, APInt(32, 1));
-  //       value = Builder->CreateAdd(var, inc, "addtmp");
-  //     } else if (type->isFloatTy()) {
-  //       inc = ConstantFP::get(*TheContext, APFloat(1.0f));
-  //       value = Builder->CreateFAdd(var, inc, "addtmp");
-  //     } else {
-  //       UNREACHABLE(PreInc, "Unknown value type");
-  //     }
-  //     break;
-  //   case TT_MINUS_MINUS:
-  //     if (type->isIntegerTy()) {
-  //       inc = ConstantInt::get(*TheContext, APInt(32, 1));
-  //       value = Builder->CreateSub(var, inc, "subtmp");
-  //     } else if (type->isFloatTy()) {
-  //       inc = ConstantFP::get(*TheContext, APFloat(1.0f));
-  //       value = Builder->CreateFSub(var, inc, "subtmp");
-  //     } else {
-  //       UNREACHABLE(PreInc, "Unknown value type");
-  //     }
-  //     break;
-  //   default:
-  //     UNREACHABLE(PreInc, "Unknown value type");
-  // }
-  // Builder->CreateStore(value, var_ptr);
+  Builder->CreateStore(value, symb->alloca_ptr);
   return nullptr;
 }
 
 Value* Compiler::Visit(Assign& expr) {
+  InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
   Value* value = expr.value->Accept(*this);
-  // LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
-  // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
-  // Builder->CreateStore(value, var_ptr);
+  Builder->CreateStore(value, symb->alloca_ptr);
   return nullptr;
 }
 
 Value* Compiler::Visit(CallExpr& expr) {
-  UNUSED(expr);
-  // Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
-  // if (!callee) {
-  //   std::cout << "callee is not a function\n";
-  //   exit(1);
-  // }
+  Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
 
-  // std::string name = callee->getName().str();
-  // auto func = func_table.find(name);
-  // if (func->second != expr.args.size()) {
-  //   std::cout << "callee arguments do not match function signature\n";
-  //   exit(1);
-  // }
+  std::vector<Value*> call_args;
+  for (auto& arg : expr.args) {
+    call_args.push_back(arg->Accept(*this));
+  }
 
-  // std::vector<Value*> call_args;
-  // for (auto& arg : expr.args) {
-  //   call_args.push_back(arg->Accept(*this));
-  // }
+  if (expr.type->kind == types::TypeKind::Void) {
+    return Builder->CreateCall(callee, call_args);
+  }
 
-  // Type* ret_type = callee->getReturnType();
-  // if (ret_type->isVoidTy()) {
-  //   return Builder->CreateCall(callee, call_args);
-  // }
-
-  // return Builder->CreateCall(callee, call_args, callee->getName());
+  return Builder->CreateCall(callee, call_args, callee->getName());
 }
 
 Value* Compiler::Visit(Grouping& expr) {
@@ -518,27 +529,6 @@ Value* Compiler::Visit(Grouping& expr) {
 Value* Compiler::Visit(Variable& expr) {
   InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
   return symb->value;
-  // std::string lex = expr.name.lexeme;
-  // auto func = func_table.find(lex);
-  // if (func != func_table.end()) {
-  //   return TheModule->getFunction(lex);
-  // }
-
-  // auto arg = argument_table.find(lex);
-  // if (arg != argument_table.end()) {
-  //   return arg->second;
-  // }
-
-  // auto temp = symbol_table.find(lex);
-  // if (temp == symbol_table.end()) {
-  //   std::cout << "Variables is undefined: '" << lex << "'\n";
-  //   exit(1);
-  // }
-
-  // AllocaInst* var_ptr = temp->second;
-  // Type* type = var_ptr->getAllocatedType();
-  // Value* value = Builder->CreateLoad(type, var_ptr, lex);
-  // return value;
 }
 
 Value* Compiler::Visit(Literal& expr) {
@@ -600,6 +590,7 @@ llvm::Type* Compiler::ResolveArgType(types::Type* type) {
     default:
       break;
   }
+  return nullptr;
 }
 
 llvm::Type* Compiler::ResolveType(types::Type* type) {
