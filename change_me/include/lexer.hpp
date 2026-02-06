@@ -131,6 +131,8 @@ struct Lexer {
   /// @brief Method to lex numeric types
   void TokenizeNumber();
 
+  void TokenizeDot();
+
   /**
    * @brief A simple helper method to parse token types into strings
    * @param tok_type The token to be formatted

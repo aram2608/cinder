@@ -8,6 +8,7 @@ struct TypeContext {
   types::FloatType float32{32};
   types::Type voidTy{types::TypeKind::Void};
   types::BoolType int1{1};
+  types::StringType str{};
 
   /// TODO: Extend types
   /// StructType
@@ -16,6 +17,7 @@ struct TypeContext {
   types::Type* Float32();
   types::Type* Void();
   types::Type* Bool();
+  types::Type* String();
   /// TODO: This is kinda funky, think of a better way to handle it
   types::Type* Function(types::Type* ret, std::vector<types::Type*> params);
 };

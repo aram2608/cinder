@@ -34,8 +34,11 @@ std::string ExpressionStmt::ToString() {
 }
 
 FunctionProto::FunctionProto(Token name, Token return_type,
-                             std::vector<FuncArg> args)
-    : name(name), return_type(return_type), args(args) {}
+                             std::vector<FuncArg> args, bool is_variadic)
+    : name(name),
+      return_type(return_type),
+      args(args),
+      is_variadic(is_variadic) {}
 
 Value* FunctionProto::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);

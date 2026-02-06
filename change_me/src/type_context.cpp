@@ -1,5 +1,7 @@
 #include "../include/type_context.hpp"
 
+#include "types.hpp"
+
 types::Type* TypeContext::Int32() {
   return &int32;
 }
@@ -14,6 +16,10 @@ types::Type* TypeContext::Void() {
 
 types::Type* TypeContext::Bool() {
   return &int1;
+}
+
+types::Type* TypeContext::String() {
+  return &str;
 }
 
 /// Leaks memory, fix somehow, maybe an arena

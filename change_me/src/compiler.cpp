@@ -1,10 +1,13 @@
 #include "../include/compiler.hpp"
 
+#include <cstdlib>
+
 #include "../include/utils.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -13,6 +16,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "stmt.hpp"
 
 using namespace llvm;
 
@@ -55,9 +59,12 @@ Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
        * cleanup At least thats what I think is happening since I don't have
        * debug info for LLVM
        */
-      context(std::make_unique<LLVMContext>()) {}
+      context(std::make_unique<LLVMContext>()),
+      pass(&type_context) {}
 
 bool Compiler::Compile() {
+  SemanticPass();
+  exit(0);
   InitializeAllTargetInfos();
   InitializeAllTargets();
   InitializeAllTargetMCs();
@@ -642,4 +649,9 @@ CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,
 std::unique_ptr<llvm::Module> Compiler::CreateModule(ModuleStmt& stmt,
                                                      llvm::LLVMContext& ctx) {
   return std::make_unique<Module>(stmt.name.lexeme, *TheContext);
+}
+
+void Compiler::SemanticPass() {
+  ModuleStmt* mod_ref = dynamic_cast<ModuleStmt*>(mod.get());
+  pass.Analyze(*mod_ref);
 }

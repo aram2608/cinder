@@ -1,6 +1,7 @@
 #include "../include/parser.hpp"
 
 #include "../include/errors.hpp"
+#include "tokens.hpp"
 // #include "../include/utils.hpp"
 
 static errs::RawOutStream errors{};
@@ -27,12 +28,17 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
   Consume(TT_LPAREN, "expected '(' after function name");
 
   std::vector<FuncArg> args;
+  bool is_variadic = false;
   if (!CheckType(TT_RPAREN)) {
     do {
       if (args.size() >= 255) {
-        std::cout << "error: exceeded maximum number of arguments: 255\n";
-        exit(1);
+        errs::ErrorOutln(errors, "Exceeded maximum number of arguments: 255");
       }
+      // if (MatchType({TT_ELLIPSIS})) {
+      //   std::cout << "Matched ellipsis\n";
+      //   is_variadic = true;
+      //   break;
+      // }
       Token type = Advance();
       Token identifier = Consume(TT_IDENTIFER, "expected arg name");
       args.emplace_back(type, identifier);
@@ -41,7 +47,7 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
   Consume(TT_RPAREN, "expected ')' after end of function declaration");
   Consume(TT_ARROW, "expected '->' prior to the return type");
   Token return_type = Advance();
-  return std::make_unique<FunctionProto>(name, return_type, args);
+  return std::make_unique<FunctionProto>(name, return_type, args, is_variadic);
 }
 
 std::unique_ptr<Stmt> Parser::ExternFunction() {
@@ -212,11 +218,10 @@ std::unique_ptr<Expr> Parser::Call() {
   if (MatchType({TT_LPAREN})) {
     const size_t MAX_ARGS = 255;
     std::vector<std::unique_ptr<Expr>> args;
-
     if (!CheckType(TT_RPAREN)) {
       do {
         if (args.size() >= MAX_ARGS) {
-          std::cout << "max arguments reached\n";
+          std::cout << "max number of allowed arguments reached\n";
           exit(1);
         }
         args.push_back(Expression());

@@ -22,7 +22,9 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
+#include "semantic_analyzer.hpp"
 #include "stmt.hpp"
+#include "type_context.hpp"
 
 /// @enum @class CompilerMode
 /// @brief The compilation mode, whether to emit LLVM, run, or compile
@@ -68,6 +70,8 @@ struct Compiler : ExprVisitor, StmtVisitor {
   CompilerOptions opts; /**< The compiler options */
   std::unique_ptr<llvm::LLVMContext>
       context; /**< TODO: Let the compiler store the context */
+  TypeContext type_context;
+  SemanticAnalyzer pass;
 
   Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
@@ -105,6 +109,8 @@ struct Compiler : ExprVisitor, StmtVisitor {
 
   std::unique_ptr<llvm::Module> CreateModule(ModuleStmt& stmt,
                                              llvm::LLVMContext& ctx);
+
+  void SemanticPass();
 };
 
 #endif

@@ -1,6 +1,10 @@
 #ifndef SEMANTIC_ANALYZER_H_
 #define SEMANTIC_ANALYZER_H_
 
+#include <cstddef>
+#include <memory>
+#include <vector>
+
 #include "expr.hpp"
 #include "llvm/IR/Value.h"
 #include "scope.hpp"
@@ -9,8 +13,10 @@
 #include "type_context.hpp"
 #include "types.hpp"
 
-struct SemanticAnalyzer : ExprVisitor, StmtVisitor {
-  SemanticAnalyzer(TypeContext& tc);
+class SemanticAnalyzer : ExprVisitor, StmtVisitor {
+  TypeContext* types;
+  std::shared_ptr<Scope> scope;
+  types::Type* current_return;
 
   /// We need to declare we are using these so the compiler knows which methods
   /// are available
@@ -29,18 +35,26 @@ struct SemanticAnalyzer : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(VarDeclarationStmt& stmt) override;
 
   // Expressions
-  llvm::Value* Visit(Literal& expr) override;
   llvm::Value* Visit(BoolLiteral& expr) override;
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Binary& expr) override;
   llvm::Value* Visit(Assign& expr) override;
+  llvm::Value* Visit(Grouping& expr) override;
+  llvm::Value* Visit(Conditional& expr) override;
+  llvm::Value* Visit(PreFixOp& expr) override;
   llvm::Value* Visit(CallExpr& expr) override;
+  llvm::Value* Visit(Literal& expr) override;
 
   types::Type* ResolveArgType(Token type);
   types::Type* ResolveType(Token type);
 
-  TypeContext& types;
-  std::shared_ptr<Scope> scope;
+  llvm::Value* Resolve(Stmt& stmt);
+  llvm::Value* Resolve(Expr& expr);
+  void Declare(std::string name, types::Type* type);
+
+ public:
+  SemanticAnalyzer(TypeContext* tc);
+  void Analyze(ModuleStmt& mod);
 };
 
 #endif

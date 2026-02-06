@@ -105,8 +105,10 @@ struct FunctionProto : Stmt {
   Token name;                /**< The name of the function */
   Token return_type;         /**< The return type of the method */
   std::vector<FuncArg> args; /**< The function arguments */
+  bool is_variadic;
 
-  FunctionProto(Token name, Token return_type, std::vector<FuncArg> args);
+  FunctionProto(Token name, Token return_type, std::vector<FuncArg> args,
+                bool is_variadic);
 
   /**
    * @brief Method used to emply the visitor pattern

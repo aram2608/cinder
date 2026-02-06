@@ -15,9 +15,7 @@ TARGET := main
 WFLAGS := -g -Wall -Wextra -pedantic -Wno-unused-parameter
 INCLUDE_FLAGS := -I$(INCLUDE_DIR)
 LDFLAGS := -L/opt/homebrew/opt/llvm/lib/c++ \
-	-L/opt/homebrew/opt/llvm/lib/unwind -lunwind\
 	$(shell llvm-config --cxxflags --ldflags --libs) \
-	-lclang \
 
 OPTS := -DCXXOPTS_NO_EXCEPTIONS
 

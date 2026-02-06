@@ -4,9 +4,11 @@ def get(int32 a, int32 b) -> int32
     return a + b;
 end
 
+extern printf(str fmt) -> int32
+
 def main() -> int32
     int32: b = get(1, 4);
-    int64: a = 4;
+    int32: a = 4;
     bool: flag = 1 > 4;
     str: test = "hello world";
 

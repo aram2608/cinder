@@ -2,7 +2,10 @@
 
 #include <cassert>
 #include <iostream>
+#include <string>
 #include <unordered_map>
+
+#include "tokens.hpp"
 
 /// TODO: Fix the typing system so it is more ergonomic to work with
 /// Handling the types at parse time and IR gen time is a bit awkward
@@ -26,6 +29,7 @@ static const std::unordered_map<std::string, TokenType> key_words = {
     {"extern", TT_EXTERN},
     {"mod", TT_MOD},
     {"import", TT_IMPORT},
+    {"...", TT_ELLIPSIS},
 };
 
 Lexer::Lexer(std::string source_str)
@@ -66,6 +70,9 @@ void Lexer::Scan() {
     case ' ':
       break;
     case '\0':
+      break;
+    case '.':
+      TokenizeDot();
       break;
     case '"':
       TokenizeString();
@@ -291,6 +298,15 @@ void Lexer::TokenizeNumber() {
   }
 }
 
+void Lexer::TokenizeDot() {
+  if (PeekChar() == '.' && PeekNextChar() == '.') {
+    Advance();
+    AddToken(TT_ELLIPSIS);
+  } else {
+    AddToken(TT_DOT);
+  }
+}
+
 std::string Lexer::TokenToString(Token tok) {
   switch (tok.type) {
     case TT_QUOTE:
@@ -373,6 +389,8 @@ std::string Lexer::TokenToString(Token tok) {
       return "END";
     case TT_EOF:
       return "EOF";
+    case TT_ELLIPSIS:
+      return "ELIPSIS";
     case TT_INT32_SPECIFIER:
       return "INT32 TYPE";
     case TT_INT64_SPECIFIER:
