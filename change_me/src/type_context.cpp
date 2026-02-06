@@ -3,23 +3,23 @@
 #include "types.hpp"
 
 types::Type* TypeContext::Int32() {
-  return new types::IntType{32};
+  return &int32;
 }
 
 types::Type* TypeContext::Float32() {
-  return new types::FloatType{32};
+  return &float32;
 }
 
 types::Type* TypeContext::Void() {
-  return new types::Type{types::TypeKind::Void};
+  return &voidTy;
 }
 
 types::Type* TypeContext::Bool() {
-  return new types::IntType{1};
+  return &int1;
 }
 
 types::Type* TypeContext::String() {
-  return new types::StringType{};
+  return &str;
 }
 
 /// Leaks memory, fix somehow, maybe an arena

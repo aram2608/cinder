@@ -275,8 +275,12 @@ Value* Compiler::Visit(IfStmt& stmt) {
   Function* Func = Builder->GetInsertBlock()->getParent();
 
   BasicBlock* then_block = BasicBlock::Create(*TheContext, "if.then", Func);
-  BasicBlock* else_block = BasicBlock::Create(*TheContext, "if.else");
   BasicBlock* merge = BasicBlock::Create(*TheContext, "if.cont");
+  BasicBlock* else_block = merge;
+
+  if (stmt.otherwise) {
+    else_block = BasicBlock::Create(*TheContext, "if.else");
+  }
 
   Builder->CreateCondBr(condition, then_block, else_block);
 
@@ -286,15 +290,21 @@ Value* Compiler::Visit(IfStmt& stmt) {
   /// probably needs a vector for now
   stmt.then->Accept(*this);
 
-  Builder->CreateBr(merge);
+  if (!Builder->GetInsertBlock()->getTerminator()) {
+    Builder->CreateBr(merge);
+  }
   then_block = Builder->GetInsertBlock();
 
-  Func->insert(Func->end(), else_block);
-  Builder->SetInsertPoint(else_block);
-  stmt.otherwise->Accept(*this);
+  if (stmt.otherwise) {
+    Func->insert(Func->end(), else_block);
+    Builder->SetInsertPoint(else_block);
+    stmt.otherwise->Accept(*this);
 
-  Builder->CreateBr(merge);
-  else_block = Builder->GetInsertBlock();
+    if (!Builder->GetInsertBlock()->getTerminator()) {
+      Builder->CreateBr(merge);
+    }
+    else_block = Builder->GetInsertBlock();
+  }
 
   Func->insert(Func->end(), merge);
   Builder->SetInsertPoint(merge);
@@ -349,6 +359,10 @@ Value* Compiler::Visit(FunctionProto& stmt) {
 }
 
 Value* Compiler::Visit(ReturnStmt& stmt) {
+  if (!stmt.value) {
+    return Builder->CreateRetVoid();
+  }
+
   Value* ret = stmt.value->Accept(*this);
   switch (stmt.value->type->kind) {
     case types::TypeKind::Void:
@@ -463,10 +477,23 @@ Value* Compiler::Visit(Binary& expr) {
 
 Value* Compiler::Visit(PreFixOp& expr) {
   InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
-  LoadInst* var = dyn_cast<LoadInst>(symb->value);
+  if (!symb) {
+    errs::ErrorOutln(errors, "Undefined variable:", expr.name.lexeme);
+    return nullptr;
+  }
 
-  Value* inc;
-  Value* value;
+  if (!symb->alloca_ptr) {
+    errs::ErrorOutln(
+        errors,
+        "Prefix operators are only valid on mutable locals:", expr.name.lexeme);
+    return nullptr;
+  }
+
+  Value* var = Builder->CreateLoad(symb->alloca_ptr->getAllocatedType(),
+                                   symb->alloca_ptr, expr.name.lexeme);
+
+  Value* inc = nullptr;
+  Value* value = nullptr;
 
   /// TODO: maybe refactor this, a but too complex
   switch (expr.op.type) {
@@ -480,6 +507,8 @@ Value* Compiler::Visit(PreFixOp& expr) {
           inc = ConstantFP::get(*TheContext, APFloat(1.0f));
           value = Builder->CreateFAdd(var, inc, "addtmp");
           break;
+        default:
+          break;
       }
       break;
     case TT_MINUS_MINUS:
@@ -492,19 +521,35 @@ Value* Compiler::Visit(PreFixOp& expr) {
           inc = ConstantFP::get(*TheContext, APFloat(1.0f));
           value = Builder->CreateFSub(var, inc, "subtmp");
           break;
+        default:
+          break;
       }
+      break;
+    default:
       break;
   }
 
+  if (!value) {
+    errs::ErrorOutln(
+        errors, "Invalid prefix operation for variable:", expr.name.lexeme);
+    return nullptr;
+  }
+
   Builder->CreateStore(value, symb->alloca_ptr);
-  return nullptr;
+  return value;
 }
 
 Value* Compiler::Visit(Assign& expr) {
   InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
+  if (!symb || !symb->alloca_ptr) {
+    errs::ErrorOutln(errors, "Assignment to undefined or immutable variable:",
+                     expr.name.lexeme);
+    return nullptr;
+  }
+
   Value* value = expr.value->Accept(*this);
   Builder->CreateStore(value, symb->alloca_ptr);
-  return nullptr;
+  return value;
 }
 
 Value* Compiler::Visit(CallExpr& expr) {
@@ -528,10 +573,26 @@ Value* Compiler::Visit(Grouping& expr) {
 
 Value* Compiler::Visit(Variable& expr) {
   InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
+  if (!symb) {
+    errs::ErrorOutln(errors, "Undefined variable:", expr.name.lexeme);
+    return nullptr;
+  }
+
+  if (symb->alloca_ptr) {
+    Type* loaded_type = symb->alloca_ptr->getAllocatedType();
+    return Builder->CreateLoad(loaded_type, symb->alloca_ptr, expr.name.lexeme);
+  }
+
   return symb->value;
 }
 
 Value* Compiler::Visit(Literal& expr) {
+  if (!expr.type) {
+    errs::ErrorOutln(errors,
+                     "Internal error: unresolved literal type during codegen");
+    return nullptr;
+  }
+
   switch (expr.type->kind) {
     case types::TypeKind::Bool:
       return ConstantInt::getBool(*TheContext, std::get<bool>(expr.value));

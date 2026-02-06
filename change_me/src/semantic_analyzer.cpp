@@ -89,7 +89,9 @@ llvm::Value* SemanticAnalyzer::Visit(WhileStmt& stmt) {
 llvm::Value* SemanticAnalyzer::Visit(IfStmt& stmt) {
   Resolve(*stmt.cond);
   Resolve(*stmt.then);
-  Resolve(*stmt.otherwise);
+  if (stmt.otherwise) {
+    Resolve(*stmt.otherwise);
+  }
   return nullptr;
 }
 
@@ -99,6 +101,19 @@ llvm::Value* SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(ReturnStmt& stmt) {
+  if (!current_return) {
+    errs::ErrorOutln(errors, "Return statement outside function body");
+    return nullptr;
+  }
+
+  if (!stmt.value) {
+    if (current_return->kind != types::TypeKind::Void) {
+      errs::ErrorOutln(errors,
+                       "Return value does not match current return type");
+    }
+    return nullptr;
+  }
+
   Resolve(*stmt.value);
   if (stmt.value->type->kind != current_return->kind) {
     errs::ErrorOutln(errors, "Return value does not match current return type");
@@ -115,8 +130,18 @@ llvm::Value* SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
     return nullptr;
   }
 
-  stmt.value->type = ResolveType(stmt.type);
-  Declare(stmt.name.lexeme, stmt.value->type);
+  types::Type* declared_type = ResolveType(stmt.type);
+  Resolve(*stmt.value);
+
+  if (stmt.value->type->kind != declared_type->kind) {
+    errs::ErrorOutln(errors,
+                     "Type mismatch in variable declaration:", stmt.name.lexeme,
+                     "at line:", stmt.name.line_num);
+    return nullptr;
+  }
+
+  stmt.value->type = declared_type;
+  Declare(stmt.name.lexeme, declared_type);
   return nullptr;
 }
 
@@ -124,6 +149,7 @@ llvm::Value* SemanticAnalyzer::Visit(Variable& expr) {
   auto* sym = scope->Lookup(expr.name.lexeme);
   if (!sym) {
     errs::ErrorOutln(errors, "Undeclared variable:", expr.name.lexeme);
+    return nullptr;
   }
   expr.type = sym->type;
   return nullptr;
@@ -162,8 +188,9 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
   if (!sym) {
     errs::ErrorOutln(errors,
                      "Assignment to undelcared variable:", expr.name.lexeme);
+    return nullptr;
   }
-  if (sym->type != expr.value->type) {
+  if (sym->type->kind != expr.value->type->kind) {
     errs::ErrorOutln(errors, "Type mismatch in assignment:", expr.name.lexeme);
   }
   expr.type = sym->type;
@@ -173,15 +200,28 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
 llvm::Value* SemanticAnalyzer::Visit(PreFixOp& expr) {
   auto* sym = scope->Lookup(expr.name.lexeme);
   if (!sym) {
-    errs::ErrorOutln(errors,
-                     "Variable is not defined:", expr.name.lexeme);
+    errs::ErrorOutln(errors, "Variable is not defined:", expr.name.lexeme);
+    return nullptr;
   }
+
+  if (sym->type->kind != types::TypeKind::Int &&
+      sym->type->kind != types::TypeKind::Float) {
+    errs::ErrorOutln(
+        errors, "Prefix operator requires numeric operand:", expr.name.lexeme);
+  }
+
+  expr.type = sym->type;
   return nullptr;
 }
 
 llvm::Value* SemanticAnalyzer::Visit(Conditional& expr) {
   Resolve(*expr.left);
   Resolve(*expr.right);
+  if (expr.left->type->kind != expr.right->type->kind) {
+    errs::ErrorOutln(errors, "Type mismatch:", expr.op.lexeme, "at line",
+                     expr.op.line_num);
+  }
+  expr.type = types->Bool();
   return nullptr;
 }
 
@@ -192,6 +232,12 @@ llvm::Value* SemanticAnalyzer::Visit(Grouping& expr) {
 
 llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   Variable* callee = dynamic_cast<Variable*>(expr.callee.get());
+  if (!callee) {
+    errs::ErrorOutln(errors,
+                     "Only direct function calls are currently supported");
+    return nullptr;
+  }
+
   Symbol* symbol = scope->Lookup(callee->name.lexeme);
 
   if (!symbol) {

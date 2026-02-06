@@ -83,6 +83,9 @@ Value* ReturnStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ReturnStmt::ToString() {
+  if (!value) {
+    return "Return";
+  }
   return "Return: " + value->ToString();
 }
 
@@ -112,7 +115,9 @@ Value* IfStmt::Accept(StmtVisitor& visitor) {
 std::string IfStmt::ToString() {
   std::string temp = "if: " + cond->ToString() + "\n";
   temp += "then: " + then->ToString() + "\n";
-  temp += "else: " + otherwise->ToString() + "\n";
+  if (otherwise) {
+    temp += "else: " + otherwise->ToString() + "\n";
+  }
   return temp;
 }
 
