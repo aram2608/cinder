@@ -5,12 +5,12 @@ issues and concrete bug spots found in `change_me/`.
 
 ## P0 - Crashes / correctness blockers
 
-- [ ] **Fix parser loop EOF bug in while parsing**
+- [x] **Fix parser loop EOF bug in while parsing**
   - `Parser::WhileStatement()` uses `while (!(CheckType(TT_END) && !IsEnd()))`.
   - At EOF this condition stays true and can recurse into invalid parse paths.
   - File: `change_me/src/parser.cpp:93`
 
-- [ ] **Harden lexer bounds checks (`PeekChar` / `PeekNextChar`)**
+- [x] **Harden lexer bounds checks (`PeekChar` / `PeekNextChar`)**
   - `PeekChar()` directly indexes `source_str[current_pos]` with no `IsEnd()` guard.
   - `PeekNextChar()` checks `!IsEnd()` but still reads `current_pos + 1`, which is
     out-of-range at the last character.
@@ -18,6 +18,7 @@ issues and concrete bug spots found in `change_me/`.
   - File: `change_me/src/lexer.cpp:169`, `change_me/src/lexer.cpp:173`, `change_me/src/lexer.cpp:207`
 
 - [ ] **Fix `if` / `else` AST printing null deref regressions across AST nodes**
+  - NOT URGENT
   - `ReturnStmt`/`IfStmt` stringification was partially fixed; audit all `ToString()`
     paths for nullable children and optional syntax forms.
   - File: `change_me/src/stmt.cpp`

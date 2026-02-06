@@ -93,7 +93,7 @@ std::unique_ptr<Stmt> Parser::Statement() {
 std::unique_ptr<Stmt> Parser::WhileStatement() {
   std::unique_ptr<Expr> condition = Expression();
   std::vector<std::unique_ptr<Stmt>> body;
-  while (!(CheckType(TT_END) && !IsEnd())) {
+  while (!CheckType(TT_END)) {
     body.push_back(Statement());
   }
   Consume(TT_END, "'end' expected after loop");

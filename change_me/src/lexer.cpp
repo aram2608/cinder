@@ -167,11 +167,14 @@ bool Lexer::IsAlphaNumeric(char c) {
 }
 
 char Lexer::PeekChar() {
-  return source_str[current_pos];
+  if (!IsEnd()) {
+    return source_str[current_pos];
+  }
+  return '\0';
 }
 
 char Lexer::PeekNextChar() {
-  if (!IsEnd()) {
+  if (!IsEnd() && LookAheadOkay()) {
     return source_str[current_pos + 1];
   }
   return '\0';
@@ -205,7 +208,7 @@ void Lexer::AddToken(TokenType tok_type, std::string lexeme) {
 }
 
 void Lexer::ParseComment() {
-  while (PeekChar() != '\n' && !IsEnd()) {
+  while (!IsEnd() && PeekChar() != '\n') {
     Advance();
   }
 }
@@ -306,6 +309,10 @@ void Lexer::TokenizeDot() {
   } else {
     AddToken(TT_DOT);
   }
+}
+
+bool Lexer::LookAheadOkay() {
+  return current_pos + 1 < source_str.size();
 }
 
 std::string Lexer::TokenToString(Token tok) {

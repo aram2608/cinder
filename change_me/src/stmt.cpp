@@ -1,11 +1,149 @@
 #include "../include/stmt.hpp"
 
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "llvm/IR/Value.h"
 
 using namespace llvm;
+
+namespace {
+
+void AppendDiagram(std::string* out, const std::string& prefix, bool is_last,
+                   const std::string& label, const std::string& diagram) {
+  *out += prefix + (is_last ? "`- " : "|- ") + label + "\n";
+  const std::string child_prefix = prefix + (is_last ? "   " : "|  ");
+
+  std::istringstream in(diagram);
+  std::string line;
+  while (std::getline(in, line)) {
+    *out += child_prefix + line + "\n";
+  }
+}
+
+std::string RenderStmt(const Stmt& stmt);
+
+std::string StmtNodeLabel(const Stmt& stmt) {
+  if (const auto* module = dynamic_cast<const ModuleStmt*>(&stmt)) {
+    return "Module " + module->name.lexeme;
+  }
+  if (dynamic_cast<const ExpressionStmt*>(&stmt)) {
+    return "ExpressionStmt";
+  }
+  if (const auto* proto = dynamic_cast<const FunctionProto*>(&stmt)) {
+    return "FunctionProto " + proto->name.lexeme + " -> " +
+           proto->return_type.lexeme;
+  }
+  if (dynamic_cast<const FunctionStmt*>(&stmt)) {
+    return "FunctionStmt";
+  }
+  if (dynamic_cast<const ReturnStmt*>(&stmt)) {
+    return "ReturnStmt";
+  }
+  if (const auto* decl = dynamic_cast<const VarDeclarationStmt*>(&stmt)) {
+    return "VarDeclaration " + decl->type.lexeme + " " + decl->name.lexeme;
+  }
+  if (dynamic_cast<const IfStmt*>(&stmt)) {
+    return "IfStmt";
+  }
+  if (dynamic_cast<const ForStmt*>(&stmt)) {
+    return "ForStmt";
+  }
+  if (dynamic_cast<const WhileStmt*>(&stmt)) {
+    return "WhileStmt";
+  }
+  return "Stmt";
+}
+
+std::string RenderStmt(const Stmt& stmt) {
+  std::string out = StmtNodeLabel(stmt) + "\n";
+
+  if (const auto* module = dynamic_cast<const ModuleStmt*>(&stmt)) {
+    for (size_t i = 0; i < module->stmts.size(); ++i) {
+      const bool is_last = (i + 1) == module->stmts.size();
+      AppendDiagram(&out, "", is_last, "stmt[" + std::to_string(i) + "]",
+                    RenderStmt(*module->stmts[i]));
+    }
+  } else if (const auto* expr_stmt =
+                 dynamic_cast<const ExpressionStmt*>(&stmt)) {
+    AppendDiagram(&out, "", true, "expr", expr_stmt->expr->ToString());
+  } else if (const auto* proto = dynamic_cast<const FunctionProto*>(&stmt)) {
+    for (size_t i = 0; i < proto->args.size(); ++i) {
+      const auto& arg = proto->args[i];
+      const std::string arg_line =
+          arg.type_token.lexeme + " " + arg.identifier.lexeme;
+      const bool is_last = (i + 1) == proto->args.size() && !proto->is_variadic;
+      AppendDiagram(&out, "", is_last, "arg[" + std::to_string(i) + "]",
+                    arg_line);
+    }
+    if (proto->is_variadic) {
+      AppendDiagram(&out, "", true, "variadic", "...");
+    }
+  } else if (const auto* fn = dynamic_cast<const FunctionStmt*>(&stmt)) {
+    const bool has_body = !fn->body.empty();
+    AppendDiagram(&out, "", !has_body, "proto", RenderStmt(*fn->proto));
+    for (size_t i = 0; i < fn->body.size(); ++i) {
+      const bool is_last = (i + 1) == fn->body.size();
+      AppendDiagram(&out, "", is_last, "body[" + std::to_string(i) + "]",
+                    RenderStmt(*fn->body[i]));
+    }
+  } else if (const auto* ret = dynamic_cast<const ReturnStmt*>(&stmt)) {
+    if (ret->value) {
+      AppendDiagram(&out, "", true, "value", ret->value->ToString());
+    }
+  } else if (const auto* decl =
+                 dynamic_cast<const VarDeclarationStmt*>(&stmt)) {
+    AppendDiagram(&out, "", true, "value", decl->value->ToString());
+  } else if (const auto* if_stmt = dynamic_cast<const IfStmt*>(&stmt)) {
+    const bool has_else = static_cast<bool>(if_stmt->otherwise);
+    AppendDiagram(&out, "", false, "condition", if_stmt->cond->ToString());
+    AppendDiagram(&out, "", !has_else, "then", RenderStmt(*if_stmt->then));
+    if (has_else) {
+      AppendDiagram(&out, "", true, "else", RenderStmt(*if_stmt->otherwise));
+    }
+  } else if (const auto* for_stmt = dynamic_cast<const ForStmt*>(&stmt)) {
+    const bool has_step = static_cast<bool>(for_stmt->step);
+    const bool has_body = !for_stmt->body.empty();
+
+    bool initializer_is_last = !for_stmt->condition && !has_step && !has_body;
+    AppendDiagram(&out, "", initializer_is_last, "initializer",
+                  RenderStmt(*for_stmt->initializer));
+
+    if (for_stmt->condition) {
+      const bool condition_is_last = !has_step && !has_body;
+      AppendDiagram(&out, "", condition_is_last, "condition",
+                    for_stmt->condition->ToString());
+    }
+
+    if (for_stmt->step) {
+      const bool step_is_last = !has_body;
+      AppendDiagram(&out, "", step_is_last, "step", for_stmt->step->ToString());
+    }
+
+    for (size_t i = 0; i < for_stmt->body.size(); ++i) {
+      const bool is_last = (i + 1) == for_stmt->body.size();
+      AppendDiagram(&out, "", is_last, "body[" + std::to_string(i) + "]",
+                    RenderStmt(*for_stmt->body[i]));
+    }
+  } else if (const auto* while_stmt = dynamic_cast<const WhileStmt*>(&stmt)) {
+    const bool has_body = !while_stmt->body.empty();
+    AppendDiagram(&out, "", !has_body, "condition",
+                  while_stmt->condition->ToString());
+    for (size_t i = 0; i < while_stmt->body.size(); ++i) {
+      const bool is_last = (i + 1) == while_stmt->body.size();
+      AppendDiagram(&out, "", is_last, "body[" + std::to_string(i) + "]",
+                    RenderStmt(*while_stmt->body[i]));
+    }
+  }
+
+  if (out.back() == '\n') {
+    out.pop_back();
+  }
+  return out;
+}
+
+}  // namespace
 
 ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
     : name(name), stmts(std::move(stmts)) {}
@@ -15,11 +153,7 @@ Value* ModuleStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ModuleStmt::ToString() {
-  std::string temp = "Module: " + name.lexeme + "\n\n\n";
-  for (auto& stmt : stmts) {
-    temp += stmt->ToString();
-  }
-  return temp;
+  return RenderStmt(*this);
 }
 
 ExpressionStmt::ExpressionStmt(std::unique_ptr<Expr> expr)
@@ -30,7 +164,7 @@ Value* ExpressionStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ExpressionStmt::ToString() {
-  return "Statement: " + expr->ToString();
+  return RenderStmt(*this);
 }
 
 FunctionProto::FunctionProto(Token name, Token return_type,
@@ -45,17 +179,7 @@ Value* FunctionProto::Accept(StmtVisitor& visitor) {
 }
 
 std::string FunctionProto::ToString() {
-  std::string temp = "Func: " + return_type.lexeme + " ";
-  temp += name.lexeme;
-  temp += " Args: ( ";
-  for (auto& tok : args) {
-    // temp += tok.type;
-    // temp += " ";
-    temp += tok.identifier.lexeme;
-    temp += ", ";
-  }
-  temp += ")";
-  return temp;
+  return RenderStmt(*this);
 }
 
 FunctionStmt::FunctionStmt(std::unique_ptr<Stmt> proto,
@@ -67,13 +191,7 @@ Value* FunctionStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string FunctionStmt::ToString() {
-  std::string temp = proto->ToString() + "\n";
-  temp += "{\n";
-  for (auto& stmt : body) {
-    temp += stmt->ToString();
-    temp += "\n";
-  }
-  return temp += "}\n";
+  return RenderStmt(*this);
 }
 
 ReturnStmt::ReturnStmt(std::unique_ptr<Expr> value) : value(std::move(value)) {}
@@ -83,10 +201,7 @@ Value* ReturnStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ReturnStmt::ToString() {
-  if (!value) {
-    return "Return";
-  }
-  return "Return: " + value->ToString();
+  return RenderStmt(*this);
 }
 
 VarDeclarationStmt::VarDeclarationStmt(Token type, Token name,
@@ -98,8 +213,7 @@ Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string VarDeclarationStmt::ToString() {
-  std::string temp{};
-  return "Var Declaration: " + name.lexeme + " = " + value->ToString();
+  return RenderStmt(*this);
 }
 
 IfStmt::IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
@@ -113,12 +227,7 @@ Value* IfStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string IfStmt::ToString() {
-  std::string temp = "if: " + cond->ToString() + "\n";
-  temp += "then: " + then->ToString() + "\n";
-  if (otherwise) {
-    temp += "else: " + otherwise->ToString() + "\n";
-  }
-  return temp;
+  return RenderStmt(*this);
 }
 
 ForStmt::ForStmt(std::unique_ptr<Stmt> intializer,
@@ -134,12 +243,7 @@ Value* ForStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string ForStmt::ToString() {
-  std::string temp = "for: " + initializer->ToString() + " ";
-  temp += condition->ToString() + " " + step->ToString() + "\n";
-  for (auto& stmt : body) {
-    temp += stmt->ToString() + "\n";
-  }
-  return temp;
+  return RenderStmt(*this);
 }
 
 WhileStmt::WhileStmt(std::unique_ptr<Expr> condition,
@@ -151,9 +255,5 @@ Value* WhileStmt::Accept(StmtVisitor& visitor) {
 }
 
 std::string WhileStmt::ToString() {
-  std::string temp = "while: " + condition->ToString() + "\n";
-  for (auto& stmt : body) {
-    temp += stmt->ToString() + "\n";
-  }
-  return temp;
+  return RenderStmt(*this);
 }

@@ -1,5 +1,148 @@
 #include "../include/expr.hpp"
+
+#include <sstream>
+#include <type_traits>
+#include <variant>
+
 using namespace llvm;
+
+namespace {
+
+std::string EscapeString(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (char c : value) {
+    switch (c) {
+      case '\\':
+        escaped += "\\\\";
+        break;
+      case '\n':
+        escaped += "\\n";
+        break;
+      case '\r':
+        escaped += "\\r";
+        break;
+      case '\t':
+        escaped += "\\t";
+        break;
+      case '"':
+        escaped += "\\\"";
+        break;
+      default:
+        escaped += c;
+        break;
+    }
+  }
+  return escaped;
+}
+
+std::string LiteralValueToString(const TokenValue& value) {
+  return std::visit(
+      [](const auto& v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+          return "\"" + EscapeString(v) + "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+          return v ? "true" : "false";
+        } else {
+          std::ostringstream out;
+          out << v;
+          return out.str();
+        }
+      },
+      value);
+}
+
+void AppendTreeBlock(std::string* out, const std::string& prefix, bool is_last,
+                     const std::string& label, const std::string& child_tree) {
+  *out += prefix + (is_last ? "`- " : "|- ") + label + "\n";
+  const std::string child_prefix = prefix + (is_last ? "   " : "|  ");
+
+  std::istringstream in(child_tree);
+  std::string line;
+  while (std::getline(in, line)) {
+    *out += child_prefix + line + "\n";
+  }
+}
+
+std::string RenderExpr(const Expr& expr);
+
+std::string ExprNodeLabel(const Expr& expr) {
+  if (const auto* literal = dynamic_cast<const Literal*>(&expr)) {
+    return "Literal " + LiteralValueToString(literal->value);
+  }
+  if (const auto* variable = dynamic_cast<const Variable*>(&expr)) {
+    return "Variable " + variable->name.lexeme;
+  }
+  if (dynamic_cast<const Grouping*>(&expr)) {
+    return "Grouping";
+  }
+  if (const auto* prefix = dynamic_cast<const PreFixOp*>(&expr)) {
+    return "PreFixOp " + prefix->op.lexeme + " " + prefix->name.lexeme;
+  }
+  if (const auto* binary = dynamic_cast<const Binary*>(&expr)) {
+    return "Binary " + binary->op.lexeme;
+  }
+  if (const auto* assign = dynamic_cast<const Assign*>(&expr)) {
+    return "Assign " + assign->name.lexeme;
+  }
+  if (const auto* conditional = dynamic_cast<const Conditional*>(&expr)) {
+    return "Conditional " + conditional->op.lexeme;
+  }
+  if (dynamic_cast<const CallExpr*>(&expr)) {
+    return "CallExpr";
+  }
+  return "Expr";
+}
+
+std::string RenderExpr(const Expr& expr) {
+  std::string out = ExprNodeLabel(expr) + "\n";
+
+  if (const auto* grouping = dynamic_cast<const Grouping*>(&expr)) {
+    AppendTreeBlock(&out, "", true, "expr", RenderExpr(*grouping->expr));
+    out.pop_back();
+    return out;
+  }
+
+  if (const auto* binary = dynamic_cast<const Binary*>(&expr)) {
+    AppendTreeBlock(&out, "", false, "left", RenderExpr(*binary->left));
+    AppendTreeBlock(&out, "", true, "right", RenderExpr(*binary->right));
+    out.pop_back();
+    return out;
+  }
+
+  if (const auto* assign = dynamic_cast<const Assign*>(&expr)) {
+    AppendTreeBlock(&out, "", true, "value", RenderExpr(*assign->value));
+    out.pop_back();
+    return out;
+  }
+
+  if (const auto* conditional = dynamic_cast<const Conditional*>(&expr)) {
+    AppendTreeBlock(&out, "", false, "left", RenderExpr(*conditional->left));
+    AppendTreeBlock(&out, "", true, "right", RenderExpr(*conditional->right));
+    out.pop_back();
+    return out;
+  }
+
+  if (const auto* call = dynamic_cast<const CallExpr*>(&expr)) {
+    const bool has_args = !call->args.empty();
+    AppendTreeBlock(&out, "", !has_args, "callee", RenderExpr(*call->callee));
+    for (size_t i = 0; i < call->args.size(); ++i) {
+      const bool is_last = (i + 1) == call->args.size();
+      AppendTreeBlock(&out, "", is_last, "arg[" + std::to_string(i) + "]",
+                      RenderExpr(*call->args[i]));
+    }
+    out.pop_back();
+    return out;
+  }
+
+  if (out.back() == '\n') {
+    out.pop_back();
+  }
+  return out;
+}
+
+}  // namespace
 
 Literal::Literal(TokenValue value) : value(value) {}
 
@@ -8,7 +151,7 @@ Value* Literal::Accept(ExprVisitor& visitor) {
 }
 
 std::string Literal::ToString() {
-  return " ";
+  return RenderExpr(*this);
 }
 
 Variable::Variable(Token name) : name(name) {}
@@ -18,7 +161,7 @@ Value* Variable::Accept(ExprVisitor& visitor) {
 }
 
 std::string Variable::ToString() {
-  return name.lexeme;
+  return RenderExpr(*this);
 }
 
 Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
@@ -28,7 +171,7 @@ Value* Grouping::Accept(ExprVisitor& visitor) {
 }
 
 std::string Grouping::ToString() {
-  return "(" + expr->ToString() + ")";
+  return RenderExpr(*this);
 }
 
 PreFixOp::PreFixOp(Token op, Token name) : op(op), name(name) {}
@@ -38,8 +181,7 @@ Value* PreFixOp::Accept(ExprVisitor& visitor) {
 }
 
 std::string PreFixOp::ToString() {
-  std::string temp = "PreFixOp: " + op.lexeme;
-  return temp;
+  return RenderExpr(*this);
 }
 
 Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
@@ -51,24 +193,7 @@ Value* Binary::Accept(ExprVisitor& visitor) {
 }
 
 std::string Binary::ToString() {
-  std::string temp_op{};
-  switch (op.type) {
-    case TT_PLUS:
-      temp_op = "+";
-      break;
-    case TT_MINUS:
-      temp_op = "-";
-      break;
-    case TT_SLASH:
-      temp_op = "/";
-      break;
-    case TT_STAR:
-      temp_op = "*";
-      break;
-    default:
-      temp_op = "UNREACHABLE";
-  }
-  return left->ToString() + " " + temp_op + " " + right->ToString();
+  return RenderExpr(*this);
 }
 
 Assign::Assign(Token name, std::unique_ptr<Expr> value)
@@ -79,7 +204,7 @@ Value* Assign::Accept(ExprVisitor& visitor) {
 }
 
 std::string Assign::ToString() {
-  return "Assignment: " + name.lexeme + " = " + value->ToString();
+  return RenderExpr(*this);
 }
 
 Conditional::Conditional(std::unique_ptr<Expr> left,
@@ -91,24 +216,7 @@ Value* Conditional::Accept(ExprVisitor& visitor) {
 }
 
 std::string Conditional::ToString() {
-  std::string temp_op{};
-  switch (op.type) {
-    case TT_LESSER:
-      temp_op = "<";
-      break;
-    case TT_LESSER_EQ:
-      temp_op = "<=";
-      break;
-    case TT_GREATER:
-      temp_op = ">";
-      break;
-    case TT_GREATER_EQ:
-      temp_op = ">=";
-      break;
-    default:
-      temp_op = "UNREACHABLE";
-  }
-  return left->ToString() + " " + temp_op + " " + right->ToString();
+  return RenderExpr(*this);
 }
 
 CallExpr::CallExpr(std::unique_ptr<Expr> callee,
@@ -120,9 +228,5 @@ Value* CallExpr::Accept(ExprVisitor& visitor) {
 }
 
 std::string CallExpr::ToString() {
-  std::string temp = callee->ToString() + "(";
-  for (auto& arg : args) {
-    temp += arg->ToString();
-  }
-  return temp += ")";
+  return RenderExpr(*this);
 }

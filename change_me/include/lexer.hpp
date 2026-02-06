@@ -133,6 +133,8 @@ struct Lexer {
 
   void TokenizeDot();
 
+  bool LookAheadOkay();
+
   /**
    * @brief A simple helper method to parse token types into strings
    * @param tok_type The token to be formatted
