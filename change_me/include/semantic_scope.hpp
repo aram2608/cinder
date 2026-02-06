@@ -14,8 +14,8 @@ struct Scope {
   std::shared_ptr<Scope> parent;
 
   explicit Scope(std::shared_ptr<Scope> parent = nullptr);
-  void Declare(const std::string& name, types::Type* type);
-  Symbol* Lookup(const std::string& name);
+  void Declare(const std::string name, types::Type* type);
+  Symbol* Lookup(const std::string name);
 };
 
 #endif

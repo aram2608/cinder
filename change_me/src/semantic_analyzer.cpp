@@ -1,10 +1,10 @@
 #include "../include/semantic_analyzer.hpp"
 
+#include <variant>
+#include <vector>
+
 #include "../include/errors.hpp"
 #include "../include/utils.hpp"
-#include "stmt.hpp"
-#include "tokens.hpp"
-#include "types.hpp"
 
 /// Global error handler
 static errs::RawOutStream errors{};
@@ -13,25 +13,35 @@ SemanticAnalyzer::SemanticAnalyzer(TypeContext* tc)
     : types(tc), scope(nullptr), current_return(nullptr) {}
 
 llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
+  std::shared_ptr<Scope> prev = this->scope;
+  std::shared_ptr<Scope> global_scope = std::make_shared<Scope>(this->scope);
+
+  this->scope = global_scope;
   for (auto& s : stmt.stmts) {
     Resolve(*s);
   }
+
+  this->scope = prev;
   return nullptr;
 }
 
 llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
   types::Type* ret = ResolveType(stmt.return_type);
+  stmt.resolved_type = ret;
 
   std::vector<types::Type*> params;
   for (auto& arg : stmt.args) {
-    params.push_back(ResolveArgType(arg.type));
+    types::Type* arg_type = ResolveArgType(arg.type_token);
+    arg.resolved_type = arg_type;
+    params.push_back(arg_type);
   }
 
-  Declare(stmt.name.lexeme, types->Function(ret, params));
+  Declare(stmt.name.lexeme, types->Function(ret, params, stmt.is_variadic));
   return nullptr;
 }
 
 llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
+  Resolve(*stmt.proto);
   FunctionProto* proto = dynamic_cast<FunctionProto*>(stmt.proto.get());
   current_return = ResolveType(proto->return_type);
 
@@ -40,7 +50,7 @@ llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
   this->scope = function_scope;
 
   for (auto& arg : proto->args) {
-    types::Type* arg_type = ResolveArgType(arg.type);
+    types::Type* arg_type = ResolveArgType(arg.type_token);
     Declare(arg.identifier.lexeme, arg_type);
   }
 
@@ -161,10 +171,13 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(PreFixOp& expr) {
+  /// TODO: implement this
   return nullptr;
 }
 
 llvm::Value* SemanticAnalyzer::Visit(Conditional& expr) {
+  Resolve(*expr.left);
+  Resolve(*expr.right);
   return nullptr;
 }
 
@@ -188,27 +201,35 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
     return nullptr;
   }
 
-  /// TODO: Find a way to add variadic functions
-  if (expr.args.size() != func_type->params.size()) {
+  size_t num_params = func_type->params.size();
+  size_t num_args = expr.args.size();
+
+  if (func_type->is_variadic) {
+    if (num_args < num_params) {
+      errs::ErrorOutln(errors, "Too few arguments for variadic function:",
+                       callee->name.lexeme);
+      return nullptr;
+    }
+  } else if (num_args != num_params) {
     errs::ErrorOutln(errors,
                      "Argument count mismatch for:", callee->name.lexeme);
     return nullptr;
   }
 
   /// TODO: make sure this works, im not entirely sure if it will or not
-  for (size_t it = 0; it < expr.args.size(); it++) {
-    Resolve(*expr.args[it]);
-    if (expr.args[it]->type != func_type->params[it]) {
-      errs::ErrorOutln(errors, "Type mismatch in argument ");
+  for (size_t i = 0; i < num_args; i++) {
+    Resolve(*expr.args[i]);
+    if (i < num_params) {
+      if (expr.args[i]->type != func_type->params[i]) {
+        errs::ErrorOutln(errors, "Type mismatch in fixed argument", i);
+      }
+    } else {
+      // This should come in handy later when types get extended
+      VariadicPromotion(expr.args[i].get());
     }
   }
 
   expr.type = func_type->return_type;
-  return nullptr;
-}
-
-llvm::Value* SemanticAnalyzer::Visit(BoolLiteral& expr) {
-  expr.type = types->Bool();
   return nullptr;
 }
 
@@ -218,6 +239,10 @@ llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
     expr.type = types->Int32();
   } else if (std::holds_alternative<float>(expr.value)) {
     expr.type = types->Float32();
+  } else if (std::holds_alternative<std::string>(expr.value)) {
+    expr.type = types->String();
+  } else if (std::holds_alternative<bool>(expr.value)) {
+    expr.type = types->Bool();
   } else {
     UNREACHABLE(VisitLiteral, "Unknown value type");
   }
@@ -278,4 +303,24 @@ void SemanticAnalyzer::Declare(std::string name, types::Type* type) {
 
 void SemanticAnalyzer::Analyze(ModuleStmt& mod) {
   Resolve(mod);
+}
+
+void SemanticAnalyzer::VariadicPromotion(Expr* expr) {
+  switch (expr->type->kind) {
+    case types::TypeKind::Float:
+      expr->type = types->Float32();
+      break;
+    case types::TypeKind::Int:
+      expr->type = types->Int32();
+      break;
+    case types::TypeKind::Bool:
+      expr->type = types->Int32();
+      break;
+    case types::TypeKind::Function:
+    case types::TypeKind::String:
+    case types::TypeKind::Struct:
+    case types::TypeKind::Void:
+    default:
+      break;
+  }
 }

@@ -8,6 +8,7 @@
 #include "expr.hpp"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Value.h"
+#include "types.hpp"
 
 struct ModuleStmt;
 struct ExpressionStmt;
@@ -106,6 +107,7 @@ struct FunctionProto : Stmt {
   Token return_type;         /**< The return type of the method */
   std::vector<FuncArg> args; /**< The function arguments */
   bool is_variadic;
+  types::Type* resolved_type;
 
   FunctionProto(Token name, Token return_type, std::vector<FuncArg> args,
                 bool is_variadic);

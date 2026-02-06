@@ -3,11 +3,10 @@
 
 #include <cstddef>
 #include <memory>
-#include <vector>
 
 #include "expr.hpp"
 #include "llvm/IR/Value.h"
-#include "scope.hpp"
+#include "semantic_scope.hpp"
 #include "stmt.hpp"
 #include "tokens.hpp"
 #include "type_context.hpp"
@@ -35,7 +34,6 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(VarDeclarationStmt& stmt) override;
 
   // Expressions
-  llvm::Value* Visit(BoolLiteral& expr) override;
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Binary& expr) override;
   llvm::Value* Visit(Assign& expr) override;
@@ -51,6 +49,7 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   llvm::Value* Resolve(Stmt& stmt);
   llvm::Value* Resolve(Expr& expr);
   void Declare(std::string name, types::Type* type);
+  void VariadicPromotion(Expr* expr);
 
  public:
   SemanticAnalyzer(TypeContext* tc);

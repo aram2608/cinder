@@ -51,9 +51,13 @@ struct StringType : Type {
 struct FunctionType : Type {
   Type* return_type;
   std::vector<Type*> params;
+  bool is_variadic;
 
-  FunctionType(Type* ret, std::vector<Type*> params)
-      : Type(TypeKind::Function), return_type(ret), params(std::move(params)) {}
+  FunctionType(Type* ret, std::vector<Type*> params, bool is_variadic)
+      : Type(TypeKind::Function),
+        return_type(ret),
+        params(std::move(params)),
+        is_variadic(is_variadic) {}
 };
 
 /// TODO: Find a way to implement this

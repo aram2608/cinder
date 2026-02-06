@@ -4,7 +4,7 @@ def get(int32 a, int32 b) -> int32
     return a + b;
 end
 
-extern printf(str fmt) -> int32
+extern printf(str fmt, ...) -> int32
 
 def main() -> int32
     int32: b = get(1, 4);

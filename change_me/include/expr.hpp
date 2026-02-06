@@ -5,11 +5,11 @@
 #include <vector>
 
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "tokens.hpp"
 #include "types.hpp"
 
 struct Literal;
-struct BoolLiteral;
 struct Variable;
 struct Grouping;
 struct PreFixOp;
@@ -21,7 +21,6 @@ struct Conditional;
 struct ExprVisitor {
   virtual ~ExprVisitor() = default;
   virtual llvm::Value* Visit(Literal& expr) = 0;
-  virtual llvm::Value* Visit(BoolLiteral& expr) = 0;
   virtual llvm::Value* Visit(Variable& expr) = 0;
   virtual llvm::Value* Visit(Grouping& expr) = 0;
   virtual llvm::Value* Visit(PreFixOp& expr) = 0;
@@ -58,28 +57,6 @@ struct Expr {
 struct Literal : Expr {
   TokenValue value; /**< Appropriate value for the given value type */
   explicit Literal(TokenValue value);
-
-  /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
-   */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
-
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
-  std::string ToString() override;
-};
-
-/// @struct Boolean
-/// @brief Boolean node
-struct BoolLiteral : Expr {
-  bool boolean; /** The boolean value */
-
-  explicit BoolLiteral(bool boolean);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -209,7 +186,7 @@ struct Conditional : Expr {
 };
 
 struct Assign : Expr {
-  Token name;                  /**< Variable name, should resolve to Variable */
+  Token name;                  /**< Variable name */
   std::unique_ptr<Expr> value; /**< The variables new value */
 
   Assign(Token name, std::unique_ptr<Expr> value);

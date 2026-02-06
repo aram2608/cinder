@@ -1,13 +1,19 @@
 #include "../include/compiler.hpp"
 
+#include <stddef.h>
+
 #include <cstdlib>
 
 #include "../include/utils.hpp"
+#include "errors.hpp"
+#include "expr.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -17,6 +23,8 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "stmt.hpp"
+#include "symbol_table.hpp"
+#include "types.hpp"
 
 using namespace llvm;
 
@@ -34,24 +42,25 @@ static std::unique_ptr<StandardInstrumentations> TheSI;
 static std::unordered_map<std::string, Value*> NamedValues;
 static ExitOnError ExitOnErr;
 
+static errs::RawOutStream errors{};
+
 void Compiler::AddPrintf() {
   /// HACK: This should let us use printf for now
   /// I need to find a way to support variadics, we check for arity at call time
   /// and variadics obviously can take an arbitrary number
   /// For now we expect only 2 arguments
-  /// TODO: Fix strings in JIT, i dont think it likes the global strings
   Type* type = Type::getInt32Ty(*TheContext);
   PointerType* char_ptr_type = PointerType::getUnqual(*TheContext);
   FunctionType* printf_type = FunctionType::get(type, char_ptr_type, true);
   Function* printfFunc = Function::Create(
       printf_type, GlobalValue::ExternalLinkage, "printf", *TheModule);
   verifyFunction(*printfFunc);
-  func_table["printf"] = 2;
+  InternalSymbol symb{nullptr, printfFunc};
+  symbol_table->Declare("printf", symb);
 }
 
 Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
     : mod(std::move(mod)),
-      symbol_table{},
       opts(opts),
       /**
        * TODO: Find a way to have the context stored as a member var
@@ -60,11 +69,10 @@ Compiler::Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts)
        * debug info for LLVM
        */
       context(std::make_unique<LLVMContext>()),
-      pass(&type_context) {}
+      pass(&type_context),
+      symbol_table(nullptr) {}
 
 bool Compiler::Compile() {
-  SemanticPass();
-  exit(0);
   InitializeAllTargetInfos();
   InitializeAllTargets();
   InitializeAllTargetMCs();
@@ -134,7 +142,7 @@ void Compiler::CompileBinary(TargetMachine* target_machine) {
 
   if (target_machine->addPassesToEmitFile(pass, object_file, nullptr,
                                           FileType)) {
-    errs() << "TheTargetMachine can't emit a file of this type";
+    errs::ErrorOutln(errors, "TheTargetMachine can't emit a file of this type");
     return;
   }
 
@@ -154,6 +162,8 @@ void Compiler::CompileBinary(TargetMachine* target_machine) {
 }
 
 Value* Compiler::Visit(ModuleStmt& stmt) {
+  SemanticPass(stmt);
+  exit(0);
   TheModule = CreateModule(stmt, *TheContext);
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
   TheFPM = std::make_unique<FunctionPassManager>();
@@ -175,8 +185,6 @@ Value* Compiler::Visit(ModuleStmt& stmt) {
   PB.registerModuleAnalyses(*TheMAM);
   PB.registerFunctionAnalyses(*TheFAM);
   PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
-
-  AddPrintf();
 
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
@@ -290,61 +298,22 @@ Value* Compiler::Visit(FunctionStmt& stmt) {
 
   verifyFunction(*Func);
   TheFPM->run(*Func, *TheFAM);
-  symbol_table.clear();
+  // symbol_table.clear();
   return Func;
 }
 
 Value* Compiler::Visit(FunctionProto& stmt) {
   std::string func_name = stmt.name.lexeme;
-  auto func = func_table.find(func_name);
-  if (func != func_table.end()) {
-    std::cout << "functions can not be redefined\n";
-    exit(1);
-  }
-
-  Type* return_type;
-  switch (stmt.return_type.type) {
-    case TT_INT32_SPECIFIER:
-      return_type = Type::getInt32Ty(*TheContext);
-      break;
-    case TT_INT64_SPECIFIER:
-      return_type = Type::getInt64Ty(*TheContext);
-      break;
-    case TT_FLT_SPECIFIER:
-      return_type = Type::getDoubleTy(*TheContext);
-      break;
-    case TT_VOID_SPECIFIER:
-      return_type = Type::getVoidTy(*TheContext);
-      break;
-    default:
-      UNREACHABLE(FunctionProto, "Unknown return type");
-  }
+  Type* return_type = ResolveType(stmt.resolved_type);
 
   std::vector<Type*> arg_types;
   for (auto& arg : stmt.args) {
     UNUSED(arg);
-    // switch (arg.type) {
-    //   case VT_INT32:
-    //     arg_types.push_back(Type::getInt32Ty(*TheContext));
-    //     break;
-    //   case VT_INT64:
-    //     arg_types.push_back(Type::getInt64Ty(*TheContext));
-    //     break;
-    //   case VT_FLT:
-    //     arg_types.push_back(Type::getFloatTy(*TheContext));
-    //     break;
-    //   case VT_STR:
-    //     IMPLEMENT(VT_STR);
-    //     exit(1);
-    //   case VT_VOID:
-    //     arg_types.push_back(Type::getVoidTy(*TheContext));
-    //     break;
-    //   default:
-    //     UNREACHABLE(FunctionProto, "Unknown argument type");
-    // }
+    arg_types.push_back(ResolveArgType(arg.resolved_type));
   }
 
-  FunctionType* FT = FunctionType::get(return_type, arg_types, false);
+  FunctionType* FT =
+      FunctionType::get(return_type, arg_types, stmt.is_variadic);
   Function* Func =
       Function::Create(FT, Function::ExternalLinkage, func_name, *TheModule);
 
@@ -355,48 +324,33 @@ Value* Compiler::Visit(FunctionProto& stmt) {
     argument_table[stmt.args[Idx++].identifier.lexeme] = &arg;
   }
 
-  func_table[func_name] = stmt.args.size();
+  InternalSymbol symb{nullptr, Func};
+  symbol_table->Declare(func_name, symb);
   return Func;
 }
 
 Value* Compiler::Visit(ReturnStmt& stmt) {
-  Value* ret = stmt.value->Accept(*this);
-  if (!ret) {
-    return Builder->CreateRetVoid();
-  }
-  return Builder->CreateRet(ret);
+  // Value* ret = ResolveType(stmt.value->type);
+  // if (!ret) {
+    // return Builder->CreateRetVoid();
+  // }
+  // return Builder->CreateRet(ret);
+  return nullptr;
 }
 
 Value* Compiler::Visit(VarDeclarationStmt& stmt) {
   std::string name = stmt.name.lexeme;
-  if (symbol_table.find(name) != symbol_table.end()) {
-    std::cout << "redeclaration of variable" << name << "\n";
-    exit(1);
-  }
-  Type* type;
-  switch (stmt.type.type) {
-    case TT_INT32_SPECIFIER:
-      type = Type::getInt32Ty(*TheContext);
-      break;
-    case TT_INT64_SPECIFIER:
-      type = Type::getInt64Ty(*TheContext);
-      break;
-    case TT_FLT_SPECIFIER:
-      type = Type::getFloatTy(*TheContext);
-      break;
-    case TT_BOOL_SPECIFIER:
-      type = Type::getInt1Ty(*TheContext);
-      break;
-    case TT_STR_SPECIFIER:
-      type = Type::getInt8Ty(*TheContext);
-      break;
-    default:
-      UNREACHABLE(VarDeclarationStmt, "Unknown variable type");
-  }
+
+  Type* type = ResolveType(stmt.value->type);
+
   Value* value = stmt.value->Accept(*this);
+
   AllocaInst* value_ptr = Builder->CreateAlloca(type, nullptr, name);
+
   Builder->CreateStore(value, value_ptr);
-  symbol_table[name] = value_ptr;
+
+  InternalSymbol symb{value_ptr, value};
+  symbol_table->Declare(name, symb);
   return nullptr;
 }
 
@@ -441,15 +395,6 @@ Value* Compiler::Visit(Conditional& expr) {
       default:
         UNREACHABLE(Conditional, "Unknown floating point operation");
     }
-  } else {
-    std::cout << "incompatible types in '" << expr.op.lexeme
-              << "' expression.\n";
-    std::cout << left->getName().str();
-    l_type->print(errs(), true);
-    std::cout << "\n";
-    r_type->print(errs(), true);
-    std::cout << "\n";
-    exit(1);
   }
   return nullptr;
 }
@@ -487,14 +432,6 @@ Value* Compiler::Visit(Binary& expr) {
       default:
         UNREACHABLE(Binary, "Unknown floating point operation");
     }
-  } else {
-    std::cout << "incompatible types in '" << expr.op.lexeme
-              << "' expression.\n";
-    l_type->print(errs(), true);
-    std::cout << "\n";
-    r_type->print(errs(), true);
-    std::cout << "\n";
-    exit(1);
   }
   return nullptr;
 }
@@ -540,7 +477,6 @@ Value* Compiler::Visit(PreFixOp& expr) {
 
 Value* Compiler::Visit(Assign& expr) {
   Value* value = expr.value->Accept(*this);
-  UNUSED(value);
   // LoadInst* var = dyn_cast<LoadInst>(expr.name->Accept(*this));
   // AllocaInst* var_ptr = dyn_cast<AllocaInst>(var->getPointerOperand());
   // Builder->CreateStore(value, var_ptr);
@@ -548,30 +484,31 @@ Value* Compiler::Visit(Assign& expr) {
 }
 
 Value* Compiler::Visit(CallExpr& expr) {
-  Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
-  if (!callee) {
-    std::cout << "callee is not a function\n";
-    exit(1);
-  }
+  UNUSED(expr);
+  // Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
+  // if (!callee) {
+  //   std::cout << "callee is not a function\n";
+  //   exit(1);
+  // }
 
-  std::string name = callee->getName().str();
-  auto func = func_table.find(name);
-  if (func->second != expr.args.size()) {
-    std::cout << "callee arguments do not match function signature\n";
-    exit(1);
-  }
+  // std::string name = callee->getName().str();
+  // auto func = func_table.find(name);
+  // if (func->second != expr.args.size()) {
+  //   std::cout << "callee arguments do not match function signature\n";
+  //   exit(1);
+  // }
 
-  std::vector<Value*> call_args;
-  for (auto& arg : expr.args) {
-    call_args.push_back(arg->Accept(*this));
-  }
+  // std::vector<Value*> call_args;
+  // for (auto& arg : expr.args) {
+  //   call_args.push_back(arg->Accept(*this));
+  // }
 
-  Type* ret_type = callee->getReturnType();
-  if (ret_type->isVoidTy()) {
-    return Builder->CreateCall(callee, call_args);
-  }
+  // Type* ret_type = callee->getReturnType();
+  // if (ret_type->isVoidTy()) {
+  //   return Builder->CreateCall(callee, call_args);
+  // }
 
-  return Builder->CreateCall(callee, call_args, callee->getName());
+  // return Builder->CreateCall(callee, call_args, callee->getName());
 }
 
 Value* Compiler::Visit(Grouping& expr) {
@@ -579,60 +516,47 @@ Value* Compiler::Visit(Grouping& expr) {
 }
 
 Value* Compiler::Visit(Variable& expr) {
-  std::string lex = expr.name.lexeme;
-  auto func = func_table.find(lex);
-  if (func != func_table.end()) {
-    return TheModule->getFunction(lex);
-  }
+  InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
+  return symb->value;
+  // std::string lex = expr.name.lexeme;
+  // auto func = func_table.find(lex);
+  // if (func != func_table.end()) {
+  //   return TheModule->getFunction(lex);
+  // }
 
-  auto arg = argument_table.find(lex);
-  if (arg != argument_table.end()) {
-    return arg->second;
-  }
+  // auto arg = argument_table.find(lex);
+  // if (arg != argument_table.end()) {
+  //   return arg->second;
+  // }
 
-  auto temp = symbol_table.find(lex);
-  if (temp == symbol_table.end()) {
-    std::cout << "Variables is undefined: '" << lex << "'\n";
-    exit(1);
-  }
+  // auto temp = symbol_table.find(lex);
+  // if (temp == symbol_table.end()) {
+  //   std::cout << "Variables is undefined: '" << lex << "'\n";
+  //   exit(1);
+  // }
 
-  AllocaInst* var_ptr = temp->second;
-  Type* type = var_ptr->getAllocatedType();
-  Value* value = Builder->CreateLoad(type, var_ptr, lex);
-  return value;
-}
-
-Value* Compiler::Visit(BoolLiteral& expr) {
-  if (expr.boolean) {
-    return ConstantInt::getTrue(*TheContext);
-  }
-  return ConstantInt::getFalse(*TheContext);
+  // AllocaInst* var_ptr = temp->second;
+  // Type* type = var_ptr->getAllocatedType();
+  // Value* value = Builder->CreateLoad(type, var_ptr, lex);
+  // return value;
 }
 
 Value* Compiler::Visit(Literal& expr) {
-  UNUSED(expr);
-  // switch (expr.value_type) {
-  //   case VT_INT32:
-  //     return ConstantInt::get(*TheContext,
-  //                             APInt(32, std::get<int>(expr.value)));
-  //   case VT_INT64:
-  //     return ConstantInt::get(*TheContext,
-  //                             APInt(64, std::get<int>(expr.value)));
-  //   case VT_FLT:
-  //     return ConstantFP::get(*TheContext,
-  //     APFloat(std::get<float>(expr.value)));
-  //   case VT_STR:
-  //     /// TODO: Need to make this a little better
-  //     /// This appears to be an imperfect solution
-  //     return Builder->CreateGlobalString(std::get<std::string>(expr.value),
-  //     "",
-  //                                        true);
-  //   case VT_VOID:
-  //     return nullptr;  // This is a horrible hack for void return types
-  //                      // I need to think of a better solution
-  //   default:
-  //     UNREACHABLE(Literal, "Unknown literal value");
-  // }
+  switch (expr.type->kind) {
+    case types::TypeKind::Bool:
+      return ConstantInt::getBool(*TheContext, std::get<bool>(expr.value));
+    case types::TypeKind::Float:
+      return ConstantFP::get(*TheContext, APFloat(std::get<float>(expr.value)));
+    case types::TypeKind::Int:
+      return EmitInteger(expr);
+    case types::TypeKind::String:
+      return Builder->CreateGlobalString(std::get<std::string>(expr.value), "",
+                                         true);
+    case types::TypeKind::Struct:
+    case types::TypeKind::Void:
+    default:
+      UNREACHABLE(Literal, "Invalid type");
+  }
   return nullptr;
 }
 
@@ -651,7 +575,47 @@ std::unique_ptr<llvm::Module> Compiler::CreateModule(ModuleStmt& stmt,
   return std::make_unique<Module>(stmt.name.lexeme, *TheContext);
 }
 
-void Compiler::SemanticPass() {
-  ModuleStmt* mod_ref = dynamic_cast<ModuleStmt*>(mod.get());
-  pass.Analyze(*mod_ref);
+void Compiler::SemanticPass(ModuleStmt& mod) {
+  pass.Analyze(mod);
+}
+
+llvm::Value* Compiler::EmitInteger(Literal& expr) {
+  types::IntType* int_type = dynamic_cast<types::IntType*>(expr.type);
+  int value = std::get<int>(expr.value);
+  return ConstantInt::get(*TheContext, APInt(int_type->bits, value));
+}
+
+llvm::Type* Compiler::ResolveArgType(types::Type* type) {
+  switch (type->kind) {
+    case types::TypeKind::Bool:
+      return Type::getInt1Ty(*TheContext);
+    case types::TypeKind::Float:
+      return Type::getFloatTy(*TheContext);
+    case types::TypeKind::Int:
+      return Type::getInt32Ty(*TheContext);
+    case types::TypeKind::String:
+      return Type::getInt8Ty(*TheContext);
+    case types::TypeKind::Void:
+    case types::TypeKind::Struct:
+    default:
+      break;
+  }
+}
+
+llvm::Type* Compiler::ResolveType(types::Type* type) {
+  switch (type->kind) {
+    case types::TypeKind::Bool:
+      return Type::getInt1Ty(*TheContext);
+    case types::TypeKind::Float:
+      return Type::getFloatTy(*TheContext);
+    case types::TypeKind::Int:
+      return Type::getInt32Ty(*TheContext);
+    case types::TypeKind::String:
+      return Type::getInt8Ty(*TheContext);
+    case types::TypeKind::Void:
+      return Type::getVoidTy(*TheContext);
+    case types::TypeKind::Struct:
+    default:
+      IMPLEMENT(ResolveType);
+  }
 }

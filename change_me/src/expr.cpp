@@ -11,17 +11,6 @@ std::string Literal::ToString() {
   return " ";
 }
 
-BoolLiteral::BoolLiteral(bool boolean) : boolean(boolean) {}
-
-Value* BoolLiteral::Accept(ExprVisitor& visitor) {
-  return visitor.Visit(*this);
-}
-
-std::string BoolLiteral::ToString() {
-  std::string temp = boolean ? "true" : "false";
-  return temp;
-}
-
 Variable::Variable(Token name) : name(name) {}
 
 Value* Variable::Accept(ExprVisitor& visitor) {

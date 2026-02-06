@@ -1,6 +1,7 @@
 #include "../include/parser.hpp"
 
 #include "../include/errors.hpp"
+#include "expr.hpp"
 #include "tokens.hpp"
 // #include "../include/utils.hpp"
 
@@ -34,11 +35,10 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
       if (args.size() >= 255) {
         errs::ErrorOutln(errors, "Exceeded maximum number of arguments: 255");
       }
-      // if (MatchType({TT_ELLIPSIS})) {
-      //   std::cout << "Matched ellipsis\n";
-      //   is_variadic = true;
-      //   break;
-      // }
+      if (MatchType({TT_ELLIPSIS})) {
+        is_variadic = true;
+        break;
+      }
       Token type = Advance();
       Token identifier = Consume(TT_IDENTIFER, "expected arg name");
       args.emplace_back(type, identifier);
@@ -64,7 +64,7 @@ std::unique_ptr<Stmt> Parser::Function() {
     while (!CheckType(TT_END) && !IsEnd()) {
       stmts.push_back(Statement());
     }
-    Consume(TT_END, "expected end after a function body");
+    Consume(TT_END, "expected end after a function definition");
     return std::make_unique<FunctionStmt>(std::move(proto), std::move(stmts));
   }
   return Statement();
@@ -241,11 +241,11 @@ std::unique_ptr<Expr> Parser::Atom() {
   }
 
   if (MatchType({TT_TRUE})) {
-    return std::make_unique<BoolLiteral>(true);
+    return std::make_unique<Literal>(true);
   }
 
   if (MatchType({TT_FALSE})) {
-    return std::make_unique<BoolLiteral>(false);
+    return std::make_unique<Literal>(false);
   }
 
   if (MatchType({TT_IDENTIFER})) {

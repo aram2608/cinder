@@ -19,7 +19,8 @@ struct TypeContext {
   types::Type* Bool();
   types::Type* String();
   /// TODO: This is kinda funky, think of a better way to handle it
-  types::Type* Function(types::Type* ret, std::vector<types::Type*> params);
+  types::Type* Function(types::Type* ret, std::vector<types::Type*> params,
+                        bool is_variadic);
 };
 
 #endif

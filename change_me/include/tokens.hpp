@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 
+#include "types.hpp"
+
 /// @enum TokenType
 /// @brief The token types allowed during lexical analysis
 enum TokenType {
@@ -87,7 +89,7 @@ enum ValueType {
   VT_NULL, /** NULL */
 };
 
-using TokenValue = std::variant<std::string, int, float>;
+using TokenValue = std::variant<std::string, int, float, bool>;
 
 /**
  * @struct Token
@@ -107,9 +109,11 @@ struct Token {
 /// @struct FuncArg
 /// @brief A simple data container to store function arguments
 struct FuncArg {
-  Token type;       /**< The argument type */
+  Token type_token; /**< The argument type */
   Token identifier; /**< The identifer for the argument */
-  FuncArg(Token type, Token identifier) : type(type), identifier(identifier) {}
+  types::Type* resolved_type;
+  FuncArg(Token type_token, Token identifier)
+      : type_token(type_token), identifier(identifier) {}
 };
 
 #endif

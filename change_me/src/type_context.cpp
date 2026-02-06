@@ -24,6 +24,7 @@ types::Type* TypeContext::String() {
 
 /// Leaks memory, fix somehow, maybe an arena
 types::Type* TypeContext::Function(types::Type* ret,
-                                   std::vector<types::Type*> params) {
-  return new types::FunctionType{ret, params};
+                                   std::vector<types::Type*> params,
+                                   bool is_variadic) {
+  return new types::FunctionType{ret, params, is_variadic};
 }

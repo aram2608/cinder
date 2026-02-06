@@ -1,6 +1,7 @@
 #ifndef COMPILER_H_
 #define COMPILER_H_
 
+#include <memory>
 #include <unordered_map>
 
 #include "expr.hpp"
@@ -23,8 +24,11 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "semantic_analyzer.hpp"
+#include "semantic_scope.hpp"
 #include "stmt.hpp"
+#include "symbol_table.hpp"
 #include "type_context.hpp"
+#include "types.hpp"
 
 /// @enum @class CompilerMode
 /// @brief The compilation mode, whether to emit LLVM, run, or compile
@@ -56,22 +60,23 @@ struct CompilerOptions {
  * Employs the visitor method to resolve the different nodes of the AST
  */
 struct Compiler : ExprVisitor, StmtVisitor {
-  std::unique_ptr<Stmt>
-      mod; /**< TODO: make this a vector or a map of mods to handle imports */
-  std::unordered_map<std::string, llvm::AllocaInst*>
-      symbol_table; /**< Symbol table to store local vars */
+  /// TODO:  make this a vector or a map of mods to handle imports
+  std::unique_ptr<Stmt> mod; /**< module */
+  // std::unordered_map<std::string, llvm::AllocaInst*>
+  // symbol_table; /**< Symbol table to store local vars */
   std::unordered_map<std::string, llvm::Argument*>
       argument_table; /**< Table to store function arguments */
   /// TODO: Fix function arity, currently we store it in the table so we can
   /// check at call time but that is restrictive for variadic funcs. I think I
   /// can probably just ignore the arity and have clang yell at the user
-  std::unordered_map<std::string, size_t>
-      func_table;       /**< Table to store the funcs in a module */
+  // std::unordered_map<std::string, size_t>
+  // func_table;       /**< Table to store the funcs in a module */
   CompilerOptions opts; /**< The compiler options */
   std::unique_ptr<llvm::LLVMContext>
       context; /**< TODO: Let the compiler store the context */
   TypeContext type_context;
   SemanticAnalyzer pass;
+  std::shared_ptr<SymbolTable> symbol_table;
 
   Compiler(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
@@ -104,13 +109,17 @@ struct Compiler : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(CallExpr& expr) override;
   llvm::Value* Visit(Grouping& expr) override;
   llvm::Value* Visit(Variable& expr) override;
-  llvm::Value* Visit(BoolLiteral& expr) override;
   llvm::Value* Visit(Literal& expr) override;
 
   std::unique_ptr<llvm::Module> CreateModule(ModuleStmt& stmt,
                                              llvm::LLVMContext& ctx);
 
-  void SemanticPass();
+  void SemanticPass(ModuleStmt& mod);
+
+  llvm::Value* EmitInteger(Literal& expr);
+
+  llvm::Type* ResolveArgType(types::Type* type);
+  llvm::Type* ResolveType(types::Type* type);
 };
 
 #endif

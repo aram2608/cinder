@@ -301,6 +301,7 @@ void Lexer::TokenizeNumber() {
 void Lexer::TokenizeDot() {
   if (PeekChar() == '.' && PeekNextChar() == '.') {
     Advance();
+    Advance();
     AddToken(TT_ELLIPSIS);
   } else {
     AddToken(TT_DOT);
