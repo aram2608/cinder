@@ -1,12 +1,18 @@
 #include "cinder/semantic/semantic_analyzer.hpp"
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
 
+#include "cinder/ast/types.hpp"
+#include "cinder/frontend/tokens.hpp"
+#include "cinder/semantic/symbol.hpp"
+#include "cinder/semantic/type_context.hpp"
+#include "cinder/support/diagnostic.hpp"
 #include "cinder/support/utils.hpp"
 
-SemanticAnalyzer::SemanticAnalyzer() : current_return(nullptr) {}
+SemanticAnalyzer::SemanticAnalyzer(TypeContext& types) : types_(types), current_return(nullptr) {}
 
 llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
   BeginScope();
@@ -19,7 +25,6 @@ llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
 
 llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
   types::Type* ret = ResolveType(stmt.return_type);
-  stmt.resolved_type = ret;
 
   std::vector<types::Type*> params;
   for (auto& arg : stmt.args) {
@@ -28,8 +33,15 @@ llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
     params.push_back(arg_type);
   }
 
-  Declare(stmt.name.lexeme, types.Function(ret, params, stmt.is_variadic), true,
-          {stmt.name.line_num});
+  std::optional<SymbolId> id =
+      Declare(stmt.name.lexeme, types_.Function(ret, params, stmt.is_variadic),
+              true, {stmt.name.line_num});
+  if (id.has_value()) {
+    stmt.id = id.value();
+  } else {
+    std::string err = "Function could not be declared: " + stmt.name.lexeme;
+    diagnose_.Error({stmt.name.line_num}, err);
+  }
   return nullptr;
 }
 
@@ -164,7 +176,7 @@ llvm::Value* SemanticAnalyzer::Visit(Binary& expr) {
       break;
     case TT_EQEQ:
     case TT_BANGEQ:
-      expr.type = types.Bool();
+      expr.type = types_.Bool();
       break;
     default:
       UNREACHABLE(VisitBinary, "Unknown operation: " + expr.op.lexeme);
@@ -219,7 +231,7 @@ llvm::Value* SemanticAnalyzer::Visit(Conditional& expr) {
     diagnose_.Error({expr.op.line_num}, err);
     return nullptr;
   }
-  expr.type = types.Bool();
+  expr.type = types_.Bool();
   return nullptr;
 }
 
@@ -294,13 +306,13 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
 /// TODO: Extend literal types
 llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
   if (std::holds_alternative<int>(expr.value)) {
-    expr.type = types.Int32();
+    expr.type = types_.Int32();
   } else if (std::holds_alternative<float>(expr.value)) {
-    expr.type = types.Float32();
+    expr.type = types_.Float32();
   } else if (std::holds_alternative<std::string>(expr.value)) {
-    expr.type = types.String();
+    expr.type = types_.String();
   } else if (std::holds_alternative<bool>(expr.value)) {
-    expr.type = types.Bool();
+    expr.type = types_.Bool();
   } else {
     UNREACHABLE(VisitLiteral, "Unknown value type");
   }
@@ -310,13 +322,13 @@ llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
 types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
   switch (type.type) {
     case TT_INT32_SPECIFIER:
-      return types.Int32();
+      return types_.Int32();
     case TT_FLT_SPECIFIER:
-      return types.Float32();
+      return types_.Float32();
     case TT_BOOL_SPECIFIER:
-      return types.Bool();
+      return types_.Bool();
     case TT_STR_SPECIFIER:
-      return types.String();
+      return types_.String();
     case TT_INT64_SPECIFIER:
     // Not valid in args
     case TT_VOID_SPECIFIER:
@@ -329,15 +341,15 @@ types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
 types::Type* SemanticAnalyzer::ResolveType(Token type) {
   switch (type.type) {
     case TT_INT32_SPECIFIER:
-      return types.Int32();
+      return types_.Int32();
     case TT_FLT_SPECIFIER:
-      return types.Float32();
+      return types_.Float32();
     case TT_VOID_SPECIFIER:
-      return types.Void();
+      return types_.Void();
     case TT_STR_SPECIFIER:
-      return types.String();
+      return types_.String();
     case TT_BOOL_SPECIFIER:
-      return types.Bool();
+      return types_.Bool();
     case TT_INT64_SPECIFIER:
     default:
       diagnose_.Error({type.line_num}, "Invalid type: " + type.lexeme);
@@ -359,7 +371,7 @@ SymbolInfo* SemanticAnalyzer::LookupSymbol(const std::string& name) {
     return nullptr;
   }
 
-  return symbols_.Get(*id);
+  return symbols_.GetSymbolInfo(*id);
 }
 
 void SemanticAnalyzer::BeginScope() {
@@ -370,15 +382,18 @@ void SemanticAnalyzer::EndScope() {
   env_.PopScope();
 }
 
-void SemanticAnalyzer::Declare(std::string name, types::Type* type,
-                               bool is_function, SourceLoc loc) {
+std::optional<SymbolId> SemanticAnalyzer::Declare(std::string name,
+                                                  types::Type* type,
+                                                  bool is_function,
+                                                  SourceLoc loc) {
   if (env_.IsDeclaredInCurrentScope(name)) {
     diagnose_.Error(loc, "Redefinition of symbol: " + name);
-    return;
+    return std::nullopt;
   }
 
   SymbolId id = symbols_.Declare(name, type, is_function);
   env_.DeclareLocal(name, id);
+  return id;
 }
 
 void SemanticAnalyzer::Analyze(ModuleStmt& mod) {
@@ -388,13 +403,13 @@ void SemanticAnalyzer::Analyze(ModuleStmt& mod) {
 void SemanticAnalyzer::VariadicPromotion(Expr* expr) {
   switch (expr->type->kind) {
     case types::TypeKind::Float:
-      expr->type = types.Float32();
+      expr->type = types_.Float32();
       break;
     case types::TypeKind::Int:
-      expr->type = types.Int32();
+      expr->type = types_.Int32();
       break;
     case types::TypeKind::Bool:
-      expr->type = types.Int32();
+      expr->type = types_.Int32();
       break;
     case types::TypeKind::Function:
     case types::TypeKind::String:
@@ -412,5 +427,39 @@ bool SemanticAnalyzer::HadError() {
 void SemanticAnalyzer::DumpErrors() {
   if (HadError()) {
     diagnose_.DumpErrors();
+  }
+}
+
+static std::string SymbolTypeToString(types::Type& type) {
+  switch (type.kind) {
+    case types::TypeKind::Bool:
+      return "Bool";
+    case types::TypeKind::Float:
+      return "Float";
+    case types::TypeKind::Int:
+      return "Int";
+    case types::TypeKind::String:
+      return "String";
+    case types::TypeKind::Struct:
+      return "Struct";
+    case types::TypeKind::Void:
+      return "Void";
+    case types::TypeKind::Function:
+      return "Function";
+    default:
+      return "Not matched to type";
+  }
+}
+
+void SemanticAnalyzer::DebugSymbols() {
+  std::vector<SymbolInfo> symbol_table = symbols_.GetSymbolTable();
+  SourceLoc loc{0};
+  for (auto& s : symbol_table) {
+    std::string symbol = "Resolved: " + s.name;
+    symbol += "\nType: " + SymbolTypeToString(*s.type);
+    symbol += "\nSymbol: " + std::to_string(s.id) + " ";
+    symbol += "\nIs Func: ";
+    symbol += (s.is_function ? "true" : "false");
+    diagnose_.Debug(loc, symbol);
   }
 }

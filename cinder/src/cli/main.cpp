@@ -5,7 +5,6 @@
 #include "cinder/codegen/codegen.hpp"
 #include "cinder/frontend/lexer.hpp"
 #include "cinder/frontend/parser.hpp"
-#include "cinder/semantic/semantic_analyzer.hpp"
 
 std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};
@@ -35,8 +34,6 @@ bool ParseCLI(int argc, char** argv) {
   options.add_options()("h,help", "Print this help message");
   options.add_options()("compile", "Compiles the program to an executable");
   options.add_options()("run", "Compiles the program to llvm");
-  options.add_options()("test-semantic",
-                        "Will remove after semantic analysis works");
   options.add_options()("emit-tokens", "Emits the lexers tokens");
   options.add_options()("emit-ast", "Emits the scanners ast");
   options.add_options()("emit-llvm", "Emits llvm output");
@@ -63,23 +60,6 @@ bool ParseCLI(int argc, char** argv) {
       Lexer lexer{source};
       lexer.ScanTokens();
       lexer.EmitTokens();
-    }
-    return true;
-  }
-
-  if (result.contains("test-semantic")) {
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.GetTokens()};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      SemanticAnalyzer pass{};
-      ModuleStmt* module = dynamic_cast<ModuleStmt*>(mod.get());
-      pass.Analyze(*module);
-      pass.DumpErrors();
     }
     return true;
   }

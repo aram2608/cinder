@@ -1,10 +1,14 @@
 #include "cinder/codegen/codegen.hpp"
 
-#include <stddef.h>
-
 #include <cstdlib>
 #include <memory>
 
+#include "cinder/ast/expr.hpp"
+#include "cinder/ast/stmt.hpp"
+#include "cinder/ast/types.hpp"
+#include "cinder/codegen/codegen_bindings.hpp"
+#include "cinder/frontend/tokens.hpp"
+#include "cinder/support/utils.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -12,23 +16,18 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Scalar.h"
-#include "cinder/ast/expr.hpp"
-#include "cinder/ast/stmt.hpp"
-#include "cinder/ast/types.hpp"
-#include "cinder/frontend/tokens.hpp"
-#include "cinder/support/errors.hpp"
-#include "cinder/support/utils.hpp"
 
 using namespace llvm;
 static ExitOnError ExitOnErr;
 
-static errs::RawOutStream errors{};
+static ostream::RawOutStream errors{2};
 
 void Codegen::AddPrintf() {
   /// HACK: This should let us use printf for now
@@ -45,7 +44,7 @@ void Codegen::AddPrintf() {
 }
 
 Codegen::Codegen(std::unique_ptr<Stmt> mod, CompilerOptions opts)
-    : mod(std::move(mod)), opts(opts) {}
+    : mod(std::move(mod)), opts(opts), pass_(types_) {}
 
 bool Codegen::Generate() {
   InitializeAllTargetInfos();
@@ -55,6 +54,7 @@ bool Codegen::Generate() {
   InitializeAllAsmPrinters();
 
   GenerateIR();
+
   auto TargetTriple = sys::getDefaultTargetTriple();
   ctx_->GetModule().setTargetTriple(Triple(TargetTriple));
 
@@ -116,7 +116,8 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
 
   if (target_machine->addPassesToEmitFile(pass, object_file, nullptr,
                                           FileType)) {
-    errs::ErrorOutln(errors, "TheTargetMachine can't emit a file of this type");
+    ostream::ErrorOutln(errors,
+                        "TheTargetMachine can't emit a file of this type");
     return;
   }
 
@@ -135,19 +136,20 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   system(CLEANUP.c_str());
 }
 
+void Codegen::SemanticPass(ModuleStmt& mod) {
+  pass_.Analyze(mod);
+}
+
 Value* Codegen::Visit(ModuleStmt& stmt) {
   SemanticPass(stmt);
+  pass_.DebugSymbols();
+  pass_.DumpErrors();
+  exit(0);
 
-  // std::shared_ptr<SymbolTable> global_state =
-  //     std::make_shared<SymbolTable>(this->symbol_table);
-  // std::shared_ptr<SymbolTable> previous = this->symbol_table;
-  // this->symbol_table = global_state;
+  for (auto& stmt : stmt.stmts) {
+    stmt->Accept(*this);
+  }
 
-  // for (auto& stmt : stmt.stmts) {
-  //   stmt->Accept(*this);
-  // }
-
-  // this->symbol_table = previous;
   return nullptr;
 }
 
@@ -158,9 +160,12 @@ Value* Codegen::Visit(ExpressionStmt& stmt) {
 
 Value* Codegen::Visit(WhileStmt& stmt) {
   Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
-  BasicBlock* cond_block = BasicBlock::Create(ctx_->GetContext(), "loop.cond", func);
-  BasicBlock* loop_block = BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
-  BasicBlock* after_block = BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
+  BasicBlock* cond_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.cond", func);
+  BasicBlock* loop_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
+  BasicBlock* after_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
 
   ctx_->GetBuilder().CreateBr(cond_block);
   ctx_->GetBuilder().SetInsertPoint(cond_block);
@@ -189,11 +194,12 @@ Value* Codegen::Visit(ForStmt& stmt) {
   // }
 
   // Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
-  // BasicBlock* cond_block = BasicBlock::Create(ctx_->GetContext(), "loop.cond",
-  // func); BasicBlock* loop_block = BasicBlock::Create(ctx_->GetContext(),
-  // "loop.body", func); BasicBlock* step_block =
-  // BasicBlock::Create(ctx_->GetContext(), "loop.step", func); BasicBlock* after_block
-  // = BasicBlock::Create(ctx_->GetContext(), "loop.end", func);
+  // BasicBlock* cond_block = BasicBlock::Create(ctx_->GetContext(),
+  // "loop.cond", func); BasicBlock* loop_block =
+  // BasicBlock::Create(ctx_->GetContext(), "loop.body", func); BasicBlock*
+  // step_block = BasicBlock::Create(ctx_->GetContext(), "loop.step", func);
+  // BasicBlock* after_block = BasicBlock::Create(ctx_->GetContext(),
+  // "loop.end", func);
 
   // ctx_->GetBuilder().CreateBr(cond_block);
 
@@ -225,7 +231,8 @@ Value* Codegen::Visit(IfStmt& stmt) {
 
   Function* Func = ctx_->GetBuilder().GetInsertBlock()->getParent();
 
-  BasicBlock* then_block = BasicBlock::Create(ctx_->GetContext(), "if.then", Func);
+  BasicBlock* then_block =
+      BasicBlock::Create(ctx_->GetContext(), "if.then", Func);
   BasicBlock* merge = BasicBlock::Create(ctx_->GetContext(), "if.cont");
   BasicBlock* else_block = merge;
 
@@ -294,7 +301,8 @@ Value* Codegen::Visit(FunctionProto& stmt) {
   // FunctionType* FT =
   //     FunctionType::get(return_type, arg_types, stmt.is_variadic);
   // Function* Func =
-  //     Function::Create(FT, Function::ExternalLinkage, func_name, ctx_->GetModule());
+  //     Function::Create(FT, Function::ExternalLinkage, func_name,
+  //     ctx_->GetModule());
 
   // unsigned Idx = 0;
   // for (auto& arg : Func->args()) {
@@ -335,7 +343,8 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
 
   // Value* value = stmt.value->Accept(*this);
 
-  // AllocaInst* value_ptr = ctx_->GetBuilder().CreateAlloca(type, nullptr, name);
+  // AllocaInst* value_ptr = ctx_->GetBuilder().CreateAlloca(type, nullptr,
+  // name);
 
   // ctx_->GetBuilder().CreateStore(value, value_ptr);
 
@@ -352,34 +361,46 @@ Value* Codegen::Visit(Conditional& expr) {
     case types::TypeKind::Int:
       switch (expr.op.type) {
         case TT_BANGEQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_NE, left, right,
+                                              "cmptmp");
         case TT_EQEQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_EQ, left, right,
+                                              "cmptmp");
         case TT_LESSER:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLT, left, right,
+                                              "cmptmp");
         case TT_LESSER_EQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLE, left, right,
+                                              "cmptmp");
         case TT_GREATER:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGT, left, right,
+                                              "cmptmp");
         case TT_GREATER_EQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGE, left, right,
+                                              "cmptmp");
         default:
           break;
       }
     case types::TypeKind::Float:
       switch (expr.op.type) {
         case TT_BANGEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_NE, left, right,
+                                               "cmptmp");
         case TT_EQEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_EQ, left, right,
+                                               "cmptmp");
         case TT_LESSER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLT, left, right,
+                                               "cmptmp");
         case TT_LESSER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLE, left, right,
+                                               "cmptmp");
         case TT_GREATER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGT, left, right,
+                                               "cmptmp");
         case TT_GREATER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGE, left, right,
+                                               "cmptmp");
         default:
           break;
       }
@@ -441,7 +462,8 @@ Value* Codegen::Visit(PreFixOp& expr) {
   //   return nullptr;
   // }
 
-  // Value* var = ctx_->GetBuilder().CreateLoad(symb->alloca_ptr->getAllocatedType(),
+  // Value* var =
+  // ctx_->GetBuilder().CreateLoad(symb->alloca_ptr->getAllocatedType(),
   //                                  symb->alloca_ptr, expr.name.lexeme);
 
   // Value* inc = nullptr;
@@ -525,38 +547,23 @@ Value* Codegen::Visit(Grouping& expr) {
 }
 
 Value* Codegen::Visit(Variable& expr) {
-  // InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
-  // if (!symb) {
-  //   errs::ErrorOutln(errors, "Undefined variable:", expr.name.lexeme);
-  //   return nullptr;
-  // }
-
-  // if (symb->alloca_ptr) {
-  //   Type* loaded_type = symb->alloca_ptr->getAllocatedType();
-  //   return ctx_->GetBuilder().CreateLoad(loaded_type, symb->alloca_ptr,
-  //   expr.name.lexeme);
-  // }
-
-  // return symb->value;
+  auto var = ir_bindings_.find(expr.id.value());
+  return var->second.value;
 }
 
 Value* Codegen::Visit(Literal& expr) {
-  if (!expr.type) {
-    errs::ErrorOutln(errors,
-                     "Internal error: unresolved literal type during codegen");
-    return nullptr;
-  }
-
   switch (expr.type->kind) {
     case types::TypeKind::Bool:
-      return ConstantInt::getBool(ctx_->GetContext(), std::get<bool>(expr.value));
+      return ConstantInt::getBool(ctx_->GetContext(),
+                                  std::get<bool>(expr.value));
     case types::TypeKind::Float:
-      return ConstantFP::get(ctx_->GetContext(), APFloat(std::get<float>(expr.value)));
+      return ConstantFP::get(ctx_->GetContext(),
+                             APFloat(std::get<float>(expr.value)));
     case types::TypeKind::Int:
       return EmitInteger(expr);
     case types::TypeKind::String:
-      return ctx_->GetBuilder().CreateGlobalString(std::get<std::string>(expr.value), "",
-                                         true);
+      return ctx_->GetBuilder().CreateGlobalString(
+          std::get<std::string>(expr.value), "", true);
     case types::TypeKind::Struct:
     case types::TypeKind::Void:
     default:
@@ -573,15 +580,6 @@ CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,
        ++it) {
     linker_flags += *it;
   }
-}
-
-std::unique_ptr<llvm::Module> Codegen::CreateModule(ModuleStmt& stmt,
-                                                     llvm::LLVMContext& ctx) {
-  return std::make_unique<Module>(stmt.name.lexeme, ctx_->GetContext());
-}
-
-void Codegen::SemanticPass(ModuleStmt& mod) {
-  pass.Analyze(mod);
 }
 
 llvm::Value* Codegen::EmitInteger(Literal& expr) {

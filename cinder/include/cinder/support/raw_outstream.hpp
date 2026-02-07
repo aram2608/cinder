@@ -5,28 +5,34 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdio>
 #include <cstring>
 #include <iomanip>
 #include <string_view>
 #include <system_error>
 
-namespace errs {
+namespace ostream {
+
+using FD = int;
 
 /**
  * @class RawOutStream
  * @brief A raw output stream similar to LLVM's
  * This implementation is much smaller and simpler
  * It is essentially an overglorified char* buffer that manages its contents
- * internally
+ * internally. This class is POSIX based and will not work on windows.
  */
 class RawOutStream {
   static constexpr size_t BUF_SIZE = 4096;
   char buffer[BUF_SIZE];
   size_t pos = 0;
+  FD fd;
 
   void FlushBuffer();
 
  public:
+  RawOutStream(FD fd);
+
   /**
    * @brief RawOutstream destructor
    * This method is virtual to ensure that the appropriate destructor is
@@ -136,6 +142,6 @@ inline void ErrorOutln(RawOutStream& stream, Args const&... args) {
   exit(1);
 }
 
-}  // namespace errs
+}  // namespace ostream
 
 #endif

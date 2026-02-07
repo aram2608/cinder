@@ -2,10 +2,10 @@
 
 #include "cinder/ast/expr.hpp"
 #include "cinder/frontend/tokens.hpp"
-#include "cinder/support/errors.hpp"
+#include "cinder/support/raw_outstream.hpp"
 // #include "cinder/support/utils.hpp"
 
-static errs::RawOutStream errors{};
+static ostream::RawOutStream errors{2};
 
 Parser::Parser(std::vector<Token> tokens) : tokens_(tokens), current_tok_(0) {}
 
@@ -33,7 +33,8 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
   if (!CheckType(TT_RPAREN)) {
     do {
       if (args.size() >= 255) {
-        errs::ErrorOutln(errors, "Exceeded maximum number of arguments: 255");
+        ostream::ErrorOutln(errors,
+                            "Exceeded maximum number of arguments: 255");
       }
       if (MatchType({TT_ELLIPSIS})) {
         is_variadic = true;
@@ -258,7 +259,7 @@ std::unique_ptr<Expr> Parser::Atom() {
     Consume(TT_RPAREN, "Expected ')' after grouping");
     return std::make_unique<Grouping>(std::move(expr));
   }
-  errs::ErrorOutln(errors, "Expected expression:", Peek().lexeme);
+  ostream::ErrorOutln(errors, "Expected expression:", Peek().lexeme);
   return nullptr;
 }
 
@@ -302,7 +303,7 @@ Token Parser::Consume(TokenType type, std::string message) {
   if (Peek().type == type) {
     return Advance();
   }
-  errs::ErrorOutln(errors, message);
+  ostream::ErrorOutln(errors, message);
   // Not used, simply to suppress compiler warning
   return {type, 0, "", std::nullopt};
 }

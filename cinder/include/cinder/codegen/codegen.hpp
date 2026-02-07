@@ -2,8 +2,15 @@
 #define COMPILER_H_
 
 #include <memory>
-#include <unordered_map>
 
+#include "cinder/ast/expr.hpp"
+#include "cinder/ast/stmt.hpp"
+#include "cinder/ast/types.hpp"
+#include "cinder/codegen/codegen_bindings.hpp"
+#include "cinder/codegen/codegen_context.hpp"
+#include "cinder/semantic/semantic_analyzer.hpp"
+#include "cinder/semantic/type_context.hpp"
+#include "cinder/support/diagnostic.hpp"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -22,12 +29,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
-#include "cinder/ast/expr.hpp"
-#include "cinder/ast/stmt.hpp"
-#include "cinder/ast/types.hpp"
-#include "cinder/codegen/codegen_context.hpp"
-#include "cinder/semantic/semantic_analyzer.hpp"
-#include "cinder/semantic/type_context.hpp"
+#include "cinder/support/environment.hpp"
 
 /// @enum @class CompilerMode
 /// @brief The compilation mode, whether to emit LLVM, run, or compile
@@ -61,21 +63,13 @@ struct CompilerOptions {
 struct Codegen : ExprVisitor, StmtVisitor {
   /// TODO:  make this a vector or a map of mods to handle imports
   std::unique_ptr<Stmt> mod; /**< module */
-  // std::unordered_map<std::string, llvm::AllocaInst*>
-  // symbol_table; /**< Symbol table to store local vars */
-  std::unordered_map<std::string, llvm::Argument*>
-      argument_table; /**< Table to store function arguments */
-  /// TODO: Fix function arity, currently we store it in the table so we can
-  /// check at call time but that is restrictive for variadic funcs. I think I
-  /// can probably just ignore the arity and have clang yell at the user
-  // std::unordered_map<std::string, size_t>
-  // func_table;       /**< Table to store the funcs in a module */
-  CompilerOptions opts; /**< The compiler options */
-  std::unique_ptr<CodegenContext> ctx_;
 
-  TypeContext type_context;
-  SemanticAnalyzer pass;
-  // std::shared_ptr<SymbolTable> symbol_table;
+  CompilerOptions opts; /**< The compiler options */
+  std::unique_ptr<CodegenContext> ctx_; /**< Codegen ctx, stores IR objs */
+  BindingMap ir_bindings_; /**< Stores the llvm IR instructions */
+  DiagnosticEngine diagnose_; /**< Engine to handle erros/warnings/ */
+  TypeContext types_; /**< Stores type information */
+  SemanticAnalyzer pass_; /**< Semantic analyzer */
 
   Codegen(std::unique_ptr<Stmt> mod, CompilerOptions opts);
 
@@ -109,9 +103,6 @@ struct Codegen : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(Grouping& expr) override;
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Literal& expr) override;
-
-  std::unique_ptr<llvm::Module> CreateModule(ModuleStmt& stmt,
-                                             llvm::LLVMContext& ctx);
 
   void SemanticPass(ModuleStmt& mod);
 

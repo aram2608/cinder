@@ -1,5 +1,6 @@
 target_sources(cinder_core
     PRIVATE
-      errors.cpp
+      environment.cpp
+      raw_outstream.cpp
       diagnostic.cpp
 )

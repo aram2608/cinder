@@ -16,12 +16,13 @@ struct SymbolInfo {
   bool is_function = false;
 };
 
-class SemanticSymbols {
+class ResolvedSymbols {
  public:
   SymbolId Declare(std::string name, types::Type* type, bool is_function);
 
-  SymbolInfo* Get(SymbolId id);
-  const SymbolInfo* Get(SymbolId id) const;
+  SymbolInfo* GetSymbolInfo(SymbolId id);
+  const SymbolInfo* GetSymbolInfo(SymbolId id) const;
+  std::vector<SymbolInfo> GetSymbolTable();
 
  private:
   std::vector<SymbolInfo> symbols_;

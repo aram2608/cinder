@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "cinder/codegen/codegen_bindings.hpp"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/BasicBlock.h"
@@ -20,7 +21,6 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Target/TargetMachine.h"
-#include "cinder/codegen/codegen_bindings.hpp"
 
 class CodegenContext {
   std::unique_ptr<llvm::LLVMContext> llvm_ctx_;

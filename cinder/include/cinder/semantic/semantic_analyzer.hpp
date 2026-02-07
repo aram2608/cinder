@@ -3,20 +3,22 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
+#include <ratio>
 
-#include "llvm/IR/Value.h"
 #include "cinder/ast/expr.hpp"
 #include "cinder/ast/stmt.hpp"
 #include "cinder/frontend/tokens.hpp"
-#include "cinder/semantic/semantic_env.hpp"
+#include "cinder/support/environment.hpp"
 #include "cinder/semantic/symbol.hpp"
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
+#include "llvm/IR/Value.h"
 
 class SemanticAnalyzer : ExprVisitor, StmtVisitor {
-  TypeContext types;
-  SemanticSymbols symbols_;
-  SemanticEnv env_;
+  TypeContext& types_;
+  ResolvedSymbols symbols_;
+  Environment env_;
   types::Type* current_return;
   DiagnosticEngine diagnose_;
 
@@ -54,15 +56,16 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   SymbolInfo* LookupSymbol(const std::string& name);
   void BeginScope();
   void EndScope();
-  void Declare(std::string name, types::Type* type, bool is_function = false,
-               SourceLoc loc = {});
+  std::optional<SymbolId> Declare(std::string name, types::Type* type,
+                                  bool is_function = false, SourceLoc loc = {});
   void VariadicPromotion(Expr* expr);
 
  public:
-  SemanticAnalyzer();
+  SemanticAnalyzer(TypeContext& types);
   void Analyze(ModuleStmt& mod);
   bool HadError();
   void DumpErrors();
+  void DebugSymbols();
 };
 
 #endif

@@ -2,14 +2,16 @@
 #define STMT_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
 // #include "common.hpp"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Value.h"
 #include "cinder/ast/expr.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
+#include "cinder/semantic/symbol.hpp"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Value.h"
 
 struct ModuleStmt;
 struct ExpressionStmt;
@@ -40,6 +42,7 @@ struct StmtVisitor {
 /// @brief The abstract class used to define stmts
 struct Stmt {
   virtual ~Stmt() = default;
+  std::optional<SymbolId> id = std::nullopt;
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -108,7 +111,6 @@ struct FunctionProto : Stmt {
   Token return_type;         /**< The return type of the method */
   std::vector<FuncArg> args; /**< The function arguments */
   bool is_variadic;
-  types::Type* resolved_type;
 
   FunctionProto(Token name, Token return_type, std::vector<FuncArg> args,
                 bool is_variadic);

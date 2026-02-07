@@ -2,12 +2,14 @@
 #define EXPR_H_
 
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instructions.h"
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
+#include "cinder/semantic/symbol.hpp"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
 
 struct Literal;
 struct Variable;
@@ -34,6 +36,7 @@ struct ExprVisitor {
 /// @brief Base class for the AST nodes for expressions
 struct Expr {
   types::Type* type = nullptr;
+  std::optional<SymbolId> id = std::nullopt;
   /// @brief Virtual destructor, set to default
   virtual ~Expr() = default;
 

@@ -1,5 +1,7 @@
-#include "cinder/support/errors.hpp"
-using namespace errs;
+#include "cinder/support/raw_outstream.hpp"
+using namespace ostream;
+
+RawOutStream::RawOutStream(FD fd) : fd(fd) {}
 
 RawOutStream::~RawOutStream() {
   FlushBuffer();
@@ -15,7 +17,7 @@ void RawOutStream::FlushBuffer() {
 RawOutStream& RawOutStream::Write(const char* data, size_t size) {
   if (size > BUF_SIZE) {
     FlushBuffer();
-    ::write(2, data, size);
+    ::write(fd, data, size);
     return *this;
   }
   if (pos + size > BUF_SIZE) {

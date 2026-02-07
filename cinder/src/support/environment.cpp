@@ -1,16 +1,16 @@
-#include "cinder/semantic/semantic_env.hpp"
+#include "cinder/support/environment.hpp"
 
-void SemanticEnv::PushScope() {
+void Environment::PushScope() {
   scopes_.emplace_back();
 }
 
-void SemanticEnv::PopScope() {
+void Environment::PopScope() {
   if (!scopes_.empty()) {
     scopes_.pop_back();
   }
 }
 
-bool SemanticEnv::DeclareLocal(const std::string& name, SymbolId id) {
+bool Environment::DeclareLocal(const std::string& name, SymbolId id) {
   if (scopes_.empty()) {
     PushScope();
   }
@@ -24,7 +24,7 @@ bool SemanticEnv::DeclareLocal(const std::string& name, SymbolId id) {
   return true;
 }
 
-SymbolId* SemanticEnv::Lookup(const std::string& name) {
+SymbolId* Environment::Lookup(const std::string& name) {
   for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
     auto lookup = it->find(name);
     if (lookup != it->end()) {
@@ -34,7 +34,7 @@ SymbolId* SemanticEnv::Lookup(const std::string& name) {
   return nullptr;
 }
 
-bool SemanticEnv::IsDeclaredInCurrentScope(const std::string& name) const {
+bool Environment::IsDeclaredInCurrentScope(const std::string& name) const {
   if (scopes_.empty()) {
     return false;
   }

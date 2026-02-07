@@ -7,7 +7,7 @@
 
 #include "cinder/semantic/symbol.hpp"
 
-class SemanticEnv {
+class Environment {
  public:
   void PushScope();
   void PopScope();
