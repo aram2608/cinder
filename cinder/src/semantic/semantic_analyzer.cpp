@@ -12,7 +12,8 @@
 #include "cinder/support/diagnostic.hpp"
 #include "cinder/support/utils.hpp"
 
-SemanticAnalyzer::SemanticAnalyzer(TypeContext& types) : types_(types), current_return(nullptr) {}
+SemanticAnalyzer::SemanticAnalyzer(TypeContext& types)
+    : types_(types), current_return(nullptr) {}
 
 llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
   BeginScope();
@@ -70,6 +71,9 @@ llvm::Value* SemanticAnalyzer::Visit(ForStmt& stmt) {
 
   Resolve(*stmt.initializer);
   Resolve(*stmt.condition);
+  if (stmt.step) {
+    Resolve(*stmt.step);
+  }
 
   for (auto& s : stmt.body) {
     Resolve(*s);
@@ -142,7 +146,11 @@ llvm::Value* SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
   }
 
   stmt.value->type = declared_type;
-  Declare(stmt.name.lexeme, declared_type, false, {stmt.name.line_num});
+  std::optional<SymbolId> id =
+      Declare(stmt.name.lexeme, declared_type, false, {stmt.name.line_num});
+  if (id.has_value()) {
+    stmt.id = id.value();
+  }
   return nullptr;
 }
 
@@ -154,6 +162,7 @@ llvm::Value* SemanticAnalyzer::Visit(Variable& expr) {
     return nullptr;
   }
   expr.type = sym->type;
+  expr.id = sym->id;
   return nullptr;
 }
 
@@ -201,6 +210,7 @@ llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
   }
 
   expr.type = sym->type;
+  expr.id = sym->id;
   return nullptr;
 }
 
@@ -220,6 +230,7 @@ llvm::Value* SemanticAnalyzer::Visit(PreFixOp& expr) {
   }
 
   expr.type = sym->type;
+  expr.id = sym->id;
   return nullptr;
 }
 
@@ -254,6 +265,9 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
     diagnose_.Error({callee->name.line_num}, err);
     return nullptr;
   }
+
+  callee->id = symbol->id;
+  callee->type = symbol->type;
 
   if (!symbol->is_function) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;

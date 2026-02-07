@@ -8,9 +8,11 @@
 #include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/codegen/codegen_context.hpp"
+#include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/semantic/semantic_analyzer.hpp"
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
+#include "cinder/support/environment.hpp"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -29,31 +31,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
-#include "cinder/support/environment.hpp"
-
-/// @enum @class CompilerMode
-/// @brief The compilation mode, whether to emit LLVM, run, or compile
-enum class CompilerMode {
-  EMIT_LLVM,
-  RUN,
-  COMPILE,
-};
-
-/**
- * @struct CompilerOptions
- * @brief A simple data container for the compiler options
- * Populated during CLI argument parse time and used during the final stages of
- * compilation.
- */
-struct CompilerOptions {
-  std::string out_path; /**< The desired outpath */
-  CompilerMode mode;    /** The compiler mode, can emit-llvm, run, or compile */
-  std::string linker_flags; /**< Flags to pass to the clang linker */
-  bool debug_info; /**< TODO: Implement debug information, its a bit of a ritual
-                    */
-  CompilerOptions(std::string out_path, CompilerMode mode, bool debug_info,
-                  std::vector<std::string> linker_flags_list);
-};
 
 /**
  * @struct Compiler
@@ -64,14 +41,14 @@ struct Codegen : ExprVisitor, StmtVisitor {
   /// TODO:  make this a vector or a map of mods to handle imports
   std::unique_ptr<Stmt> mod; /**< module */
 
-  CompilerOptions opts; /**< The compiler options */
+  CodegenOpts opts;                     /**< The compiler options */
   std::unique_ptr<CodegenContext> ctx_; /**< Codegen ctx, stores IR objs */
-  BindingMap ir_bindings_; /**< Stores the llvm IR instructions */
-  DiagnosticEngine diagnose_; /**< Engine to handle erros/warnings/ */
-  TypeContext types_; /**< Stores type information */
-  SemanticAnalyzer pass_; /**< Semantic analyzer */
+  BindingMap ir_bindings_;              /**< Stores the llvm IR instructions */
+  DiagnosticEngine diagnose_;           /**< Engine to handle erros/warnings/ */
+  TypeContext types_;                   /**< Stores type information */
+  SemanticAnalyzer pass_;               /**< Semantic analyzer */
 
-  Codegen(std::unique_ptr<Stmt> mod, CompilerOptions opts);
+  Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts);
 
   void AddPrintf();
   bool Generate();

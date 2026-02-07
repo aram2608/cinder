@@ -3,6 +3,7 @@
 #include "../vendor/cxxopts.hpp"
 #include "cinder/ast/stmt.hpp"
 #include "cinder/codegen/codegen.hpp"
+#include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/frontend/lexer.hpp"
 #include "cinder/frontend/parser.hpp"
 
@@ -78,25 +79,24 @@ bool ParseCLI(int argc, char** argv) {
     return true;
   }
 
-  // if (result.contains("emit-llvm")) {
-  //   std::vector<std::string> file_paths =
-  //       result["src"].as<std::vector<std::string>>();
-  //   std::string out_path = "cinder";
-  //   if (result.contains("o")) {
-  //     out_path = result["o"].as<std::string>();
-  //   }
-  //   for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-  //     std::string source = ReadEntireFile(*it);
-  //     Lexer lexer{source};
-  //     lexer.ScanTokens();
-  //     Parser parser{lexer.tokens};
-  //     std::unique_ptr<Stmt> mod = parser.Parse();
-  //     Compiler compiler{
-  //         std::move(mod),
-  //         CompilerOptions{out_path, CompilerMode::EMIT_LLVM, false, {}}};
-  //     return compiler.Compile();
-  //   }
-  // }
+  if (result.contains("emit-llvm")) {
+    std::vector<std::string> file_paths =
+        result["src"].as<std::vector<std::string>>();
+    std::string out_path = "cinder";
+    if (result.contains("o")) {
+      out_path = result["o"].as<std::string>();
+    }
+    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
+      std::string source = ReadEntireFile(*it);
+      Lexer lexer{source};
+      lexer.ScanTokens();
+      Parser parser{lexer.GetTokens()};
+      std::unique_ptr<Stmt> mod = parser.Parse();
+      CodegenOpts opts{out_path, CodegenOpts::Opt::EMIT_LLVM, false, {}};
+      Codegen cg{std::move(mod), opts};
+      return cg.Generate();
+    }
+  }
 
   if (result.contains("compile")) {
     bool debug_info = false;
@@ -121,8 +121,8 @@ bool ParseCLI(int argc, char** argv) {
       lexer.ScanTokens();
       Parser parser{lexer.GetTokens()};
       std::unique_ptr<Stmt> mod = parser.Parse();
-      CompilerOptions opts{out_path, CompilerMode::COMPILE, debug_info,
-                           linker_flags};
+      CodegenOpts opts{out_path, CodegenOpts::Opt::COMPILE, debug_info,
+                       linker_flags};
       Codegen cg{std::move(mod), opts};
       return cg.Generate();
     }

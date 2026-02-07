@@ -9,10 +9,10 @@
 #include "cinder/ast/expr.hpp"
 #include "cinder/ast/stmt.hpp"
 #include "cinder/frontend/tokens.hpp"
-#include "cinder/support/environment.hpp"
 #include "cinder/semantic/symbol.hpp"
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
+#include "cinder/support/environment.hpp"
 #include "llvm/IR/Value.h"
 
 class SemanticAnalyzer : ExprVisitor, StmtVisitor {

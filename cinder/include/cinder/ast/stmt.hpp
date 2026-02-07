@@ -110,7 +110,7 @@ struct FunctionProto : Stmt {
   Token name;                /**< The name of the function */
   Token return_type;         /**< The return type of the method */
   std::vector<FuncArg> args; /**< The function arguments */
-  bool is_variadic;
+  bool is_variadic;          /**< Whether the function is variadic */
 
   FunctionProto(Token name, Token return_type, std::vector<FuncArg> args,
                 bool is_variadic);

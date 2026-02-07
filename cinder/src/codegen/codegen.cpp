@@ -1,12 +1,13 @@
 #include "cinder/codegen/codegen.hpp"
 
 #include <cstdlib>
-#include <memory>
 
 #include "cinder/ast/expr.hpp"
 #include "cinder/ast/stmt.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
+#include "cinder/codegen/codegen_context.hpp"
+#include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/APFloat.h"
@@ -43,8 +44,11 @@ void Codegen::AddPrintf() {
   // symbol_table->Declare("printf", symb);
 }
 
-Codegen::Codegen(std::unique_ptr<Stmt> mod, CompilerOptions opts)
-    : mod(std::move(mod)), opts(opts), pass_(types_) {}
+Codegen::Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts)
+    : mod(std::move(mod)),
+      opts(opts),
+      ctx_(std::make_unique<CodegenContext>(this->opts.out_path)),
+      pass_(types_) {}
 
 bool Codegen::Generate() {
   InitializeAllTargetInfos();
@@ -69,20 +73,20 @@ bool Codegen::Generate() {
 
   auto CPU = "generic";
   auto Features = "";
-  TargetOptions opt;
+  TargetOptions gen_opt;
   auto TheTargetMachine = Target->createTargetMachine(
-      Triple(TargetTriple), CPU, Features, opt, Reloc::PIC_);
+      Triple(TargetTriple), CPU, Features, gen_opt, Reloc::PIC_);
 
   switch (opts.mode) {
-    case CompilerMode::COMPILE:
+    case CodegenOpts::Opt::COMPILE:
       ctx_->GetModule().setDataLayout(TheTargetMachine->createDataLayout());
       CompileBinary(TheTargetMachine);
       return true;
-    case CompilerMode::EMIT_LLVM:
+    case CodegenOpts::Opt::EMIT_LLVM:
       ctx_->GetModule().setDataLayout(TheTargetMachine->createDataLayout());
       EmitLLVM();
       return true;
-    case CompilerMode::RUN:
+    case CodegenOpts::Opt::RUN:
       CompileRun();
       return false;
     default:
@@ -142,9 +146,6 @@ void Codegen::SemanticPass(ModuleStmt& mod) {
 
 Value* Codegen::Visit(ModuleStmt& stmt) {
   SemanticPass(stmt);
-  pass_.DebugSymbols();
-  pass_.DumpErrors();
-  exit(0);
 
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
@@ -184,45 +185,41 @@ Value* Codegen::Visit(WhileStmt& stmt) {
 }
 
 Value* Codegen::Visit(ForStmt& stmt) {
-  // std::shared_ptr<SymbolTable> for_scope =
-  //     std::make_shared<SymbolTable>(this->symbol_table);
-  // std::shared_ptr<SymbolTable> previous = this->symbol_table;
-  // this->symbol_table = for_scope;
+  if (stmt.initializer) {
+    stmt.initializer->Accept(*this);
+  }
 
-  // if (stmt.initializer) {
-  //   stmt.initializer->Accept(*this);
-  // }
+  Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
+  BasicBlock* cond_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.cond", func);
+  BasicBlock* loop_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
+  BasicBlock* step_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.step", func);
+  BasicBlock* after_block =
+      BasicBlock::Create(ctx_->GetContext(), "loop.end", func);
 
-  // Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
-  // BasicBlock* cond_block = BasicBlock::Create(ctx_->GetContext(),
-  // "loop.cond", func); BasicBlock* loop_block =
-  // BasicBlock::Create(ctx_->GetContext(), "loop.body", func); BasicBlock*
-  // step_block = BasicBlock::Create(ctx_->GetContext(), "loop.step", func);
-  // BasicBlock* after_block = BasicBlock::Create(ctx_->GetContext(),
-  // "loop.end", func);
+  ctx_->GetBuilder().CreateBr(cond_block);
 
-  // ctx_->GetBuilder().CreateBr(cond_block);
+  ctx_->GetBuilder().SetInsertPoint(cond_block);
+  Value* condition = stmt.condition->Accept(*this);
 
-  // ctx_->GetBuilder().SetInsertPoint(cond_block);
-  // Value* condition = stmt.condition->Accept(*this);
+  ctx_->GetBuilder().CreateCondBr(condition, loop_block, after_block);
 
-  // ctx_->GetBuilder().CreateCondBr(condition, loop_block, after_block);
+  ctx_->GetBuilder().SetInsertPoint(loop_block);
+  for (auto& stmt : stmt.body) {
+    stmt->Accept(*this);
+  }
 
-  // ctx_->GetBuilder().SetInsertPoint(loop_block);
-  // for (auto& stmt : stmt.body) {
-  //   stmt->Accept(*this);
-  // }
+  ctx_->GetBuilder().CreateBr(step_block);
 
-  // ctx_->GetBuilder().CreateBr(step_block);
+  ctx_->GetBuilder().SetInsertPoint(step_block);
+  if (stmt.step) {
+    stmt.step->Accept(*this);
+  }
+  ctx_->GetBuilder().CreateBr(cond_block);
 
-  // ctx_->GetBuilder().SetInsertPoint(step_block);
-  // if (stmt.step) {
-  //   stmt.step->Accept(*this);
-  // }
-  // ctx_->GetBuilder().CreateBr(cond_block);
-
-  // ctx_->GetBuilder().SetInsertPoint(after_block);
-  // this->symbol_table = previous;
+  ctx_->GetBuilder().SetInsertPoint(after_block);
   return nullptr;
 }
 
@@ -270,51 +267,64 @@ Value* Codegen::Visit(IfStmt& stmt) {
 }
 
 Value* Codegen::Visit(FunctionStmt& stmt) {
-  // Function* Func = dyn_cast<Function>(stmt.proto->Accept(*this));
-  // std::shared_ptr<SymbolTable> function_scope =
-  //     std::make_shared<SymbolTable>(this->symbol_table);
-  // std::shared_ptr<SymbolTable> previous = this->symbol_table;
-  // this->symbol_table = function_scope;
+  Function* func = dyn_cast<Function>(stmt.proto->Accept(*this));
+  BasicBlock* entry = BasicBlock::Create(ctx_->GetContext(), "entry", func);
+  ctx_->GetBuilder().SetInsertPoint(entry);
 
-  // BasicBlock* BB = BasicBlock::Create(ctx_->GetContext(), "entry", Func);
-  // ctx_->GetBuilder().SetInsertPoint(BB);
+  for (auto& body_stmt : stmt.body) {
+    body_stmt->Accept(*this);
+  }
 
-  // for (auto& body_stmt : stmt.body) {
-  //   body_stmt->Accept(*this);
-  // }
+  if (!ctx_->GetBuilder().GetInsertBlock()->getTerminator()) {
+    if (func->getReturnType()->isVoidTy()) {
+      ctx_->GetBuilder().CreateRetVoid();
+    }
+  }
 
-  // verifyFunction(*Func);
-  // TheFPM->run(*Func, *TheFAM);
-  // this->symbol_table = previous;
-  // return Func;
+  verifyFunction(*func);
+  return func;
 }
 
 Value* Codegen::Visit(FunctionProto& stmt) {
-  // std::string func_name = stmt.name.lexeme;
-  // Type* return_type = ResolveType(stmt.resolved_type);
+  auto match_type = [&](Token t) -> Type* {
+    switch (t.type) {
+      case TT_INT32_SPECIFIER:
+        return Type::getInt32Ty(ctx_->GetContext());
+      case TT_FLT_SPECIFIER:
+        return Type::getFloatTy(ctx_->GetContext());
+      case TT_BOOL_SPECIFIER:
+        return Type::getInt1Ty(ctx_->GetContext());
+      case TT_STR_SPECIFIER:
+        return PointerType::getInt8Ty(ctx_->GetContext());
+      case TT_VOID_SPECIFIER:
+        return Type::getVoidTy(ctx_->GetContext());
+      default:
+        return nullptr;
+    }
+  };
 
-  // std::vector<Type*> arg_types;
-  // for (auto& arg : stmt.args) {
-  //   arg_types.push_back(ResolveArgType(arg.resolved_type));
-  // }
+  std::vector<Type*> arg_types;
+  arg_types.reserve(stmt.args.size());
+  for (auto& arg : stmt.args) {
+    arg_types.push_back(ResolveArgType(arg.resolved_type));
+  }
 
-  // FunctionType* FT =
-  //     FunctionType::get(return_type, arg_types, stmt.is_variadic);
-  // Function* Func =
-  //     Function::Create(FT, Function::ExternalLinkage, func_name,
-  //     ctx_->GetModule());
+  FunctionType* func_type = FunctionType::get(match_type(stmt.return_type),
+                                              arg_types, stmt.is_variadic);
 
-  // unsigned Idx = 0;
-  // for (auto& arg : Func->args()) {
-  //   arg.setName(stmt.args[Idx].identifier.lexeme);
-  //   InternalSymbol symb{nullptr, &arg};
-  //   std::string name = stmt.args[Idx++].identifier.lexeme;
-  //   symbol_table->Declare(name, symb);
-  // }
+  Function* func = Function::Create(func_type, Function::ExternalLinkage,
+                                    stmt.name.lexeme, ctx_->GetModule());
 
-  // InternalSymbol symb{nullptr, Func};
-  // symbol_table->Declare(func_name, symb);
-  // return Func;
+  size_t idx = 0;
+  for (auto& arg : func->args()) {
+    arg.setName(stmt.args[idx].identifier.lexeme);
+    ++idx;
+  }
+
+  if (stmt.id.has_value()) {
+    ir_bindings_[stmt.id.value()].function = func;
+  }
+  return func;
 }
 
 Value* Codegen::Visit(ReturnStmt& stmt) {
@@ -337,27 +347,29 @@ Value* Codegen::Visit(ReturnStmt& stmt) {
 }
 
 Value* Codegen::Visit(VarDeclarationStmt& stmt) {
-  // std::string name = stmt.name.lexeme;
+  Value* init = stmt.value->Accept(*this);
+  Type* ty = ResolveType(stmt.value->type);
+  AllocaInst* slot =
+      ctx_->GetBuilder().CreateAlloca(ty, nullptr, stmt.name.lexeme);
+  ctx_->GetBuilder().CreateStore(init, slot);
 
-  // Type* type = ResolveType(stmt.value->type);
-
-  // Value* value = stmt.value->Accept(*this);
-
-  // AllocaInst* value_ptr = ctx_->GetBuilder().CreateAlloca(type, nullptr,
-  // name);
-
-  // ctx_->GetBuilder().CreateStore(value, value_ptr);
-
-  // InternalSymbol symb{value_ptr, value};
-  // symbol_table->Declare(name, symb);
-  return nullptr;
+  if (stmt.id.has_value()) {
+    Binding& b = ir_bindings_[stmt.id.value()];
+    b.alloca_ptr = slot;
+    b.value = init;
+  }
+  return init;
 }
 
 Value* Codegen::Visit(Conditional& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
-  switch (expr.type->kind) {
+  if (!left || !right) {
+    return nullptr;
+  }
+
+  switch (expr.left->type->kind) {
     case types::TypeKind::Int:
       switch (expr.op.type) {
         case TT_BANGEQ:
@@ -384,22 +396,22 @@ Value* Codegen::Visit(Conditional& expr) {
     case types::TypeKind::Float:
       switch (expr.op.type) {
         case TT_BANGEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_NE, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_ONE, left, right,
                                                "cmptmp");
         case TT_EQEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_EQ, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OEQ, left, right,
                                                "cmptmp");
         case TT_LESSER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLT, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLT, left, right,
                                                "cmptmp");
         case TT_LESSER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SLE, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLE, left, right,
                                                "cmptmp");
         case TT_GREATER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGT, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGT, left, right,
                                                "cmptmp");
         case TT_GREATER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::ICMP_SGE, left, right,
+          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGE, left, right,
                                                "cmptmp");
         default:
           break;
@@ -448,83 +460,70 @@ Value* Codegen::Visit(Binary& expr) {
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
-  // InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
-  // if (!symb) {
-  //   errs::ErrorOutln(errors, "Undefined variable:", expr.name.lexeme);
-  //   return nullptr;
-  // }
+  if (!expr.id.has_value()) {
+    return nullptr;
+  }
+  auto symbol = ir_bindings_.find(expr.id.value());
+  if (symbol == ir_bindings_.end() || !symbol->second.alloca_ptr) {
+    return nullptr;
+  }
+  Binding& bind = symbol->second;
+  Type* type = bind.alloca_ptr->getAllocatedType();
+  std::string name = expr.name.lexeme;
 
-  // if (!symb->alloca_ptr) {
-  //   errs::ErrorOutln(
-  //       errors,
-  //       "Prefix operators are only valid on mutable locals:",
-  //       expr.name.lexeme);
-  //   return nullptr;
-  // }
+  Value* var = ctx_->GetBuilder().CreateLoad(type, bind.alloca_ptr, name);
 
-  // Value* var =
-  // ctx_->GetBuilder().CreateLoad(symb->alloca_ptr->getAllocatedType(),
-  //                                  symb->alloca_ptr, expr.name.lexeme);
+  Value* inc = nullptr;
+  Value* value = nullptr;
 
-  // Value* inc = nullptr;
-  // Value* value = nullptr;
+  /// TODO: maybe refactor this or find a better way to match this
+  switch (expr.op.type) {
+    case TT_PLUS_PLUS:
+      switch (expr.type->kind) {
+        case types::TypeKind::Int:
+          inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
+          value = ctx_->GetBuilder().CreateAdd(var, inc, "addtmp");
+          break;
+        case types::TypeKind::Float:
+          inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
+          value = ctx_->GetBuilder().CreateFAdd(var, inc, "addtmp");
+          break;
+        default:
+          break;
+      }
+      break;
+    case TT_MINUS_MINUS:
+      switch (expr.type->kind) {
+        case types::TypeKind::Int:
+          inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
+          value = ctx_->GetBuilder().CreateSub(var, inc, "subtmp");
+          break;
+        case types::TypeKind::Float:
+          inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
+          value = ctx_->GetBuilder().CreateFSub(var, inc, "subtmp");
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
 
-  // /// TODO: maybe refactor this, a but too complex
-  // switch (expr.op.type) {
-  //   case TT_PLUS_PLUS:
-  //     switch (expr.type->kind) {
-  //       case types::TypeKind::Int:
-  //         inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
-  //         value = ctx_->GetBuilder().CreateAdd(var, inc, "addtmp");
-  //         break;
-  //       case types::TypeKind::Float:
-  //         inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
-  //         value = ctx_->GetBuilder().CreateFAdd(var, inc, "addtmp");
-  //         break;
-  //       default:
-  //         break;
-  //     }
-  //     break;
-  //   case TT_MINUS_MINUS:
-  //     switch (expr.type->kind) {
-  //       case types::TypeKind::Int:
-  //         inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
-  //         value = ctx_->GetBuilder().CreateSub(var, inc, "subtmp");
-  //         break;
-  //       case types::TypeKind::Float:
-  //         inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
-  //         value = ctx_->GetBuilder().CreateFSub(var, inc, "subtmp");
-  //         break;
-  //       default:
-  //         break;
-  //     }
-  //     break;
-  //   default:
-  //     break;
-  // }
-
-  // if (!value) {
-  //   errs::ErrorOutln(
-  //       errors, "Invalid prefix operation for variable:", expr.name.lexeme);
-  //   return nullptr;
-  // }
-
-  // ctx_->GetBuilder().CreateStore(value, symb->alloca_ptr);
-  // return value;
+  ctx_->GetBuilder().CreateStore(value, bind.alloca_ptr);
+  return value;
 }
 
 Value* Codegen::Visit(Assign& expr) {
-  // InternalSymbol* symb = symbol_table->LookUp(expr.name.lexeme);
-  // if (!symb || !symb->alloca_ptr) {
-  //   errs::ErrorOutln(errors, "Assignment to undefined or immutable
-  //   variable:",
-  //                    expr.name.lexeme);
-  //   return nullptr;
-  // }
+  auto symbol = ir_bindings_.find(expr.id.value());
+  if (symbol == ir_bindings_.end() || !symbol->second.alloca_ptr) {
+    return nullptr;
+  }
+  Binding& bind = symbol->second;
 
-  // Value* value = expr.value->Accept(*this);
-  // ctx_->GetBuilder().CreateStore(value, symb->alloca_ptr);
-  // return value;
+  Value* value = expr.value->Accept(*this);
+  ctx_->GetBuilder().CreateStore(value, bind.alloca_ptr);
+  return value;
 }
 
 Value* Codegen::Visit(CallExpr& expr) {
@@ -547,8 +546,38 @@ Value* Codegen::Visit(Grouping& expr) {
 }
 
 Value* Codegen::Visit(Variable& expr) {
-  auto var = ir_bindings_.find(expr.id.value());
-  return var->second.value;
+  if (expr.id.has_value()) {
+    auto it = ir_bindings_.find(expr.id.value());
+    if (it != ir_bindings_.end()) {
+      Binding& b = it->second;
+      if (b.function) {
+        return b.function;
+      }
+      if (b.alloca_ptr) {
+        return ctx_->GetBuilder().CreateLoad(b.alloca_ptr->getAllocatedType(),
+                                             b.alloca_ptr, expr.name.lexeme);
+      }
+      if (b.value) {
+        return b.value;
+      }
+    }
+  }
+
+  if (ctx_->GetBuilder().GetInsertBlock()) {
+    Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
+    if (func) {
+      for (auto& arg : func->args()) {
+        if (arg.getName() == expr.name.lexeme) {
+          return &arg;
+        }
+      }
+    }
+  }
+
+  if (Function* fn = ctx_->GetModule().getFunction(expr.name.lexeme)) {
+    return fn;
+  }
+  return nullptr;
 }
 
 Value* Codegen::Visit(Literal& expr) {
@@ -572,16 +601,6 @@ Value* Codegen::Visit(Literal& expr) {
   return nullptr;
 }
 
-CompilerOptions::CompilerOptions(std::string out_path, CompilerMode mode,
-                                 bool debug_info,
-                                 std::vector<std::string> linker_flags_list)
-    : out_path(out_path), mode(mode), debug_info(debug_info) {
-  for (auto it = linker_flags_list.begin(); it != linker_flags_list.end();
-       ++it) {
-    linker_flags += *it;
-  }
-}
-
 llvm::Value* Codegen::EmitInteger(Literal& expr) {
   types::IntType* int_type = dynamic_cast<types::IntType*>(expr.type);
   int value = std::get<int>(expr.value);
@@ -597,7 +616,7 @@ llvm::Type* Codegen::ResolveArgType(types::Type* type) {
     case types::TypeKind::Int:
       return Type::getInt32Ty(ctx_->GetContext());
     case types::TypeKind::String:
-      return Type::getInt8Ty(ctx_->GetContext());
+      return PointerType::getInt8Ty(ctx_->GetContext());
     case types::TypeKind::Void:
     case types::TypeKind::Struct:
     default:
@@ -615,7 +634,7 @@ llvm::Type* Codegen::ResolveType(types::Type* type) {
     case types::TypeKind::Int:
       return Type::getInt32Ty(ctx_->GetContext());
     case types::TypeKind::String:
-      return Type::getInt8Ty(ctx_->GetContext());
+      return PointerType::getInt8Ty(ctx_->GetContext());
     case types::TypeKind::Void:
       return Type::getVoidTy(ctx_->GetContext());
     case types::TypeKind::Struct:
