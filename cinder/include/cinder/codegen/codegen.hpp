@@ -9,6 +9,7 @@
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/codegen/codegen_context.hpp"
 #include "cinder/codegen/codegen_opts.hpp"
+#include "cinder/driver/clang_driver.hpp"
 #include "cinder/semantic/semantic_analyzer.hpp"
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
@@ -50,7 +51,6 @@ struct Codegen : ExprVisitor, StmtVisitor {
 
   Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts);
 
-  void AddPrintf();
   bool Generate();
   void GenerateIR();
   void EmitLLVM();

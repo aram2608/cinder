@@ -8,6 +8,7 @@
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/codegen/codegen_context.hpp"
 #include "cinder/codegen/codegen_opts.hpp"
+#include "cinder/driver/clang_driver.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/APFloat.h"
@@ -29,20 +30,6 @@ using namespace llvm;
 static ExitOnError ExitOnErr;
 
 static ostream::RawOutStream errors{2};
-
-void Codegen::AddPrintf() {
-  /// HACK: This should let us use printf for now
-  /// I need to find a way to support variadics, we check for arity at call time
-  /// and variadics obviously can take an arbitrary number
-  /// For now we expect only 2 arguments
-  Type* type = Type::getInt32Ty(ctx_->GetContext());
-  PointerType* char_ptr_type = PointerType::getUnqual(ctx_->GetContext());
-  FunctionType* printf_type = FunctionType::get(type, char_ptr_type, true);
-  Function* printfFunc = Function::Create(
-      printf_type, GlobalValue::ExternalLinkage, "printf", ctx_->GetModule());
-  verifyFunction(*printfFunc);
-  // symbol_table->Declare("printf", symb);
-}
 
 Codegen::Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts)
     : mod(std::move(mod)),
@@ -128,16 +115,15 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   pass.run(ctx_->GetModule());
   object_file.flush();
 
-  std::string linker_flags{};
-  for (auto opt : opts.linker_flags) {
-    linker_flags += opt;
+  bool ok = ClangDriver::LinkObject(temp, opts.out_path, opts.linker_flags);
+  if (!ok) {
+    ostream::ErrorOutln(errors, "clang driver link step failed");
   }
 
-  std::string CMD =
-      "clang " + temp + " " + linker_flags + " -o " + opts.out_path;
-  std::string CLEANUP = "rm " + temp;
-  system(CMD.c_str());
-  system(CLEANUP.c_str());
+  auto err = llvm::sys::fs::remove(temp);
+  if(err) {
+    diagnose_.Error({0}, err.message());
+  }
 }
 
 void Codegen::SemanticPass(ModuleStmt& mod) {
@@ -545,6 +531,10 @@ Value* Codegen::Visit(Grouping& expr) {
   return expr.expr->Accept(*this);
 }
 
+/// TODO: Refactor this, it seems arbitrary to iterate over each possible
+/// field in the Binded values, it would make more sense to make a smarter symbol
+/// that tracks what is and have it evaluated given its type
+/// For example an IsFunction method.
 Value* Codegen::Visit(Variable& expr) {
   if (expr.id.has_value()) {
     auto it = ir_bindings_.find(expr.id.value());

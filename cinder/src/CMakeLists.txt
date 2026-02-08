@@ -7,6 +7,28 @@ set(LLVM_EXTRA_CXXFLAGS "")
 set(LLVM_CONFIG_LDFLAGS_LIST "")
 set(LLVM_CONFIG_LIBS_LIST "")
 set(LLVM_SYSTEM_LIBS_LIST "")
+set(CLANG_LIBS_LIST "")
+
+if(Clang_FOUND)
+  if(TARGET clang-cpp)
+    list(APPEND CLANG_LIBS_LIST clang-cpp)
+  else()
+    foreach(clang_component IN ITEMS
+        clangDriver
+        clangFrontend
+        clangSerialization
+        clangParse
+        clangSema
+        clangEdit
+        clangAST
+        clangLex
+        clangBasic)
+      if(TARGET ${clang_component})
+        list(APPEND CLANG_LIBS_LIST ${clang_component})
+      endif()
+    endforeach()
+  endif()
+endif()
 
 if(LLVM_CONFIG_EXECUTABLE)
   execute_process(
@@ -68,6 +90,7 @@ target_include_directories(cinder_core
       ${CINDER_ROOT_DIR}/vendor
     SYSTEM PUBLIC
       ${LLVM_INCLUDE_DIRS}
+      ${CLANG_INCLUDE_DIRS}
 )
 
 target_compile_options(cinder_core
@@ -91,6 +114,7 @@ target_link_options(cinder_core PUBLIC ${LLVM_CONFIG_LDFLAGS_LIST})
 target_link_libraries(cinder_core
     PUBLIC
       ${LLVM_CONFIG_LIBS_LIST}
+      ${CLANG_LIBS_LIST}
       ${LLVM_SYSTEM_LIBS_LIST}
 )
 
@@ -113,3 +137,4 @@ add_subdirectory(frontend)
 add_subdirectory(semantic)
 add_subdirectory(support)
 add_subdirectory(cli)
+add_subdirectory(driver)
