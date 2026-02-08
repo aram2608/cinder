@@ -180,6 +180,10 @@ Value* ModuleStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
+void ModuleStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
 std::string ModuleStmt::ToString() {
   return RenderStmt(*this);
 }
@@ -189,6 +193,10 @@ ExpressionStmt::ExpressionStmt(std::unique_ptr<Expr> expr)
 
 Value* ExpressionStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void ExpressionStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string ExpressionStmt::ToString() {
@@ -207,6 +215,10 @@ Value* FunctionProto::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
+void FunctionProto::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
 std::string FunctionProto::ToString() {
   return RenderStmt(*this);
 }
@@ -221,6 +233,10 @@ Value* FunctionStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
+void FunctionStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
 std::string FunctionStmt::ToString() {
   return RenderStmt(*this);
 }
@@ -230,6 +246,10 @@ ReturnStmt::ReturnStmt(Token ret_token, std::unique_ptr<Expr> value)
 
 Value* ReturnStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void ReturnStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string ReturnStmt::ToString() {
@@ -247,6 +267,10 @@ Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
+void VarDeclarationStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
 std::string VarDeclarationStmt::ToString() {
   return RenderStmt(*this);
 }
@@ -260,6 +284,10 @@ IfStmt::IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
 
 Value* IfStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void IfStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string IfStmt::ToString() {
@@ -279,6 +307,10 @@ Value* ForStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
+void ForStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
 std::string ForStmt::ToString() {
   return RenderStmt(*this);
 }
@@ -291,6 +323,10 @@ WhileStmt::WhileStmt(std::unique_ptr<Expr> condition,
 
 Value* WhileStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void WhileStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string WhileStmt::ToString() {

@@ -175,8 +175,12 @@ bool Expr::IsConditional() {
 
 Literal::Literal(TokenValue value) : Expr(ExprType::Literal), value(value) {}
 
-Value* Literal::Accept(ExprVisitor& visitor) {
+Value* Literal::Accept(CodegenExprVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void Literal::Accept(SemanticExprVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string Literal::ToString() {
@@ -185,7 +189,11 @@ std::string Literal::ToString() {
 
 Variable::Variable(Token name) : Expr(ExprType::Variable), name(name) {}
 
-Value* Variable::Accept(ExprVisitor& visitor) {
+Value* Variable::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void Variable::Accept(SemanticExprVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -196,7 +204,11 @@ std::string Variable::ToString() {
 Grouping::Grouping(std::unique_ptr<Expr> expr)
     : Expr(ExprType::Grouping), expr(std::move(expr)) {}
 
-Value* Grouping::Accept(ExprVisitor& visitor) {
+Value* Grouping::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void Grouping::Accept(SemanticExprVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -207,7 +219,11 @@ std::string Grouping::ToString() {
 PreFixOp::PreFixOp(Token op, Token name)
     : Expr(ExprType::PreFix), op(op), name(name) {}
 
-Value* PreFixOp::Accept(ExprVisitor& visitor) {
+Value* PreFixOp::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void PreFixOp::Accept(SemanticExprVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -222,7 +238,11 @@ Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
       right(std::move(right)),
       op(op) {}
 
-Value* Binary::Accept(ExprVisitor& visitor) {
+Value* Binary::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void Binary::Accept(SemanticExprVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -233,7 +253,11 @@ std::string Binary::ToString() {
 Assign::Assign(Token name, std::unique_ptr<Expr> value)
     : Expr(ExprType::Assign), name(name), value(std::move(value)) {}
 
-Value* Assign::Accept(ExprVisitor& visitor) {
+Value* Assign::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void Assign::Accept(SemanticExprVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -248,8 +272,12 @@ Conditional::Conditional(std::unique_ptr<Expr> left,
       right(std::move(right)),
       op(op) {}
 
-Value* Conditional::Accept(ExprVisitor& visitor) {
+Value* Conditional::Accept(CodegenExprVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void Conditional::Accept(SemanticExprVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string Conditional::ToString() {
@@ -260,8 +288,12 @@ CallExpr::CallExpr(std::unique_ptr<Expr> callee,
                    std::vector<std::unique_ptr<Expr>> args)
     : Expr(ExprType::Call), callee(std::move(callee)), args(std::move(args)) {}
 
-Value* CallExpr::Accept(ExprVisitor& visitor) {
+Value* CallExpr::Accept(CodegenExprVisitor& visitor) {
   return visitor.Visit(*this);
+}
+
+void CallExpr::Accept(SemanticExprVisitor& visitor) {
+  visitor.Visit(*this);
 }
 
 std::string CallExpr::ToString() {

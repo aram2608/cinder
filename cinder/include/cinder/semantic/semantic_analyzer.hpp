@@ -13,9 +13,8 @@
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
 #include "cinder/support/environment.hpp"
-#include "llvm/IR/Value.h"
 
-class SemanticAnalyzer : ExprVisitor, StmtVisitor {
+class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   TypeContext& types_;
   ResolvedSymbols symbols_;
   Environment env_;
@@ -24,35 +23,35 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
 
   /// We need to declare we are using these so the compiler knows which methods
   /// are available
-  using ExprVisitor::Visit;
-  using StmtVisitor::Visit;
+  using SemanticExprVisitor::Visit;
+  using SemanticStmtVisitor::Visit;
 
   // Statements
-  llvm::Value* Visit(ModuleStmt& stmt) override;
-  llvm::Value* Visit(ForStmt& stmt) override;
-  llvm::Value* Visit(WhileStmt& stmt) override;
-  llvm::Value* Visit(IfStmt& stmt) override;
-  llvm::Value* Visit(ExpressionStmt& stmt) override;
-  llvm::Value* Visit(FunctionStmt& stmt) override;
-  llvm::Value* Visit(FunctionProto& stmt) override;
-  llvm::Value* Visit(ReturnStmt& stmt) override;
-  llvm::Value* Visit(VarDeclarationStmt& stmt) override;
+  void Visit(ModuleStmt& stmt) override;
+  void Visit(ForStmt& stmt) override;
+  void Visit(WhileStmt& stmt) override;
+  void Visit(IfStmt& stmt) override;
+  void Visit(ExpressionStmt& stmt) override;
+  void Visit(FunctionStmt& stmt) override;
+  void Visit(FunctionProto& stmt) override;
+  void Visit(ReturnStmt& stmt) override;
+  void Visit(VarDeclarationStmt& stmt) override;
 
   // Expressions
-  llvm::Value* Visit(Variable& expr) override;
-  llvm::Value* Visit(Binary& expr) override;
-  llvm::Value* Visit(Assign& expr) override;
-  llvm::Value* Visit(Grouping& expr) override;
-  llvm::Value* Visit(Conditional& expr) override;
-  llvm::Value* Visit(PreFixOp& expr) override;
-  llvm::Value* Visit(CallExpr& expr) override;
-  llvm::Value* Visit(Literal& expr) override;
+  void Visit(Variable& expr) override;
+  void Visit(Binary& expr) override;
+  void Visit(Assign& expr) override;
+  void Visit(Grouping& expr) override;
+  void Visit(Conditional& expr) override;
+  void Visit(PreFixOp& expr) override;
+  void Visit(CallExpr& expr) override;
+  void Visit(Literal& expr) override;
 
   cinder::types::Type* ResolveArgType(Token type);
   cinder::types::Type* ResolveType(Token type);
 
-  llvm::Value* Resolve(Stmt& stmt);
-  llvm::Value* Resolve(Expr& expr);
+  void Resolve(Stmt& stmt);
+  void Resolve(Expr& expr);
   SymbolInfo* LookupSymbol(const std::string& name);
   void BeginScope();
   void EndScope();

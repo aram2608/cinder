@@ -38,7 +38,7 @@
  * @brief The main compiler structure
  * Employs the visitor method to resolve the different nodes of the AST
  */
-struct Codegen : ExprVisitor, StmtVisitor {
+struct Codegen : CodegenExprVisitor, StmtVisitor {
   /// TODO:  make this a vector or a map of mods to handle imports
   std::unique_ptr<Stmt> mod; /**< module */
 
@@ -57,7 +57,7 @@ struct Codegen : ExprVisitor, StmtVisitor {
   void CompileRun();
   void CompileBinary(llvm::TargetMachine* target_machine);
 
-  using ExprVisitor::Visit;
+  using CodegenExprVisitor::Visit;
   using StmtVisitor::Visit;
 
   // Statements

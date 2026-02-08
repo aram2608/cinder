@@ -40,6 +40,9 @@ struct Type {
   bool String();
   bool Function();
   bool Struct();
+  bool IsThisType(Type* type);
+  bool IsThisType(Type& type);
+  bool IsThisType(TypeKind type);
 
   template <typename T>
   T* CastTo(std::error_code& ec) {

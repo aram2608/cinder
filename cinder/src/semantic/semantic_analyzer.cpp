@@ -23,16 +23,15 @@ using namespace cinder;
 SemanticAnalyzer::SemanticAnalyzer(TypeContext& types)
     : types_(types), current_return(nullptr) {}
 
-llvm::Value* SemanticAnalyzer::Visit(ModuleStmt& stmt) {
+void SemanticAnalyzer::Visit(ModuleStmt& stmt) {
   BeginScope();
   for (auto& s : stmt.stmts) {
     Resolve(*s);
   }
   EndScope();
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
+void SemanticAnalyzer::Visit(FunctionProto& stmt) {
   types::Type* ret = ResolveType(stmt.return_type);
 
   std::vector<types::Type*> params;
@@ -51,17 +50,16 @@ llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
     std::string err = "Function could not be declared: " + stmt.name.lexeme;
     diagnose_.Error({stmt.name.line_num}, err);
   }
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
+void SemanticAnalyzer::Visit(FunctionStmt& stmt) {
   Resolve(*stmt.proto);
   std::error_code ec;
   FunctionProto* proto = stmt.proto->CastTo<FunctionProto>(ec);
 
   if (ec) {
     diagnose_.Error({0}, ec.message());
-    return nullptr;
+    return;
   }
 
   current_return = ResolveType(proto->return_type);
@@ -78,10 +76,9 @@ llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
   }
 
   EndScope();
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(ForStmt& stmt) {
+void SemanticAnalyzer::Visit(ForStmt& stmt) {
   BeginScope();
 
   Resolve(*stmt.initializer);
@@ -95,69 +92,65 @@ llvm::Value* SemanticAnalyzer::Visit(ForStmt& stmt) {
   }
 
   EndScope();
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(WhileStmt& stmt) {
+void SemanticAnalyzer::Visit(WhileStmt& stmt) {
   Resolve(*stmt.condition);
   for (auto& s : stmt.body) {
     Resolve(*s);
   }
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(IfStmt& stmt) {
+void SemanticAnalyzer::Visit(IfStmt& stmt) {
   Resolve(*stmt.cond);
   Resolve(*stmt.then);
   if (stmt.otherwise) {
     Resolve(*stmt.otherwise);
   }
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
+void SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
   Resolve(*stmt.expr);
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(ReturnStmt& stmt) {
+void SemanticAnalyzer::Visit(ReturnStmt& stmt) {
   if (!current_return) {
     diagnose_.Error({stmt.ret_token.line_num},
                     "Return statement outside function body");
-    return nullptr;
+    return;
   }
 
   if (!stmt.value) {
-    if (current_return->kind != types::TypeKind::Void) {
+    if (!current_return->IsThisType(types::TypeKind::Void)) {
       diagnose_.Error({stmt.ret_token.line_num},
                       "Return value does not match current return type");
     }
-    return nullptr;
+    return;
   }
 
   Resolve(*stmt.value);
-  if (stmt.value->type->kind != current_return->kind) {
+  if (!stmt.value->type->IsThisType(current_return)) {
     diagnose_.Error({stmt.ret_token.line_num},
                     "Return value does not match current return type");
+    return;
   }
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
+void SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
   if (env_.IsDeclaredInCurrentScope(stmt.name.lexeme)) {
     std::string error = "Variable already declared: " + stmt.name.lexeme;
     diagnose_.Error({stmt.name.line_num}, error);
-    return nullptr;
+    return;
   }
 
   types::Type* declared_type = ResolveType(stmt.type);
   Resolve(*stmt.value);
 
-  if (stmt.value->type->kind != declared_type->kind) {
+  if (!stmt.value->type->IsThisType(declared_type)) {
     std::string error =
         "Type mismatch in variable declaration: " + stmt.name.lexeme;
     diagnose_.Error({stmt.name.line_num}, error);
-    return nullptr;
+    return;
   }
 
   stmt.value->type = declared_type;
@@ -166,29 +159,27 @@ llvm::Value* SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
   if (id.has_value()) {
     stmt.id = id.value();
   }
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(Variable& expr) {
+void SemanticAnalyzer::Visit(Variable& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Undeclared variable: " + expr.name.lexeme;
     diagnose_.Error({expr.name.line_num}, err);
-    return nullptr;
+    return;
   }
   expr.type = sym->type;
   expr.id = sym->id;
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(Binary& expr) {
+void SemanticAnalyzer::Visit(Binary& expr) {
   Resolve(*expr.left);
   Resolve(*expr.right);
 
-  if (expr.left->type->kind != expr.right->type->kind) {
+  if (!expr.left->type->IsThisType(expr.right->type)) {
     std::string err = "Type mismatch: " + expr.op.lexeme;
     diagnose_.Error({expr.op.line_num}, err);
-    return nullptr;
+    return;
   }
 
   switch (expr.op.type) {
@@ -205,75 +196,69 @@ llvm::Value* SemanticAnalyzer::Visit(Binary& expr) {
     default:
       UNREACHABLE(VisitBinary, "Unknown operation: " + expr.op.lexeme);
   }
-
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(Assign& expr) {
+void SemanticAnalyzer::Visit(Assign& expr) {
   Resolve(*expr.value);
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Assignment to undelcared variable: " + expr.name.lexeme;
     diagnose_.Error({expr.name.line_num}, err);
-    return nullptr;
+    return;
   }
 
-  if (sym->type->kind != expr.value->type->kind) {
+  if (!sym->type->IsThisType(expr.value->type)) {
     std::string err = "Type mismatch in assignment: " + expr.name.lexeme;
     diagnose_.Error({expr.name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   expr.type = sym->type;
   expr.id = sym->id;
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(PreFixOp& expr) {
+void SemanticAnalyzer::Visit(PreFixOp& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Variable is not defined: " + expr.name.lexeme;
     diagnose_.Error({expr.op.line_num}, err);
-    return nullptr;
+    return;
   }
 
   if (sym->type->kind != types::TypeKind::Int &&
       sym->type->kind != types::TypeKind::Float) {
     std::string err =
         "Prefix operator requires numeric operand: " + expr.name.lexeme;
-    return nullptr;
+    return;
   }
 
   expr.type = sym->type;
   expr.id = sym->id;
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(Conditional& expr) {
+void SemanticAnalyzer::Visit(Conditional& expr) {
   Resolve(*expr.left);
   Resolve(*expr.right);
   if (expr.left->type->kind != expr.right->type->kind) {
     std::string err = "Type mismatch: " + expr.op.lexeme;
     diagnose_.Error({expr.op.line_num}, err);
-    return nullptr;
+    return;
   }
   expr.type = types_.Bool();
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(Grouping& expr) {
+void SemanticAnalyzer::Visit(Grouping& expr) {
   Resolve(*expr.expr);
-  return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
+void SemanticAnalyzer::Visit(CallExpr& expr) {
   std::error_code ec;
   Variable* callee = expr.callee->CastTo<Variable>(ec);
 
   if (ec) {
     std::string err = callee->name.lexeme + " is not callable";
     diagnose_.Error({callee->name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   SymbolInfo* symbol = LookupSymbol(callee->name.lexeme);
@@ -281,7 +266,7 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   if (!symbol) {
     std::string err = "Undefined function: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   callee->id = symbol->id;
@@ -290,14 +275,14 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   if (!symbol->is_function) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   auto* func_type = symbol->type->CastTo<types::FunctionType>(ec);
   if (ec) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   size_t num_params = func_type->params.size();
@@ -308,12 +293,12 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
       std::string err =
           "Too few arguments for variadic function: " + callee->name.lexeme;
       diagnose_.Error({callee->name.line_num}, err);
-      return nullptr;
+      return;
     }
   } else if (num_args != num_params) {
     std::string err = "Argument count mismatch for: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
-    return nullptr;
+    return;
   }
 
   /// TODO: make sure this works, im not entirely sure if it will or not
@@ -323,7 +308,7 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
       if (expr.args[i]->type->kind != func_type->params[i]->kind) {
         diagnose_.Error({callee->name.line_num},
                         "Type mismatch in fixed argument");
-        return nullptr;
+        return;
       }
     } else {
       // This should come in handy later when types get extended
@@ -332,11 +317,10 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   }
 
   expr.type = func_type->return_type;
-  return nullptr;
 }
 
 /// TODO: Extend literal types
-llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
+void SemanticAnalyzer::Visit(Literal& expr) {
   if (std::holds_alternative<int>(expr.value)) {
     expr.type = types_.Int32();
   } else if (std::holds_alternative<float>(expr.value)) {
@@ -348,7 +332,6 @@ llvm::Value* SemanticAnalyzer::Visit(Literal& expr) {
   } else {
     UNREACHABLE(VisitLiteral, "Unknown value type");
   }
-  return nullptr;
 }
 
 types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
@@ -389,12 +372,12 @@ types::Type* SemanticAnalyzer::ResolveType(Token type) {
   return nullptr;
 }
 
-llvm::Value* SemanticAnalyzer::Resolve(Stmt& stmt) {
-  return stmt.Accept(*this);
+void SemanticAnalyzer::Resolve(Stmt& stmt) {
+  stmt.Accept(*this);
 }
 
-llvm::Value* SemanticAnalyzer::Resolve(Expr& expr) {
-  return expr.Accept(*this);
+void SemanticAnalyzer::Resolve(Expr& expr) {
+  expr.Accept(*this);
 }
 
 SymbolInfo* SemanticAnalyzer::LookupSymbol(const std::string& name) {

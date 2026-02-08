@@ -22,8 +22,8 @@ struct CallExpr;
 struct Assign;
 struct Conditional;
 
-struct ExprVisitor {
-  virtual ~ExprVisitor() = default;
+struct CodegenExprVisitor {
+  virtual ~CodegenExprVisitor() = default;
   virtual llvm::Value* Visit(Literal& expr) = 0;
   virtual llvm::Value* Visit(Variable& expr) = 0;
   virtual llvm::Value* Visit(Grouping& expr) = 0;
@@ -76,7 +76,8 @@ struct Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  virtual llvm::Value* Accept(ExprVisitor& visitor) = 0;
+  virtual llvm::Value* Accept(CodegenExprVisitor& visitor) = 0;
+  virtual void Accept(SemanticExprVisitor& visitor) = 0;
 
   /**
    * @brief Method to return the string representation of the node
@@ -117,7 +118,8 @@ struct Literal : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -139,7 +141,8 @@ struct Variable : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -161,7 +164,8 @@ struct Grouping : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -182,7 +186,8 @@ struct PreFixOp : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -206,7 +211,8 @@ struct Binary : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -229,7 +235,8 @@ struct Conditional : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -250,7 +257,8 @@ struct Assign : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -272,7 +280,8 @@ struct CallExpr : Expr {
    * @param visitor The expression visitor
    * @return The appropiate visitor method
    */
-  llvm::Value* Accept(ExprVisitor& visitor) override;
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node

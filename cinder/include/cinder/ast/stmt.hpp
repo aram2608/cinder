@@ -39,6 +39,19 @@ struct StmtVisitor {
   virtual llvm::Value* Visit(WhileStmt& stmt) = 0;
 };
 
+struct SemanticStmtVisitor {
+  virtual ~SemanticStmtVisitor() = default;
+  virtual void Visit(ExpressionStmt& stmt) = 0;
+  virtual void Visit(FunctionStmt& stmt) = 0;
+  virtual void Visit(ReturnStmt& stmt) = 0;
+  virtual void Visit(VarDeclarationStmt& stmt) = 0;
+  virtual void Visit(FunctionProto& stmt) = 0;
+  virtual void Visit(ModuleStmt& stmt) = 0;
+  virtual void Visit(IfStmt& stmt) = 0;
+  virtual void Visit(ForStmt& stmt) = 0;
+  virtual void Visit(WhileStmt& stmt) = 0;
+};
+
 /// @struct Stmt
 /// @brief The abstract class used to define stmts
 struct Stmt {
@@ -67,6 +80,7 @@ struct Stmt {
    * @return The appropiate visitor method
    */
   virtual llvm::Value* Accept(StmtVisitor& visitor) = 0;
+  virtual void Accept(SemanticStmtVisitor& visitor) = 0;
 
   /**
    * @brief Method to return the string representation of the node
@@ -110,6 +124,7 @@ struct ModuleStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -132,6 +147,7 @@ struct ExpressionStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -158,6 +174,7 @@ struct FunctionProto : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -182,6 +199,7 @@ struct FunctionStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -205,6 +223,7 @@ struct ReturnStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -229,6 +248,7 @@ struct VarDeclarationStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -254,6 +274,7 @@ struct IfStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -280,6 +301,7 @@ struct ForStmt : Stmt {
    * @return The appropiate visitor method
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
    * @brief Method to return the string representation of the node
@@ -298,6 +320,8 @@ struct WhileStmt : Stmt {
             std::vector<std::unique_ptr<Stmt>> body);
 
   llvm::Value* Accept(StmtVisitor& visitor) override;
+  virtual void Accept(SemanticStmtVisitor& visitor) override;
+
   std::string ToString() override;
 };
 
