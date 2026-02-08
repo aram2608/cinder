@@ -6,7 +6,7 @@
 #include <string>
 
 // #include "common.hpp"
-#include "cinder/ast/expr.hpp"
+#include "cinder/ast/expr/expr.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"

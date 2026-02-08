@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "cinder/ast/expr.hpp"
-#include "cinder/ast/stmt.hpp"
+#include "cinder/ast/expr/expr.hpp"
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/codegen/codegen_context.hpp"

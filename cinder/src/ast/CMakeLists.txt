@@ -1,6 +1,7 @@
 target_sources(cinder_core
     PRIVATE
-      expr.cpp
-      stmt.cpp
       types.cpp
 )
+
+add_subdirectory(expr)
+add_subdirectory(stmt)

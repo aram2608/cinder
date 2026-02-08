@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "../vendor/cxxopts.hpp"
-#include "cinder/ast/stmt.hpp"
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/codegen/codegen.hpp"
 #include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/frontend/lexer.hpp"

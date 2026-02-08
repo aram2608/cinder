@@ -6,8 +6,8 @@
 #include <optional>
 #include <ratio>
 
-#include "cinder/ast/expr.hpp"
-#include "cinder/ast/stmt.hpp"
+#include "cinder/ast/expr/expr.hpp"
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"
 #include "cinder/semantic/type_context.hpp"
