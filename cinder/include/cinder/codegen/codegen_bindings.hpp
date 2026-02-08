@@ -15,7 +15,7 @@ struct Binding {
   enum class BindType { Func, Var, None };
   BindType type_ = BindType::None;
 
-  explicit Binding(BindType type = BindType::None) : type_(type) {}
+  explicit Binding(BindType type) : type_(type) {}
   virtual ~Binding() = default;
 
   bool IsFunction() const;

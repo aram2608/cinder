@@ -1,5 +1,7 @@
 #include "cinder/semantic/symbol.hpp"
 
+using namespace cinder;
+
 SymbolId ResolvedSymbols::Declare(std::string name, types::Type* type,
                                   bool is_function) {
   SymbolId id = static_cast<SymbolId>(symbols_.size());

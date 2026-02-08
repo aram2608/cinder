@@ -10,6 +10,7 @@
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"
+#include "cinder/support/error_category.hpp"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Value.h"
 
@@ -41,6 +42,21 @@ struct StmtVisitor {
 /// @struct Stmt
 /// @brief The abstract class used to define stmts
 struct Stmt {
+  enum class StmtType {
+    Module,
+    Expression,
+    Function,
+    FunctionProto,
+    Return,
+    VarDeclaration,
+    If,
+    For,
+    While,
+  };
+
+  StmtType stmt_type;
+  Stmt(StmtType type) : stmt_type(type) {};
+
   virtual ~Stmt() = default;
   std::optional<SymbolId> id = std::nullopt;
 
@@ -57,6 +73,26 @@ struct Stmt {
    * @return The string represention
    */
   virtual std::string ToString() = 0;
+
+  bool IsModule();
+  bool IsExpression();
+  bool IsFunction();
+  bool IsFunctionP();
+  bool IsReturn();
+  bool IsVarDeclaration();
+  bool IsIf();
+  bool IsFor();
+  bool IsWhile();
+
+  template <typename T>
+  T* CastTo(std::error_code& ec) {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      ec = Errors::BadCast;
+      return nullptr;
+    }
+    return p;
+  }
 };
 
 /// @struct ModuleStmt

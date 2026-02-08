@@ -1,3 +1,5 @@
+# Test suite
+
 ast:
 	./build/bin/cinder --emit-ast -o test ./tests/test.ci
 
@@ -17,3 +19,7 @@ linker:
 	-o test \
 	-l "-Wall,-Wextra" \
 	./tests/test.ci
+
+# Ironic to use cmake inside of a makefile but it is what is it
+cinder:
+	cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  && cmake --build build

@@ -1,6 +1,7 @@
 #include "cinder/ast/expr.hpp"
 
 #include <sstream>
+#include <system_error>
 #include <variant>
 
 using namespace llvm;
@@ -147,7 +148,32 @@ static std::string RenderExpr(const Expr& expr) {
 
 }  // namespace
 
-Literal::Literal(TokenValue value) : value(value) {}
+bool Expr::IsLiteral() {
+  return expr_type == ExprType::Literal;
+}
+bool Expr::IsVariable() {
+  return expr_type == ExprType::Variable;
+}
+bool Expr::IsGrouping() {
+  return expr_type == ExprType::Grouping;
+}
+bool Expr::IsPreFixOp() {
+  return expr_type == ExprType::PreFix;
+}
+bool Expr::IsBinary() {
+  return expr_type == ExprType::Binary;
+}
+bool Expr::IsCallExpr() {
+  return expr_type == ExprType::Call;
+}
+bool Expr::IsAssign() {
+  return expr_type == ExprType::Assign;
+}
+bool Expr::IsConditional() {
+  return expr_type == ExprType::Conditional;
+}
+
+Literal::Literal(TokenValue value) : Expr(ExprType::Literal), value(value) {}
 
 Value* Literal::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -157,7 +183,7 @@ std::string Literal::ToString() {
   return RenderExpr(*this);
 }
 
-Variable::Variable(Token name) : name(name) {}
+Variable::Variable(Token name) : Expr(ExprType::Variable), name(name) {}
 
 Value* Variable::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -167,7 +193,8 @@ std::string Variable::ToString() {
   return RenderExpr(*this);
 }
 
-Grouping::Grouping(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
+Grouping::Grouping(std::unique_ptr<Expr> expr)
+    : Expr(ExprType::Grouping), expr(std::move(expr)) {}
 
 Value* Grouping::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -177,7 +204,8 @@ std::string Grouping::ToString() {
   return RenderExpr(*this);
 }
 
-PreFixOp::PreFixOp(Token op, Token name) : op(op), name(name) {}
+PreFixOp::PreFixOp(Token op, Token name)
+    : Expr(ExprType::PreFix), op(op), name(name) {}
 
 Value* PreFixOp::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -189,7 +217,10 @@ std::string PreFixOp::ToString() {
 
 Binary::Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
                Token op)
-    : left(std::move(left)), right(std::move(right)), op(op) {}
+    : Expr(ExprType::Binary),
+      left(std::move(left)),
+      right(std::move(right)),
+      op(op) {}
 
 Value* Binary::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -200,7 +231,7 @@ std::string Binary::ToString() {
 }
 
 Assign::Assign(Token name, std::unique_ptr<Expr> value)
-    : name(name), value(std::move(value)) {}
+    : Expr(ExprType::Assign), name(name), value(std::move(value)) {}
 
 Value* Assign::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -212,7 +243,10 @@ std::string Assign::ToString() {
 
 Conditional::Conditional(std::unique_ptr<Expr> left,
                          std::unique_ptr<Expr> right, Token op)
-    : left(std::move(left)), right(std::move(right)), op(op) {}
+    : Expr(ExprType::Conditional),
+      left(std::move(left)),
+      right(std::move(right)),
+      op(op) {}
 
 Value* Conditional::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);
@@ -224,7 +258,7 @@ std::string Conditional::ToString() {
 
 CallExpr::CallExpr(std::unique_ptr<Expr> callee,
                    std::vector<std::unique_ptr<Expr>> args)
-    : callee(std::move(callee)), args(std::move(args)) {}
+    : Expr(ExprType::Call), callee(std::move(callee)), args(std::move(args)) {}
 
 Value* CallExpr::Accept(ExprVisitor& visitor) {
   return visitor.Visit(*this);

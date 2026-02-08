@@ -2,7 +2,12 @@
 #define TYPES_H_
 
 #include <memory>
+#include <system_error>
 #include <vector>
+
+#include "cinder/support/error_category.hpp"
+
+namespace cinder {
 
 namespace types {
 
@@ -16,10 +21,35 @@ enum class TypeKind {
   Struct,
 };
 
+struct IntType;
+struct FloatType;
+struct BoolType;
+struct StructType;
+struct FunctionType;
+struct StructType;
+
 struct Type {
   TypeKind kind;
   virtual ~Type() = default;
   explicit Type(TypeKind kind) : kind(kind) {}
+
+  bool Void();
+  bool Int();
+  bool Float();
+  bool Bool();
+  bool String();
+  bool Function();
+  bool Struct();
+
+  template <typename T>
+  T* CastTo(std::error_code& ec) {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      ec = Errors::BadCast;
+      return nullptr;
+    }
+    return p;
+  }
 };
 
 struct IntType : Type {
@@ -56,6 +86,8 @@ struct FunctionType : Type {
         return_type(ret),
         params(std::move(params)),
         is_variadic(is_variadic) {}
+
+  bool IsVariadic();
 };
 
 /// TODO: Find a way to implement this
@@ -70,4 +102,6 @@ struct StructType : Type {
 };
 
 }  // namespace types
+
+}  // namespace cinder
 #endif

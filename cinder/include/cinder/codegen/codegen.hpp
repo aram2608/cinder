@@ -85,8 +85,8 @@ struct Codegen : ExprVisitor, StmtVisitor {
 
   llvm::Value* EmitInteger(Literal& expr);
 
-  llvm::Type* ResolveArgType(types::Type* type);
-  llvm::Type* ResolveType(types::Type* type);
+  llvm::Type* ResolveArgType(cinder::types::Type* type);
+  llvm::Type* ResolveType(cinder::types::Type* type);
 };
 
 #endif

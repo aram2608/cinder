@@ -3,11 +3,13 @@
 
 #include <memory>
 #include <optional>
+#include <system_error>
 #include <vector>
 
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"
+#include "cinder/support/error_category.hpp"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
@@ -32,11 +34,38 @@ struct ExprVisitor {
   virtual llvm::Value* Visit(Conditional& expr) = 0;
 };
 
+struct SemanticExprVisitor {
+  virtual ~SemanticExprVisitor() = default;
+  virtual void Visit(Literal& expr) = 0;
+  virtual void Visit(Variable& expr) = 0;
+  virtual void Visit(Grouping& expr) = 0;
+  virtual void Visit(PreFixOp& expr) = 0;
+  virtual void Visit(Binary& expr) = 0;
+  virtual void Visit(CallExpr& expr) = 0;
+  virtual void Visit(Assign& expr) = 0;
+  virtual void Visit(Conditional& expr) = 0;
+};
+
 /// @struct Expr
 /// @brief Base class for the AST nodes for expressions
 struct Expr {
-  types::Type* type = nullptr; /**< The underlying type of the expression */
+  enum class ExprType {
+    Literal,
+    Variable,
+    Grouping,
+    PreFix,
+    Binary,
+    Call,
+    Assign,
+    Conditional,
+    Unknown
+  };
+  cinder::types::Type* type =
+      nullptr; /**< The underlying type of the expression */
   std::optional<SymbolId> id = std::nullopt; /**< ID produced during sem pass */
+  ExprType expr_type;
+
+  Expr(ExprType type) : expr_type(type) {}
 
   /// @brief Default so the appropriate destructor is called for derived classes
   virtual ~Expr() = default;
@@ -54,6 +83,25 @@ struct Expr {
    * @return The string represention
    */
   virtual std::string ToString() = 0;
+
+  bool IsLiteral();
+  bool IsVariable();
+  bool IsGrouping();
+  bool IsPreFixOp();
+  bool IsBinary();
+  bool IsCallExpr();
+  bool IsAssign();
+  bool IsConditional();
+
+  template <typename T>
+  T* CastTo(std::error_code& ec) {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      ec = Errors::BadCast;
+      return nullptr;
+    }
+    return p;
+  }
 };
 
 /// @struct Literal

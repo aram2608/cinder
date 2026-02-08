@@ -19,7 +19,7 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   TypeContext& types_;
   ResolvedSymbols symbols_;
   Environment env_;
-  types::Type* current_return;
+  cinder::types::Type* current_return;
   DiagnosticEngine diagnose_;
 
   /// We need to declare we are using these so the compiler knows which methods
@@ -48,15 +48,15 @@ class SemanticAnalyzer : ExprVisitor, StmtVisitor {
   llvm::Value* Visit(CallExpr& expr) override;
   llvm::Value* Visit(Literal& expr) override;
 
-  types::Type* ResolveArgType(Token type);
-  types::Type* ResolveType(Token type);
+  cinder::types::Type* ResolveArgType(Token type);
+  cinder::types::Type* ResolveType(Token type);
 
   llvm::Value* Resolve(Stmt& stmt);
   llvm::Value* Resolve(Expr& expr);
   SymbolInfo* LookupSymbol(const std::string& name);
   void BeginScope();
   void EndScope();
-  std::optional<SymbolId> Declare(std::string name, types::Type* type,
+  std::optional<SymbolId> Declare(std::string name, cinder::types::Type* type,
                                   bool is_function = false, SourceLoc loc = {});
   void VariadicPromotion(Expr* expr);
 

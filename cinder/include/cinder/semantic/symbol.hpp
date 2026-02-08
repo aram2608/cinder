@@ -12,13 +12,14 @@ using SymbolId = uint32_t;
 struct SymbolInfo {
   SymbolId id;
   std::string name;
-  types::Type* type;
+  cinder::types::Type* type;
   bool is_function = false;
 };
 
 class ResolvedSymbols {
  public:
-  SymbolId Declare(std::string name, types::Type* type, bool is_function);
+  SymbolId Declare(std::string name, cinder::types::Type* type,
+                   bool is_function);
 
   SymbolInfo* GetSymbolInfo(SymbolId id);
   const SymbolInfo* GetSymbolInfo(SymbolId id) const;

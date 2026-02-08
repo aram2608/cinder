@@ -145,8 +145,36 @@ std::string RenderStmt(const Stmt& stmt) {
 
 }  // namespace
 
+bool Stmt::IsModule() {
+  return stmt_type == StmtType::Module;
+}
+bool Stmt::IsExpression() {
+  return stmt_type == StmtType::Expression;
+}
+bool Stmt::IsFunction() {
+  return stmt_type == StmtType::Function;
+}
+bool Stmt::IsFunctionP() {
+  return stmt_type == StmtType::FunctionProto;
+}
+bool Stmt::IsReturn() {
+  return stmt_type == StmtType::Return;
+}
+bool Stmt::IsVarDeclaration() {
+  return stmt_type == StmtType::VarDeclaration;
+}
+bool Stmt::IsIf() {
+  return stmt_type == StmtType::If;
+}
+bool Stmt::IsFor() {
+  return stmt_type == StmtType::For;
+}
+bool Stmt::IsWhile() {
+  return stmt_type == StmtType::While;
+}
+
 ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
-    : name(name), stmts(std::move(stmts)) {}
+    : Stmt(StmtType::Module), name(name), stmts(std::move(stmts)) {}
 
 Value* ModuleStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -157,7 +185,7 @@ std::string ModuleStmt::ToString() {
 }
 
 ExpressionStmt::ExpressionStmt(std::unique_ptr<Expr> expr)
-    : expr(std::move(expr)) {}
+    : Stmt(StmtType::Expression), expr(std::move(expr)) {}
 
 Value* ExpressionStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -169,7 +197,8 @@ std::string ExpressionStmt::ToString() {
 
 FunctionProto::FunctionProto(Token name, Token return_type,
                              std::vector<FuncArg> args, bool is_variadic)
-    : name(name),
+    : Stmt(StmtType::FunctionProto),
+      name(name),
       return_type(return_type),
       args(args),
       is_variadic(is_variadic) {}
@@ -184,7 +213,9 @@ std::string FunctionProto::ToString() {
 
 FunctionStmt::FunctionStmt(std::unique_ptr<Stmt> proto,
                            std::vector<std::unique_ptr<Stmt>> body)
-    : proto(std::move(proto)), body(std::move(body)) {}
+    : Stmt(StmtType::Function),
+      proto(std::move(proto)),
+      body(std::move(body)) {}
 
 Value* FunctionStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -195,7 +226,7 @@ std::string FunctionStmt::ToString() {
 }
 
 ReturnStmt::ReturnStmt(Token ret_token, std::unique_ptr<Expr> value)
-    : ret_token(ret_token), value(std::move(value)) {}
+    : Stmt(StmtType::Return), ret_token(ret_token), value(std::move(value)) {}
 
 Value* ReturnStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -207,7 +238,10 @@ std::string ReturnStmt::ToString() {
 
 VarDeclarationStmt::VarDeclarationStmt(Token type, Token name,
                                        std::unique_ptr<Expr> value)
-    : type(type), name(name), value(std::move(value)) {}
+    : Stmt(StmtType::VarDeclaration),
+      type(type),
+      name(name),
+      value(std::move(value)) {}
 
 Value* VarDeclarationStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -219,7 +253,8 @@ std::string VarDeclarationStmt::ToString() {
 
 IfStmt::IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
                std::unique_ptr<Stmt> otherwise)
-    : cond(std::move(cond)),
+    : Stmt(StmtType::If),
+      cond(std::move(cond)),
       then(std::move(then)),
       otherwise(std::move(otherwise)) {}
 
@@ -234,7 +269,8 @@ std::string IfStmt::ToString() {
 ForStmt::ForStmt(std::unique_ptr<Stmt> intializer,
                  std::unique_ptr<Expr> condition, std::unique_ptr<Expr> step,
                  std::vector<std::unique_ptr<Stmt>> body)
-    : initializer(std::move(intializer)),
+    : Stmt(StmtType::For),
+      initializer(std::move(intializer)),
       condition(std::move(condition)),
       step(std::move(step)),
       body(std::move(body)) {}
@@ -249,7 +285,9 @@ std::string ForStmt::ToString() {
 
 WhileStmt::WhileStmt(std::unique_ptr<Expr> condition,
                      std::vector<std::unique_ptr<Stmt>> body)
-    : condition(std::move(condition)), body(std::move(body)) {}
+    : Stmt(StmtType::While),
+      condition(std::move(condition)),
+      body(std::move(body)) {}
 
 Value* WhileStmt::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);

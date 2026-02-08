@@ -2,6 +2,8 @@
 
 #include "cinder/ast/types.hpp"
 
+using namespace cinder;
+
 types::IntType* TypeContext::Int32() {
   return &int32_;
 }

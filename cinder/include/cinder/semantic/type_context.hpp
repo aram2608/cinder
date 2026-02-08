@@ -5,26 +5,26 @@
 
 class TypeContext {
  public:
-  types::IntType* Int32();
-  types::IntType* Int64();
-  types::FloatType* Float32();
-  types::BoolType* Bool();
-  types::Type* Void();
-  types::StringType* String();
+  cinder::types::IntType* Int32();
+  cinder::types::IntType* Int64();
+  cinder::types::FloatType* Float32();
+  cinder::types::BoolType* Bool();
+  cinder::types::Type* Void();
+  cinder::types::StringType* String();
 
-  types::FunctionType* Function(types::Type* ret,
-                                std::vector<types::Type*> params,
-                                bool variadic);
+  cinder::types::FunctionType* Function(
+      cinder::types::Type* ret, std::vector<cinder::types::Type*> params,
+      bool variadic);
 
  private:
-  types::IntType int32_{32, true};
-  types::IntType int64_{64, true};
-  types::FloatType flt32_{32};
-  types::BoolType bool_{1};
-  types::Type void_{types::TypeKind::Void};
-  types::StringType str_{};
+  cinder::types::IntType int32_{32, true};
+  cinder::types::IntType int64_{64, true};
+  cinder::types::FloatType flt32_{32};
+  cinder::types::BoolType bool_{1};
+  cinder::types::Type void_{cinder::types::TypeKind::Void};
+  cinder::types::StringType str_{};
 
-  std::vector<std::unique_ptr<types::FunctionType>> function_pool_;
+  std::vector<std::unique_ptr<cinder::types::FunctionType>> function_pool_;
 };
 
 #endif

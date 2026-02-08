@@ -1,16 +1,21 @@
 #include "cinder/semantic/semantic_analyzer.hpp"
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
 
+#include "cinder/ast/expr.hpp"
+#include "cinder/ast/stmt.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"
 #include "cinder/semantic/type_context.hpp"
 #include "cinder/support/diagnostic.hpp"
 #include "cinder/support/utils.hpp"
+
+using namespace cinder;
 
 /// TODO: Add a control flow analysis check to make sure that there is a return
 /// for every path possible in non-void functions
@@ -51,7 +56,14 @@ llvm::Value* SemanticAnalyzer::Visit(FunctionProto& stmt) {
 
 llvm::Value* SemanticAnalyzer::Visit(FunctionStmt& stmt) {
   Resolve(*stmt.proto);
-  FunctionProto* proto = dynamic_cast<FunctionProto*>(stmt.proto.get());
+  std::error_code ec;
+  FunctionProto* proto = stmt.proto->CastTo<FunctionProto>(ec);
+
+  if (ec) {
+    diagnose_.Error({0}, ec.message());
+    return nullptr;
+  }
+
   current_return = ResolveType(proto->return_type);
 
   BeginScope();
@@ -255,16 +267,19 @@ llvm::Value* SemanticAnalyzer::Visit(Grouping& expr) {
 }
 
 llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
-  Variable* callee = dynamic_cast<Variable*>(expr.callee.get());
-  if (!callee) {
-    diagnose_.Error({}, "Object is not a callable");
+  std::error_code ec;
+  Variable* callee = expr.callee->CastTo<Variable>(ec);
+
+  if (ec) {
+    std::string err = callee->name.lexeme + " is not callable";
+    diagnose_.Error({callee->name.line_num}, err);
     return nullptr;
   }
 
   SymbolInfo* symbol = LookupSymbol(callee->name.lexeme);
 
   if (!symbol) {
-    std::string err = "Undefined functions: " + callee->name.lexeme;
+    std::string err = "Undefined function: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
     return nullptr;
   }
@@ -278,8 +293,8 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
     return nullptr;
   }
 
-  auto* func_type = dynamic_cast<types::FunctionType*>(symbol->type);
-  if (!func_type) {
+  auto* func_type = symbol->type->CastTo<types::FunctionType>(ec);
+  if (ec) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;
     diagnose_.Error({callee->name.line_num}, err);
     return nullptr;
@@ -288,7 +303,7 @@ llvm::Value* SemanticAnalyzer::Visit(CallExpr& expr) {
   size_t num_params = func_type->params.size();
   size_t num_args = expr.args.size();
 
-  if (func_type->is_variadic) {
+  if (func_type->IsVariadic()) {
     if (num_args < num_params) {
       std::string err =
           "Too few arguments for variadic function: " + callee->name.lexeme;

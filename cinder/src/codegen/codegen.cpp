@@ -27,6 +27,7 @@
 #include "llvm/Transforms/Scalar.h"
 
 using namespace llvm;
+using namespace cinder;
 static ExitOnError ExitOnErr;
 
 static ostream::RawOutStream errors{2};

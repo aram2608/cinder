@@ -111,7 +111,7 @@ struct Token {
 struct FuncArg {
   Token type_token; /**< The argument type */
   Token identifier; /**< The identifer for the argument */
-  types::Type* resolved_type;
+  cinder::types::Type* resolved_type;
   FuncArg(Token type_token, Token identifier)
       : type_token(type_token), identifier(identifier) {}
 };
