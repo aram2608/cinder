@@ -121,7 +121,7 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   }
 
   auto err = llvm::sys::fs::remove(temp);
-  if(err) {
+  if (err) {
     diagnose_.Error({0}, err.message());
   }
 }
@@ -532,9 +532,9 @@ Value* Codegen::Visit(Grouping& expr) {
 }
 
 /// TODO: Refactor this, it seems arbitrary to iterate over each possible
-/// field in the Binded values, it would make more sense to make a smarter symbol
-/// that tracks what is and have it evaluated given its type
-/// For example an IsFunction method.
+/// field in the Binded values, it would make more sense to make a smarter
+/// symbol that tracks what is and have it evaluated given its type For example
+/// an IsFunction method.
 Value* Codegen::Visit(Variable& expr) {
   if (expr.id.has_value()) {
     auto it = ir_bindings_.find(expr.id.value());
