@@ -42,8 +42,6 @@ struct BoolType : Type {
   explicit BoolType(unsigned int bits) : Type(TypeKind::Bool), bits(bits) {}
 };
 
-/// TODO: This probably needs to store string specific stuff to help compiling
-/// I'll deal with that later though
 struct StringType : Type {
   explicit StringType() : Type(TypeKind::String) {}
 };

@@ -308,7 +308,15 @@ Value* Codegen::Visit(FunctionProto& stmt) {
   }
 
   if (stmt.id.has_value()) {
-    ir_bindings_[stmt.id.value()].function = func;
+    std::unique_ptr<Binding>& b = ir_bindings_[stmt.id.value()];
+    if (!b || !b->IsFunction()) {
+      b = std::make_unique<FuncBinding>();
+    }
+    FuncBinding* f = dynamic_cast<FuncBinding*>(b.get());
+    if (!f) {
+      return nullptr;
+    }
+    f->function = func;
   }
   return func;
 }
@@ -340,9 +348,15 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
   ctx_->GetBuilder().CreateStore(init, slot);
 
   if (stmt.id.has_value()) {
-    Binding& b = ir_bindings_[stmt.id.value()];
-    b.alloca_ptr = slot;
-    b.value = init;
+    std::unique_ptr<Binding>& b = ir_bindings_[stmt.id.value()];
+    if (!b || !b->IsVariable()) {
+      b = std::make_unique<VarBinding>();
+    }
+    VarBinding* var = dynamic_cast<VarBinding*>(b.get());
+    if (!var) {
+      return nullptr;
+    }
+    var->alloca_ptr = slot;
   }
   return init;
 }
@@ -450,14 +464,18 @@ Value* Codegen::Visit(PreFixOp& expr) {
     return nullptr;
   }
   auto symbol = ir_bindings_.find(expr.id.value());
-  if (symbol == ir_bindings_.end() || !symbol->second.alloca_ptr) {
+  if (symbol == ir_bindings_.end() || !symbol->second ||
+      !symbol->second->IsVariable()) {
     return nullptr;
   }
-  Binding& bind = symbol->second;
-  Type* type = bind.alloca_ptr->getAllocatedType();
+  VarBinding* bind = dynamic_cast<VarBinding*>(symbol->second.get());
+  if (!bind || !bind->alloca_ptr) {
+    return nullptr;
+  }
+  Type* type = bind->alloca_ptr->getAllocatedType();
   std::string name = expr.name.lexeme;
 
-  Value* var = ctx_->GetBuilder().CreateLoad(type, bind.alloca_ptr, name);
+  Value* var = ctx_->GetBuilder().CreateLoad(type, bind->alloca_ptr, name);
 
   Value* inc = nullptr;
   Value* value = nullptr;
@@ -496,19 +514,23 @@ Value* Codegen::Visit(PreFixOp& expr) {
       break;
   }
 
-  ctx_->GetBuilder().CreateStore(value, bind.alloca_ptr);
+  ctx_->GetBuilder().CreateStore(value, bind->alloca_ptr);
   return value;
 }
 
 Value* Codegen::Visit(Assign& expr) {
   auto symbol = ir_bindings_.find(expr.id.value());
-  if (symbol == ir_bindings_.end() || !symbol->second.alloca_ptr) {
+  if (symbol == ir_bindings_.end() || !symbol->second ||
+      !symbol->second->IsVariable()) {
     return nullptr;
   }
-  Binding& bind = symbol->second;
+  VarBinding* var = dynamic_cast<VarBinding*>(symbol->second.get());
+  if (!var || !var->alloca_ptr) {
+    return nullptr;
+  }
 
   Value* value = expr.value->Accept(*this);
-  ctx_->GetBuilder().CreateStore(value, bind.alloca_ptr);
+  ctx_->GetBuilder().CreateStore(value, var->alloca_ptr);
   return value;
 }
 
@@ -539,16 +561,24 @@ Value* Codegen::Visit(Variable& expr) {
   if (expr.id.has_value()) {
     auto it = ir_bindings_.find(expr.id.value());
     if (it != ir_bindings_.end()) {
-      Binding& b = it->second;
-      if (b.function) {
-        return b.function;
+      Binding* b = it->second.get();
+      if (!b) {
+        return nullptr;
       }
-      if (b.alloca_ptr) {
-        return ctx_->GetBuilder().CreateLoad(b.alloca_ptr->getAllocatedType(),
-                                             b.alloca_ptr, expr.name.lexeme);
+      if (b->IsFunction()) {
+        FuncBinding* f = dynamic_cast<FuncBinding*>(b);
+        if (!f) {
+          return nullptr;
+        }
+        return f->function;
       }
-      if (b.value) {
-        return b.value;
+      if (b->IsVariable()) {
+        VarBinding* v = dynamic_cast<VarBinding*>(b);
+        if (!v || !v->alloca_ptr) {
+          return nullptr;
+        }
+        return ctx_->GetBuilder().CreateLoad(v->alloca_ptr->getAllocatedType(),
+                                             v->alloca_ptr, expr.name.lexeme);
       }
     }
   }

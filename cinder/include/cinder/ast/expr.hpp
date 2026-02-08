@@ -35,9 +35,10 @@ struct ExprVisitor {
 /// @struct Expr
 /// @brief Base class for the AST nodes for expressions
 struct Expr {
-  types::Type* type = nullptr;
-  std::optional<SymbolId> id = std::nullopt;
-  /// @brief Virtual destructor, set to default
+  types::Type* type = nullptr; /**< The underlying type of the expression */
+  std::optional<SymbolId> id = std::nullopt; /**< ID produced during sem pass */
+
+  /// @brief Default so the appropriate destructor is called for derived classes
   virtual ~Expr() = default;
 
   /**
@@ -59,6 +60,7 @@ struct Expr {
 /// @brief Numeric Node, stores floats and ints as of now
 struct Literal : Expr {
   TokenValue value; /**< Appropriate value for the given value type */
+
   explicit Literal(TokenValue value);
 
   /**
@@ -121,8 +123,8 @@ struct Grouping : Expr {
 };
 
 struct PreFixOp : Expr {
-  Token op;
-  Token name;
+  Token op;   /**< Operator token */
+  Token name; /**< Name of variable */
 
   PreFixOp(Token op, Token name);
 
