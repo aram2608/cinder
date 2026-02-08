@@ -567,14 +567,11 @@ Value* Codegen::Visit(Variable& expr) {
       }
       if (b->IsFunction()) {
         FuncBinding* f = dynamic_cast<FuncBinding*>(b);
-        if (!f) {
-          return nullptr;
-        }
         return f->function;
       }
       if (b->IsVariable()) {
         VarBinding* v = dynamic_cast<VarBinding*>(b);
-        if (!v || !v->alloca_ptr) {
+        if (!v->alloca_ptr) {
           return nullptr;
         }
         return ctx_->GetBuilder().CreateLoad(v->alloca_ptr->getAllocatedType(),
@@ -592,10 +589,6 @@ Value* Codegen::Visit(Variable& expr) {
         }
       }
     }
-  }
-
-  if (Function* fn = ctx_->GetModule().getFunction(expr.name.lexeme)) {
-    return fn;
   }
   return nullptr;
 }

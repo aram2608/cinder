@@ -12,14 +12,8 @@
 #include "cinder/support/diagnostic.hpp"
 #include "cinder/support/utils.hpp"
 
-/// TODO: Change how the AST is evaluated at compile time, currently
-/// each node is simply annotated with a Symbol id (unsigned int),
-/// the problem with this is it nots very scalable since its easy to forget to
-/// add the ID field.
-/// It may be easier to transform the AST into another annotated IR that
-/// can keep track of its type along with resolved values. That would
-/// improve the separation of concerns and decouple semantic analysis from
-/// codegen even more i think
+/// TODO: Add a control flow analysis check to make sure that there is a return
+/// for every path possible in non-void functions
 
 SemanticAnalyzer::SemanticAnalyzer(TypeContext& types)
     : types_(types), current_return(nullptr) {}

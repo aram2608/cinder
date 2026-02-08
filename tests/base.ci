@@ -1,3 +1,0 @@
-mod main;
-
-extern printf(str fmt, ...) -> int32

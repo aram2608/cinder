@@ -1,0 +1,30 @@
+mod main;
+
+extern printf(str fmt, ...) -> int32
+
+def fib(int32 range) -> int32
+    if range <= 1
+        return range;
+    end
+
+    int32: a = 0;
+    int32: b = 1;
+    int32: c = 0;
+    for int32: it = 0; it <= range; ++it
+        c = a + b;
+        a = b;
+        b = c;
+    end
+
+    return a;
+end
+
+def main() -> int32
+
+    int32: x = 20;
+    int32: y = fib(x);
+
+    printf("Fibonacci number %d  is %d\n", x, y);
+
+    return 0;
+end

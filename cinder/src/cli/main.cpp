@@ -1,4 +1,6 @@
+#include <cstdlib>
 #include <fstream>
+#include <vector>
 
 #include "../vendor/cxxopts.hpp"
 #include "cinder/ast/stmt.hpp"
@@ -7,7 +9,9 @@
 #include "cinder/frontend/lexer.hpp"
 #include "cinder/frontend/parser.hpp"
 
-std::string ReadEntireFile(std::string file_path) {
+#define DEBUG_BUILD
+
+static std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};
 
   if (!file.is_open()) {
@@ -22,7 +26,47 @@ std::string ReadEntireFile(std::string file_path) {
   return content;
 }
 
-bool ParseCLI(int argc, char** argv) {
+static bool GenerateProgram(cxxopts::ParseResult& result,
+                            CodegenOpts::Opt opt) {
+  bool debug_info = false;
+  std::vector<std::string> linker_flags;
+  std::vector<std::string> file_paths =
+      result["src"].as<std::vector<std::string>>();
+  std::string out_path = "cinder";
+  if (result.contains("o")) {
+    out_path = result["o"].as<std::string>();
+  }
+  if (result.contains("l")) {
+    linker_flags = result["l"].as<std::vector<std::string>>();
+  }
+  if (result.contains("g")) {
+    debug_info = true;
+    linker_flags.push_back("-g");
+  }
+  for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
+    std::string source = ReadEntireFile(*it);
+    Lexer lexer{source};
+    lexer.ScanTokens();
+    Parser parser{lexer.GetTokens()};
+    std::unique_ptr<Stmt> mod = parser.Parse();
+    CodegenOpts opts{out_path, opt, debug_info, linker_flags};
+    Codegen cg{std::move(mod), opts};
+    return cg.Generate();
+  }
+  return true;
+}
+
+static void DumpUnknownArgs(cxxopts::ParseResult& result,
+                            cxxopts::Options& options) {
+  std::cout << "Unknown arguments provided:\n";
+  for (auto arg : result.unmatched()) {
+    std::cout << "\t" << arg << "\n";
+  }
+  std::cout << "\n";
+  std::cout << options.help() << std::endl;
+}
+
+static bool ParseCLI(int argc, char** argv) {
   using namespace cxxopts;
   Options options{"cinder", "Compiler for the Cinder language"};
   options.positional_help("[optional args]").show_positional_help();
@@ -30,15 +74,20 @@ bool ParseCLI(int argc, char** argv) {
   options.set_width(70).set_tab_expansion();
   options.allow_unrecognised_options();
 
-  /// TODO: Add debug information
-  // options.add_options()("g", "Debug information");
   options.add_options()("h,help", "Print this help message");
-  options.add_options()("compile", "Compiles the program to an executable");
-  options.add_options()("run", "Compiles the program to llvm");
+#ifdef DEBUG_BUILD
   options.add_options()("emit-tokens", "Emits the lexers tokens");
   options.add_options()("emit-ast", "Emits the scanners ast");
+#endif
+  options.add_options()("compile", "Compiles the program to an executable");
+  /// TODO: Add compile run option
+  // options.add_options()("compile-run", "Compiles the program to llvm");
   options.add_options()("emit-llvm", "Emits llvm output");
-  options.add_options()("l", "Linker option");
+  /// TODO: Add debug information
+  // options.add_options()("g", "Debug information")
+
+  options.add_options()("l,l-flags", "Linker option",
+                        value<std::vector<std::string>>());
   options.add_options()("src", "The input files to be compiled",
                         value<std::vector<std::string>>());
   options.add_options()("o,output", "Desired output file",
@@ -53,6 +102,7 @@ bool ParseCLI(int argc, char** argv) {
     return true;
   }
 
+#ifdef DEBUG_BUILD
   if (result.contains("emit-tokens")) {
     std::vector<std::string> file_paths =
         result["src"].as<std::vector<std::string>>();
@@ -78,77 +128,17 @@ bool ParseCLI(int argc, char** argv) {
     }
     return true;
   }
+#endif
 
   if (result.contains("emit-llvm")) {
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    std::string out_path = "cinder";
-    if (result.contains("o")) {
-      out_path = result["o"].as<std::string>();
-    }
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.GetTokens()};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      CodegenOpts opts{out_path, CodegenOpts::Opt::EMIT_LLVM, false, {}};
-      Codegen cg{std::move(mod), opts};
-      return cg.Generate();
-    }
+    return GenerateProgram(result, CodegenOpts::Opt::EMIT_LLVM);
   }
 
   if (result.contains("compile")) {
-    bool debug_info = false;
-    std::vector<std::string> linker_flags;
-    std::vector<std::string> file_paths =
-        result["src"].as<std::vector<std::string>>();
-    std::string out_path = "cinder";
-    if (result.contains("o")) {
-      out_path = result["o"].as<std::string>();
-    }
-    if (result.contains("l")) {
-      linker_flags.push_back("-l");
-      linker_flags.push_back(result["l"].as<std::string>());
-    }
-    if (result.contains("g")) {
-      debug_info = true;
-      linker_flags.push_back("-g");
-    }
-    for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-      std::string source = ReadEntireFile(*it);
-      Lexer lexer{source};
-      lexer.ScanTokens();
-      Parser parser{lexer.GetTokens()};
-      std::unique_ptr<Stmt> mod = parser.Parse();
-      CodegenOpts opts{out_path, CodegenOpts::Opt::COMPILE, debug_info,
-                       linker_flags};
-      Codegen cg{std::move(mod), opts};
-      return cg.Generate();
-    }
+    return GenerateProgram(result, CodegenOpts::Opt::COMPILE);
   }
 
-  // if (result.contains("run")) {
-  //   std::vector<std::string> file_paths =
-  //       result["src"].as<std::vector<std::string>>();
-  //   std::string out_path = "cinder";
-  //   if (result.contains("o")) {
-  //     out_path = result["o"].as<std::string>();
-  //   }
-  //   for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-  //     std::string source = ReadEntireFile(*it);
-  //     Lexer lexer{source};
-  //     lexer.ScanTokens();
-  //     Parser parser{lexer.tokens};
-  //     std::unique_ptr<Stmt> mod = parser.Parse();
-  //     Compiler compiler{
-  //         std::move(mod),
-  //         CompilerOptions{out_path, CompilerMode::RUN, false, {}}};
-  //     return compiler.Compile();
-  //   }
-  // }
-  std::cout << "Unknown arguments provided\n" << std::endl;
-  std::cout << options.help() << std::endl;
+  DumpUnknownArgs(result, options);
   return false;
 }
 

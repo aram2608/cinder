@@ -1,177 +1,167 @@
-# AGENTS.md - Development Guidelines for no-name-lang
+# AGENTS.md
+Guidance for coding agents working in this repository.
 
-This document provides essential guidelines for agentic coding agents working on this C++ compiler project.
+## Project Snapshot
+- Language: C++20.
+- Build system: CMake.
+- Main binary: `build/bin/cinder`.
+- Primary code: `cinder/include`, `cinder/src`.
+- Sample inputs used as tests: `tests/test.ci`, `tests/fib.ci`.
+- Third-party code: `cinder/vendor` (do not edit unless asked).
 
-## Project Overview
+## Cursor and Copilot Rules
+- `.cursor/rules/`: not present.
+- `.cursorrules`: not present.
+- `.github/copilot-instructions.md`: not present.
+- If any of these are added later, treat them as high-priority instructions.
 
-This is a C++17/20 compiler for a custom programming language with Ruby/C-like syntax, using LLVM as the backend. The project implements a recursive descent parser with AST traversal using the visitor pattern.
+## Dependencies
+- CMake >= 3.21.
+- C++20-capable compiler.
+- LLVM development packages discoverable by CMake.
+- Clang package is optional; build works without it.
 
-## Build System and Commands
+## Build Commands
+Configure once:
 
-### Building
 ```bash
-# Build the main compiler
-make -C /Users/ja1473/no-name-lang
-
-# Alternative: Build explicitly
-make -C /Users/ja1473/no-name-lang $(BUILD_DIR)/$(TARGET)
+cmake -S . -B build
 ```
 
-### Testing and Development Commands
+Build:
+
 ```bash
-# Lexical analysis (token output)
-./build/main --emit-tokens test.changeme
-
-# Parse and show AST
-./build/main --emit-ast test.changeme
-
-# Generate LLVM IR
-./build/main --emit-llvm -o test.ll test.changeme
-
-# Compile to executable
-./build/main --compile -o test test.changeme
-
-# Quick test commands (via Makefile)
-make -C /Users/ja1473/no-name-lang LLVM   # Generate LLVM IR from test file
-make -C /Users/ja1473/no-name-lang TEST   # Compile test file to executable
+cmake --build build
 ```
 
-### Build Configuration
-- **Compiler**: `clang++`
-- **Standard**: C++17/20
-- **Flags**: `-g -Wall -Wextra -pedantic -Wno-unused-parameter`
-- **LLVM Integration**: Uses `llvm-config` for flags and libraries
-- **No Exceptions**: Compiled with `-DCXXOPTS_NO_EXCEPTIONS`
+Rebuild from clean state:
+
+```bash
+rm -rf build && cmake -S . -B build && cmake --build build
+```
+
+## Lint and Format Commands
+This repo has formatting tooling but no dedicated lint target.
+
+Apply formatting:
+
+```bash
+./format.sh
+```
+
+Check formatting only:
+
+```bash
+git ls-files "*.cpp" "*.hpp" | xargs clang-format --dry-run --Werror
+```
+
+Formatting source of truth: `.clang-format`.
+
+## Test Commands
+There is no `ctest` or unit test harness yet.
+Use compiler smoke tests against `.ci` inputs.
+
+Makefile wrappers:
+
+```bash
+make ast
+make llvm
+make test
+```
+
+Important caveat:
+- `make semantic` currently fails because `--test-semantic` is not a valid CLI option.
+
+Direct CLI commands:
+
+```bash
+./build/bin/cinder --emit-tokens ./tests/test.ci
+./build/bin/cinder --emit-ast -o /tmp/out ./tests/test.ci
+./build/bin/cinder --emit-llvm -o test.ll ./tests/test.ci
+./build/bin/cinder --compile -o test ./tests/test.ci
+```
+
+### Running a Single Test File
+Run any one `.ci` file directly:
+
+```bash
+./build/bin/cinder --emit-ast -o /tmp/out ./tests/fib.ci
+```
+
+Reusable template:
+
+```bash
+TEST_FILE=./tests/fib.ci
+./build/bin/cinder --emit-ast -o /tmp/out "$TEST_FILE"
+```
+
+For semantic/codegen-focused checks, swap `--emit-ast` with `--emit-llvm` or `--compile`.
+
+## Recommended Agent Workflow
+1. Configure build dir: `cmake -S . -B build`.
+2. Build after edits: `cmake --build build`.
+3. Run one targeted single-file smoke test.
+4. Format touched C++ files.
 
 ## Code Style Guidelines
 
-### Formatting (from .clang-format)
-- **Style**: Google-based
-- **Indentation**: 2 spaces (no tabs)
-- **Line Limit**: 80 characters
-- **Braces**: Attached to closing brace (same line)
-- **Pointers**: Left alignment (`Type* ptr` not `Type *ptr`)
-- **Includes**: Sorted alphabetically
+### Formatting
+- Follow `.clang-format` (Google base, 2-space indent, 80-column limit).
+- Use spaces, not tabs.
+- Keep braces attached (K&R style).
+- Prefer short, single-purpose functions.
+- Prefer early return over deep nesting.
 
-### Naming Conventions
-- **Classes/Structs**: `PascalCase` (e.g., `Compiler`, `ExprVisitor`)
-- **Functions/Methods**: `PascalCase` for class methods, `camelCase` for standalone functions
-- **Variables**: `snake_case` (e.g., `line_count`, `source_str`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `TT_PLUS`, `VT_INT32`)
-- **Enums**: `PascalCase` with `UPPER_SNAKE_CASE` members
-- **Files**: `snake_case.cpp` and `snake_case.hpp`
+### Includes and Imports
+- Keep includes sorted (clang-format enforces this).
+- Use project includes as `cinder/...` when possible.
+- Keep STL includes explicit; do not rely on transitive includes.
+- In headers, prefer forward declarations when practical.
+- Do not include unused headers.
 
-### Include Organization
-```cpp
-// System headers first
-#include <memory>
-#include <vector>
+### Types and Ownership
+- Use `std::unique_ptr` for AST ownership.
+- Use references (`T&`) for required non-null parameters.
+- Use raw pointers for non-owning links only.
+- Use `std::optional` for maybe-present values.
+- Keep visitor interfaces returning `llvm::Value*`.
 
-// LLVM headers
-#include "llvm/IR/IRBuilder.h"
-
-// Local headers with relative paths from source location
-#include "../include/compiler.hpp"
-#include "expr.hpp"
-```
-
-## Architecture and Patterns
-
-### Core Components
-- **Lexer**: Tokenizes source code into predefined token types
-- **Parser**: Recursive descent parser building AST
-- **AST Nodes**: Expression and statement nodes with visitor pattern
-- **Semantic Analyzer**: Type checking and semantic validation
-- **Compiler**: LLVM IR generation and compilation
-- **Symbol Table**: Variable and function scope management
-
-### Design Patterns
-- **Visitor Pattern**: Used for AST traversal (`ExprVisitor`, `StmtVisitor`)
-- **RAII**: Extensive use of smart pointers (`std::unique_ptr`, `std::shared_ptr`)
-- **Factory Methods**: For AST node creation
-- **Builder Pattern**: For complex LLVM IR construction
+### Naming
+- Types/structs/classes: `PascalCase`.
+- Member fields: trailing underscore (`tokens_`, `current_tok_`).
+- Token constants: `TT_*` uppercase enum names.
+- Match local file naming style for methods/functions.
+- Do not mix naming styles in a single touched file.
 
 ### Error Handling
-- **Custom Error System**: Uses `RawOutStream` and template-based error reporting
-- **No Exceptions**: Project compiled without exception support
-- **Exit on Error**: Immediate program termination on compilation errors
-- **Error Location**: Include line/column information when possible
+- Prefer `DiagnosticEngine` for semantic and analysis errors.
+- Use `UNREACHABLE(...)` for impossible internal states.
+- Avoid adding new ad-hoc `std::cout` + `exit(1)` paths where diagnostics exist.
+- For expected failures, prefer returning status/results over aborting.
 
-## Language Design Context
+### AST and Semantic Conventions
+- Construct AST nodes with `std::make_unique<...>`.
+- Ensure semantic passes set `type` and `id` where applicable.
+- Preserve scope balance (`BeginScope` / `EndScope`).
+- Use symbol/environment helpers for declaration and lookup.
+- Keep parser token handling consistent with current `Consume/MatchType` patterns.
 
-### Supported Types
-- `int32`, `int64` (signed integers)
-- `flt` (floating point)
-- `str` (strings)
-- `bool` (booleans)
-- `void` (for functions)
+### CMake Conventions
+- Keep warning flags aligned across targets.
+- Prefer target-scoped CMake APIs (`target_*`).
+- Guard platform-specific options.
+- Do not introduce global compile flags unless required.
 
-### Syntax Characteristics
-- Function declarations: `def func_name(type: param) -> return_type`
-- Variable declarations: `int32: variable = value;`
-- Module system: `mod main;`
-- External functions: `extern printf(str fmt, ...) -> int32`
-- Control structures: `if-else-end`, `for`, `while`, `return`
+## Verification Expectations
+- Minimum: successful build + one relevant `.ci` smoke test.
+- Parser/Lexer changes: run `--emit-tokens` and `--emit-ast`.
+- Semantic changes: run `--emit-ast` and `--emit-llvm`.
+- Codegen changes: run `--emit-llvm` and `--compile`.
 
-## Development Guidelines
+## Files to Avoid Touching by Default
+- `cinder/vendor/**`.
+- `build/**` outputs.
+- Generated artifacts (`*.ll`, compiled binaries) unless requested.
 
-### Memory Management
-- Use smart pointers exclusively for AST nodes
-- Prefer `std::unique_ptr` for ownership
-- Use `std::shared_ptr` only when sharing is necessary
-- Never use raw pointers for AST node management
-
-### LLVM Integration
-- Use `llvm-config` for proper linking flags
-- Follow LLVM coding conventions when writing IR generation code
-- Always verify LLVM modules before compilation
-- Handle LLVM errors gracefully with proper error messages
-
-### Code Organization
-- Header files in `change_me/include/`
-- Source files in `change_me/src/`
-- Vendor libraries in `change_me/vendor/`
-- Build output in `build/`
-
-### Testing Approach
-- Currently uses manual testing with `test.changeme`
-- Use CLI flags for component testing:
-  - `--emit-tokens` for lexer testing
-  - `--emit-ast` for parser testing
-  - `--emit-llvm` for compiler testing
-- No automated test framework currently implemented
-
-## Common Issues to Avoid
-
-### LLVM Integration
-- Don't forget to verify modules before code generation
-- Properly manage LLVM context lifetime
-- Use correct calling conventions for external functions
-
-### Parser Development
-- Handle all error cases with meaningful messages
-- Maintain proper token lookahead
-- Ensure AST node ownership is clear
-
-### Memory Safety
-- Never delete pointers managed by smart pointers
-- Be careful with reference cycles in shared_ptr
-- Use weak_ptr where appropriate to break cycles
-
-## Current Limitations (from TODO.md)
-- LLVM code generation needs cleanup
-- JIT compiler has segmentation faults
-- Function arity problems (no variadic support)
-- Import/module resolution not implemented
-- No standard library (printf, etc.)
-
-## External Dependencies
-- **LLVM**: Core dependency for IR generation
-- **cxxopts**: Header-only CLI parsing (in `vendor/`)
-- **QBE**: Backend compiler reference (in `qbe-1.2/`)
-
-## File Extensions
-- Source files: `.cpp`
-- Header files: `.hpp`
-- Language files: `.changeme` (subject to change)
-- LLVM IR: `.ll`
+## Maintenance Note
+- If you add/rename commands or test flows, update this file in the same change.
