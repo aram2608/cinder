@@ -274,8 +274,10 @@ Value* Codegen::Visit(FunctionProto& stmt) {
     switch (t.type) {
       case TT_INT32_SPECIFIER:
         return Type::getInt32Ty(ctx_->GetContext());
-      case TT_FLT_SPECIFIER:
+      case TT_FLT32_SPECIFIER:
         return Type::getFloatTy(ctx_->GetContext());
+      case TT_FLT64_SPECIFIER:
+        return Type::getDoubleTy(ctx_->GetContext());
       case TT_BOOL_SPECIFIER:
         return Type::getInt1Ty(ctx_->GetContext());
       case TT_STR_SPECIFIER:

@@ -7,18 +7,27 @@ using namespace cinder;
 types::IntType* TypeContext::Int32() {
   return &int32_;
 }
+
 types::IntType* TypeContext::Int64() {
   return &int64_;
 }
+
 types::FloatType* TypeContext::Float32() {
   return &flt32_;
 }
+
+types::FloatType* TypeContext::Float64() {
+  return &flt64_;
+}
+
 types::BoolType* TypeContext::Bool() {
   return &bool_;
 }
+
 types::Type* TypeContext::Void() {
   return &void_;
 }
+
 types::StringType* TypeContext::String() {
   return &str_;
 }

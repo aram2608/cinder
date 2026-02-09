@@ -336,8 +336,10 @@ types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
   switch (type.type) {
     case TT_INT32_SPECIFIER:
       return types_.Int32();
-    case TT_FLT_SPECIFIER:
+    case TT_FLT32_SPECIFIER:
       return types_.Float32();
+    case TT_FLT64_SPECIFIER:
+      return types_.Float64();
     case TT_BOOL_SPECIFIER:
       return types_.Bool();
     case TT_STR_SPECIFIER:
@@ -355,8 +357,10 @@ types::Type* SemanticAnalyzer::ResolveType(Token type) {
   switch (type.type) {
     case TT_INT32_SPECIFIER:
       return types_.Int32();
-    case TT_FLT_SPECIFIER:
+    case TT_FLT32_SPECIFIER:
       return types_.Float32();
+    case TT_FLT64_SPECIFIER:
+      return types_.Float64();
     case TT_VOID_SPECIFIER:
       return types_.Void();
     case TT_STR_SPECIFIER:

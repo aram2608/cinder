@@ -12,7 +12,7 @@
 static const std::unordered_map<std::string, TokenType> key_words = {
     {"int32", TT_INT32_SPECIFIER},
     {"int64", TT_INT64_SPECIFIER},
-    {"flt", TT_FLT_SPECIFIER},
+    {"flt32", TT_FLT32_SPECIFIER},
     {"str", TT_STR_SPECIFIER},
     {"bool", TT_BOOL_SPECIFIER},
     {"def", TT_DEF},
@@ -409,8 +409,10 @@ std::string Lexer::TokenToString(Token tok) {
       return "INT32 TYPE";
     case TT_INT64_SPECIFIER:
       return "INT64 TYPE";
-    case TT_FLT_SPECIFIER:
-      return "FLOAT TYPE";
+    case TT_FLT32_SPECIFIER:
+      return "FLOAT32 TYPE";
+    case TT_FLT64_SPECIFIER:
+      return "FLOAT64 TYPE";
     case TT_STR_SPECIFIER:
       return "STR TYPE";
     case TT_BOOL_SPECIFIER:

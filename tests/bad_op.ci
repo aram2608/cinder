@@ -1,0 +1,6 @@
+mod main;
+
+def main() -> int32
+    int32: a = 4;
+    flt32: b = 4.0;
+end

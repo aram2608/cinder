@@ -8,6 +8,7 @@ class TypeContext {
   cinder::types::IntType* Int32();
   cinder::types::IntType* Int64();
   cinder::types::FloatType* Float32();
+  cinder::types::FloatType* Float64();
   cinder::types::BoolType* Bool();
   cinder::types::Type* Void();
   cinder::types::StringType* String();
@@ -20,6 +21,7 @@ class TypeContext {
   cinder::types::IntType int32_{32, true};
   cinder::types::IntType int64_{64, true};
   cinder::types::FloatType flt32_{32};
+  cinder::types::FloatType flt64_{64};
   cinder::types::BoolType bool_{1};
   cinder::types::Type void_{cinder::types::TypeKind::Void};
   cinder::types::StringType str_{};
