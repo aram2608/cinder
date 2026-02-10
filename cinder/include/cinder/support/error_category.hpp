@@ -1,7 +1,6 @@
 #ifndef ERROR_CATEGORY_H_
 #define ERROR_CATEGORY_H_
 
-#include <iostream>
 #include <string>
 #include <system_error>
 #include <type_traits>

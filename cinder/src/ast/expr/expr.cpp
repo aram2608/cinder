@@ -4,6 +4,8 @@
 #include <system_error>
 #include <variant>
 
+using namespace cinder;
+
 using namespace llvm;
 
 namespace {
@@ -37,23 +39,23 @@ std::string EscapeString(const std::string& value) {
 }
 
 template <class... Ts>
-struct overloaded : Ts... {
+struct overload : Ts... {
   using Ts::operator()...;
 };
 template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+overload(Ts...) -> overload<Ts...>;
 
 static std::string LiteralValueToString(const TokenValue& value) {
   return std::visit(
-      overloaded{[](bool v) -> std::string { return v ? "true" : "false"; },
-                 [](const std::string& v) -> std::string {
-                   return "\"" + EscapeString(v) + "\"";
-                 },
-                 [](auto v) -> std::string {
-                   std::ostringstream out;
-                   out << v;
-                   return out.str();
-                 }},
+      overload{[](bool v) -> std::string { return v ? "true" : "false"; },
+               [](const std::string& v) -> std::string {
+                 return "\"" + EscapeString(v) + "\"";
+               },
+               [](auto v) -> std::string {
+                 std::ostringstream out;
+                 out << v;
+                 return out.str();
+               }},
       value);
 }
 

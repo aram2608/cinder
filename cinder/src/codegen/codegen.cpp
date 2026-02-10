@@ -1,12 +1,10 @@
 #include "cinder/codegen/codegen.hpp"
 
 #include <cstdlib>
+#include <memory>
+#include <variant>
 
 #include "cinder/codegen/codegen_bindings.hpp"
-#include "cinder/codegen/codegen_context.hpp"
-#include "cinder/codegen/codegen_opts.hpp"
-#include "cinder/driver/clang_driver.hpp"
-#include "cinder/frontend/tokens.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/IR/Constants.h"
@@ -124,12 +122,19 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   }
 }
 
-void Codegen::SemanticPass(ModuleStmt& mod) {
+bool Codegen::SemanticPass(ModuleStmt& mod) {
   pass_.Analyze(mod);
+  if (pass_.HadError()) {
+    pass_.DumpErrors();
+    return false;
+  }
+  return true;
 }
 
 Value* Codegen::Visit(ModuleStmt& stmt) {
-  SemanticPass(stmt);
+  if (!SemanticPass(stmt)) {
+    return nullptr;
+  }
 
   for (auto& stmt : stmt.stmts) {
     stmt->Accept(*this);
@@ -259,6 +264,8 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
     body_stmt->Accept(*this);
   }
 
+  /// TODO: Catch malformed non void fuctions
+  /// Right now it seg faults when a return is not provided
   if (!ctx_->GetBuilder().GetInsertBlock()->getTerminator()) {
     if (func->getReturnType()->isVoidTy()) {
       ctx_->GetBuilder().CreateRetVoid();
@@ -271,18 +278,18 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
 
 Value* Codegen::Visit(FunctionProto& stmt) {
   auto match_type = [&](Token t) -> Type* {
-    switch (t.type) {
-      case TT_INT32_SPECIFIER:
+    switch (t.kind) {
+      case Token::Type::INT32_SPECIFIER:
         return Type::getInt32Ty(ctx_->GetContext());
-      case TT_FLT32_SPECIFIER:
+      case Token::Type::FLT32_SPECIFIER:
         return Type::getFloatTy(ctx_->GetContext());
-      case TT_FLT64_SPECIFIER:
+      case Token::Type::FLT64_SPECIFIER:
         return Type::getDoubleTy(ctx_->GetContext());
-      case TT_BOOL_SPECIFIER:
+      case Token::Type::BOOL_SPECIFIER:
         return Type::getInt1Ty(ctx_->GetContext());
-      case TT_STR_SPECIFIER:
+      case Token::Type::STR_SPECIFIER:
         return PointerType::getInt8Ty(ctx_->GetContext());
-      case TT_VOID_SPECIFIER:
+      case Token::Type::VOID_SPECIFIER:
         return Type::getVoidTy(ctx_->GetContext());
       default:
         return nullptr;
@@ -352,8 +359,9 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
     if (!b || !b->IsVariable()) {
       b = std::make_unique<VarBinding>();
     }
-    VarBinding* var = dynamic_cast<VarBinding*>(b.get());
-    if (!var) {
+    std::error_code ec;
+    VarBinding* var = b->CastTo<VarBinding>(ec);
+    if (ec) {
       return nullptr;
     }
     var->alloca_ptr = slot;
@@ -371,46 +379,46 @@ Value* Codegen::Visit(Conditional& expr) {
 
   switch (expr.left->type->kind) {
     case types::TypeKind::Int:
-      switch (expr.op.type) {
-        case TT_BANGEQ:
+      switch (expr.op.kind) {
+        case Token::Type::BANGEQ:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_NE, left, right,
                                               "cmptmp");
-        case TT_EQEQ:
+        case Token::Type::EQEQ:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_EQ, left, right,
                                               "cmptmp");
-        case TT_LESSER:
+        case Token::Type::LESSER:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLT, left, right,
                                               "cmptmp");
-        case TT_LESSER_EQ:
+        case Token::Type::LESSER_EQ:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLE, left, right,
                                               "cmptmp");
-        case TT_GREATER:
+        case Token::Type::GREATER:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGT, left, right,
                                               "cmptmp");
-        case TT_GREATER_EQ:
+        case Token::Type::GREATER_EQ:
           return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGE, left, right,
                                               "cmptmp");
         default:
           break;
       }
     case types::TypeKind::Float:
-      switch (expr.op.type) {
-        case TT_BANGEQ:
+      switch (expr.op.kind) {
+        case Token::Type::BANGEQ:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_ONE, left, right,
                                                "cmptmp");
-        case TT_EQEQ:
+        case Token::Type::EQEQ:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OEQ, left, right,
                                                "cmptmp");
-        case TT_LESSER:
+        case Token::Type::LESSER:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLT, left, right,
                                                "cmptmp");
-        case TT_LESSER_EQ:
+        case Token::Type::LESSER_EQ:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLE, left, right,
                                                "cmptmp");
-        case TT_GREATER:
+        case Token::Type::GREATER:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGT, left, right,
                                                "cmptmp");
-        case TT_GREATER_EQ:
+        case Token::Type::GREATER_EQ:
           return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGE, left, right,
                                                "cmptmp");
         default:
@@ -428,27 +436,27 @@ Value* Codegen::Visit(Binary& expr) {
 
   switch (expr.type->kind) {
     case types::TypeKind::Int:
-      switch (expr.op.type) {
-        case TT_PLUS:
+      switch (expr.op.kind) {
+        case Token::Type::PLUS:
           return ctx_->GetBuilder().CreateAdd(left, right, "addtmp");
-        case TT_MINUS:
+        case Token::Type::MINUS:
           return ctx_->GetBuilder().CreateSub(left, right, "subtmp");
-        case TT_SLASH:
+        case Token::Type::SLASH:
           return ctx_->GetBuilder().CreateSDiv(left, right, "divtmp");
-        case TT_STAR:
+        case Token::Type::STAR:
           return ctx_->GetBuilder().CreateMul(left, right, "multmp");
         default:
           break;
       }
     case types::TypeKind::Float:
-      switch (expr.op.type) {
-        case TT_PLUS:
+      switch (expr.op.kind) {
+        case Token::Type::PLUS:
           return ctx_->GetBuilder().CreateFAdd(left, right, "addtmp");
-        case TT_MINUS:
+        case Token::Type::MINUS:
           return ctx_->GetBuilder().CreateFSub(left, right, "subtmp");
-        case TT_STAR:
+        case Token::Type::STAR:
           return ctx_->GetBuilder().CreateFMul(left, right, "multmp");
-        case TT_SLASH:
+        case Token::Type::SLASH:
           return ctx_->GetBuilder().CreateFDiv(left, right, "divtmp");
         default:
           break;
@@ -481,8 +489,8 @@ Value* Codegen::Visit(PreFixOp& expr) {
   Value* value = nullptr;
 
   /// TODO: maybe refactor this or find a better way to match this
-  switch (expr.op.type) {
-    case TT_PLUS_PLUS:
+  switch (expr.op.kind) {
+    case Token::Type::PLUS_PLUS:
       switch (expr.type->kind) {
         case types::TypeKind::Int:
           inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
@@ -496,7 +504,7 @@ Value* Codegen::Visit(PreFixOp& expr) {
           break;
       }
       break;
-    case TT_MINUS_MINUS:
+    case Token::Type::MINUS_MINUS:
       switch (expr.type->kind) {
         case types::TypeKind::Int:
           inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
@@ -553,10 +561,6 @@ Value* Codegen::Visit(Grouping& expr) {
   return expr.expr->Accept(*this);
 }
 
-/// TODO: Refactor this, it seems arbitrary to iterate over each possible
-/// field in the Binded values, it would make more sense to make a smarter
-/// symbol that tracks what is and have it evaluated given its type For example
-/// an IsFunction method.
 Value* Codegen::Visit(Variable& expr) {
   if (expr.id.has_value()) {
     auto it = ir_bindings_.find(expr.id.value());
@@ -580,6 +584,8 @@ Value* Codegen::Visit(Variable& expr) {
     }
   }
 
+  // Instead of tracking a scope, we simply search the parent block and see if
+  // the variable is define there
   if (ctx_->GetBuilder().GetInsertBlock()) {
     Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
     if (func) {
@@ -630,12 +636,17 @@ llvm::Type* Codegen::ResolveArgType(types::Type* type) {
       return Type::getInt32Ty(ctx_->GetContext());
     case types::TypeKind::String:
       return PointerType::getInt8Ty(ctx_->GetContext());
-    case types::TypeKind::Void:
     case types::TypeKind::Struct:
+    case types::TypeKind::Void:
     default:
       break;
   }
   return nullptr;
+}
+
+static Type* ResolveStructType() {
+  StructType* ty = nullptr;
+  return ty;
 }
 
 llvm::Type* Codegen::ResolveType(types::Type* type) {
@@ -651,7 +662,30 @@ llvm::Type* Codegen::ResolveType(types::Type* type) {
     case types::TypeKind::Void:
       return Type::getVoidTy(ctx_->GetContext());
     case types::TypeKind::Struct:
+      ResolveStructType();
     default:
       IMPLEMENT(ResolveType);
   }
 }
+
+// auto* s = dynamic_cast<types::StructType*>(type);
+//   if (!s) return nullptr;
+//   auto it = struct_types_.find(s->name);
+//   llvm::StructType* llvm_struct = nullptr;
+//   if (it != struct_types_.end()) {
+//     llvm_struct = it->second;
+//   } else {
+//     llvm_struct = llvm::StructType::create(ctx_->GetContext(),
+//     s->name); struct_types_[s->name] = llvm_struct;  // cache early
+//   }
+//   if (!llvm_struct->isOpaque()) return llvm_struct;
+//   std::vector<llvm::Type*> field_types;
+//   field_types.reserve(s->fields.size());
+//   for (auto* f : s->fields) {
+//     llvm::Type* ft = ResolveType(f);
+//     if (!ft) return nullptr;
+//     field_types.push_back(ft);
+//   }
+//   llvm_struct->setBody(field_types, /*isPacked=*/false);
+//   return llvm_struct;
+// }

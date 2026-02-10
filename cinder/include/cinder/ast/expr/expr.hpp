@@ -108,9 +108,9 @@ struct Expr {
 /// @struct Literal
 /// @brief Numeric Node, stores floats and ints as of now
 struct Literal : Expr {
-  TokenValue value; /**< Appropriate value for the given value type */
+  cinder::TokenValue value; /**< Appropriate value for the given value type */
 
-  explicit Literal(TokenValue value);
+  explicit Literal(cinder::TokenValue value);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -131,9 +131,9 @@ struct Literal : Expr {
 /// @struct Variable
 /// @brief Variable node
 struct Variable : Expr {
-  Token name; /** Name of the variable */
+  cinder::Token name; /** Name of the variable */
 
-  explicit Variable(Token name);
+  explicit Variable(cinder::Token name);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -175,10 +175,10 @@ struct Grouping : Expr {
 };
 
 struct PreFixOp : Expr {
-  Token op;   /**< Operator token */
-  Token name; /**< Name of variable */
+  cinder::Token op;   /**< Operator cinder::Token */
+  cinder::Token name; /**< Name of variable */
 
-  PreFixOp(Token op, Token name);
+  PreFixOp(cinder::Token op, cinder::Token name);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -201,9 +201,9 @@ struct PreFixOp : Expr {
 struct Binary : Expr {
   std::unique_ptr<Expr> left;  /**< The lhs expression */
   std::unique_ptr<Expr> right; /**< The rhs expression */
-  Token op;                    /** The binary operator */
+  cinder::Token op;                    /** The binary operator */
 
-  Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, Token op);
+  Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, cinder::Token op);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -224,10 +224,10 @@ struct Binary : Expr {
 struct Conditional : Expr {
   std::unique_ptr<Expr> left;  /**< The lhs expression */
   std::unique_ptr<Expr> right; /**< The rhs expression */
-  Token op;                    /**< The bianry operator */
+  cinder::Token op;                    /**< The bianry operator */
 
   Conditional(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
-              Token op);
+              cinder::Token op);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -246,10 +246,10 @@ struct Conditional : Expr {
 };
 
 struct Assign : Expr {
-  Token name;                  /**< Variable name */
+  cinder::Token name;                  /**< Variable name */
   std::unique_ptr<Expr> value; /**< The variables new value */
 
-  Assign(Token name, std::unique_ptr<Expr> value);
+  Assign(cinder::Token name, std::unique_ptr<Expr> value);
 
   /**
    * @brief Method used to emply the visitor pattern

@@ -81,7 +81,7 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Literal& expr) override;
 
-  void SemanticPass(ModuleStmt& mod);
+  bool SemanticPass(ModuleStmt& mod);
 
   llvm::Value* EmitInteger(Literal& expr);
 

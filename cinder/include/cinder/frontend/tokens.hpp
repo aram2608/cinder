@@ -3,92 +3,11 @@
 
 #include <optional>
 #include <string>
+#include <variant>
 
 #include "cinder/ast/types.hpp"
 
-/// @enum TokenType
-/// @brief The token types allowed during lexical analysis
-enum TokenType {
-  // Binops
-  TT_PLUS, /** "+" */
-  TT_PLUS_PLUS,
-  TT_MINUS, /** "-" */
-  TT_MINUS_MINUS,
-  TT_MODULO, /** "%" */
-  TT_STAR,   /** "*" */
-  TT_SLASH,  /** "/" */
-  TT_BANG,   /** "!" */
-  TT_BANGEQ, /** "!=" */
-  TT_EQ,     /** "=" */
-  TT_EQEQ,   /** "==" */
-  TT_GREATER,
-  TT_LESSER,
-  TT_GREATER_EQ,
-  TT_LESSER_EQ,
-
-  TT_ARROW, /** "->" */
-  TT_EXTERN,
-
-  // Control flow
-  TT_IF,     /** If statement */
-  TT_ELSEIF, /** Then branch */
-  TT_ELSE,   /** Else branch */
-  TT_FOR,    /** For loop */
-  TT_WHILE,
-  TT_TRUE,
-  TT_FALSE,
-  TT_RETURN,
-  // Containers
-  TT_MOD,
-  TT_IMPORT,
-  TT_LPAREN,   /** "(" */
-  TT_RPAREN,   /** ")" */
-  TT_LBRACE,   /** "{" */
-  TT_RBRACE,   /** "}" */
-  TT_LBRACKET, /** "[" */
-  TT_RBRACKET, /** "]" */
-  TT_QUOTE,
-  TT_COMMA, /**< "," */
-  TT_ELLIPSIS,
-  TT_DOT,
-
-  // Key words and identifiers
-  TT_IDENTIFER, /** Any series of characters */
-  TT_DEF,       /** "def" keyword */
-  TT_END,       /** "end" keyword */
-
-  // Types
-  TT_BOOL_SPECIFIER,
-  TT_INT32_SPECIFIER,
-  TT_INT64_SPECIFIER,
-  TT_FLT32_SPECIFIER,
-  TT_FLT64_SPECIFIER,
-  TT_STR_SPECIFIER,
-  TT_VOID_SPECIFIER,
-  // Types
-  TT_INT_LITERAL,
-  TT_FLT_LITERAL,
-  TT_STR_LITERAL,
-  // Delimiters
-  TT_COLON,     /** ":" */
-  TT_SEMICOLON, /** ";" */
-
-  // Misc
-  TT_EOF,   /** The end of the list of tokens */
-  TT_COUNT, /** The number of tokens available */
-};
-
-/// @enum ValueType
-/// @brief Enum type used to store the underling value types
-/// TODO: Fix the typing system so it is more ergonomic
-enum ValueType {
-  VT_INT32, /** Integer */
-  VT_INT64,
-  VT_STR, /** String */
-  VT_FLT, /** Float */
-  VT_VOID,
-  VT_NULL, /** NULL */
-};
+namespace cinder {
 
 using TokenValue = std::variant<std::string, int, float, bool>;
 
@@ -98,13 +17,95 @@ using TokenValue = std::variant<std::string, int, float, bool>;
  * A simple POD
  */
 struct Token {
-  TokenType type;
+  enum class Type {
+    // Binops
+    PLUS, /** "+" */
+    PLUS_PLUS,
+    MINUS, /** "-" */
+    MINUS_MINUS,
+    MODULO, /** "%" */
+    STAR,   /** "*" */
+    SLASH,  /** "/" */
+    BANG,   /** "!" */
+    BANGEQ, /** "!=" */
+    EQ,     /** "=" */
+    EQEQ,   /** "==" */
+    GREATER,
+    LESSER,
+    GREATER_EQ,
+    LESSER_EQ,
+
+    ARROW, /** "->" */
+    EXTERN,
+
+    // Control flow
+    IF,     /** If statement */
+    ELSEIF, /** Then branch */
+    ELSE,   /** Else branch */
+    FOR,    /** For loop */
+    WHILE,
+    TRUE,
+    FALSE,
+    RETURN,
+    // Containers
+    MOD,
+    IMPORT,
+    LPAREN,   /** "(" */
+    RPAREN,   /** ")" */
+    LBRACE,   /** "{" */
+    RBRACE,   /** "}" */
+    LBRACKET, /** "[" */
+    RBRACKET, /** "]" */
+    QUOTE,
+    COMMA, /**< "," */
+    ELLIPSIS,
+    DOT,
+    // Key words and identifiers
+    IDENTIFER, /** Any series of characters */
+    DEF,       /** "def" keyword */
+    END,       /** "end" keyword */
+    // Types
+    BOOL_SPECIFIER,
+    INT32_SPECIFIER,
+    INT64_SPECIFIER,
+    FLT32_SPECIFIER,
+    FLT64_SPECIFIER,
+    STR_SPECIFIER,
+    VOID_SPECIFIER,
+    STRUCT_SPECIFIER,
+    // Types
+    INT_LITERAL,
+    FLT_LITERAL,
+    STR_LITERAL,
+    // Delimiters
+    COLON,     /** ":" */
+    SEMICOLON, /** ";" */
+
+    // Misc
+    EOF_,  /** The end of the list of tokens */
+    COUNT, /** The number of tokens available */
+  };
+  Token::Type kind;
   size_t line_num;
   std::string lexeme;
   std::optional<TokenValue> literal;
-  Token(TokenType type, size_t line_num, std::string lexeme,
-        std::optional<TokenValue> literal = std::nullopt)
-      : type(type), line_num(line_num), lexeme(lexeme), literal(literal) {}
+  Token(Token::Type kind, size_t line_num, std::string lexeme,
+        std::optional<TokenValue> literal = std::nullopt);
+
+  bool IsLiteral();
+  bool IsInt();
+  bool IsFloat();
+  bool IsString();
+  bool IsVoid();
+  bool IsPrimitive();
+  bool IsStruct();
+  bool IsIdentifier();
+  bool IsBool();
+  bool IsTerm();
+  bool IsFactor();
+  bool IsComparison();
+  bool IsThisType(Type type);
+  bool IsEOF();
 };
 
 /// @struct FuncArg
@@ -116,5 +117,7 @@ struct FuncArg {
   FuncArg(Token type_token, Token identifier)
       : type_token(type_token), identifier(identifier) {}
 };
+
+}
 
 #endif

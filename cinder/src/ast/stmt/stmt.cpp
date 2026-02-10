@@ -6,6 +6,8 @@
 
 #include "llvm/IR/Value.h"
 
+using namespace cinder;
+
 using namespace llvm;
 
 namespace {

@@ -1,10 +1,8 @@
 #ifndef SEMANTIC_ANALYZER_H_
 #define SEMANTIC_ANALYZER_H_
 
-#include <cstddef>
-#include <memory>
 #include <optional>
-#include <ratio>
+#include <string>
 
 #include "cinder/ast/expr/expr.hpp"
 #include "cinder/ast/stmt/stmt.hpp"
@@ -47,8 +45,8 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   void Visit(CallExpr& expr) override;
   void Visit(Literal& expr) override;
 
-  cinder::types::Type* ResolveArgType(Token type);
-  cinder::types::Type* ResolveType(Token type);
+  cinder::types::Type* ResolveArgType(cinder::Token type);
+  cinder::types::Type* ResolveType(cinder::Token type);
 
   void Resolve(Stmt& stmt);
   void Resolve(Expr& expr);

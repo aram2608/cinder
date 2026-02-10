@@ -1,16 +1,5 @@
 #include "cinder/semantic/semantic_analyzer.hpp"
 
-#include <cstddef>
-#include <optional>
-#include <string>
-#include <variant>
-#include <vector>
-
-#include "cinder/ast/types.hpp"
-#include "cinder/frontend/tokens.hpp"
-#include "cinder/semantic/symbol.hpp"
-#include "cinder/semantic/type_context.hpp"
-#include "cinder/support/diagnostic.hpp"
 #include "cinder/support/utils.hpp"
 
 using namespace cinder;
@@ -180,15 +169,15 @@ void SemanticAnalyzer::Visit(Binary& expr) {
     return;
   }
 
-  switch (expr.op.type) {
-    case TT_PLUS:
-    case TT_MINUS:
-    case TT_STAR:
-    case TT_SLASH:
+  switch (expr.op.kind) {
+    case Token::Type::PLUS:
+    case Token::Type::MINUS:
+    case Token::Type::STAR:
+    case Token::Type::SLASH:
       expr.type = expr.left->type;
       break;
-    case TT_EQEQ:
-    case TT_BANGEQ:
+    case Token::Type::EQEQ:
+    case Token::Type::BANGEQ:
       expr.type = types_.Bool();
       break;
     default:
@@ -299,7 +288,6 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
     return;
   }
 
-  /// TODO: make sure this works, im not entirely sure if it will or not
   for (size_t i = 0; i < num_args; i++) {
     Resolve(*expr.args[i]);
     if (i < num_params) {
@@ -333,20 +321,20 @@ void SemanticAnalyzer::Visit(Literal& expr) {
 }
 
 types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
-  switch (type.type) {
-    case TT_INT32_SPECIFIER:
+  switch (type.kind) {
+    case Token::Type::INT32_SPECIFIER:
       return types_.Int32();
-    case TT_FLT32_SPECIFIER:
+    case Token::Type::FLT32_SPECIFIER:
       return types_.Float32();
-    case TT_FLT64_SPECIFIER:
+    case Token::Type::FLT64_SPECIFIER:
       return types_.Float64();
-    case TT_BOOL_SPECIFIER:
+    case Token::Type::BOOL_SPECIFIER:
       return types_.Bool();
-    case TT_STR_SPECIFIER:
+    case Token::Type::STR_SPECIFIER:
       return types_.String();
-    case TT_INT64_SPECIFIER:
+    case Token::Type::INT64_SPECIFIER:
     // Not valid in args
-    case TT_VOID_SPECIFIER:
+    case Token::Type::VOID_SPECIFIER:
     default:
       diagnose_.Error({type.line_num}, "Invalid type");
   }
@@ -354,20 +342,20 @@ types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
 }
 
 types::Type* SemanticAnalyzer::ResolveType(Token type) {
-  switch (type.type) {
-    case TT_INT32_SPECIFIER:
+  switch (type.kind) {
+    case Token::Type::INT32_SPECIFIER:
       return types_.Int32();
-    case TT_FLT32_SPECIFIER:
+    case Token::Type::FLT32_SPECIFIER:
       return types_.Float32();
-    case TT_FLT64_SPECIFIER:
+    case Token::Type::FLT64_SPECIFIER:
       return types_.Float64();
-    case TT_VOID_SPECIFIER:
+    case Token::Type::VOID_SPECIFIER:
       return types_.Void();
-    case TT_STR_SPECIFIER:
+    case Token::Type::STR_SPECIFIER:
       return types_.String();
-    case TT_BOOL_SPECIFIER:
+    case Token::Type::BOOL_SPECIFIER:
       return types_.Bool();
-    case TT_INT64_SPECIFIER:
+    case Token::Type::INT64_SPECIFIER:
     default:
       diagnose_.Error({type.line_num}, "Invalid type: " + type.lexeme);
   }

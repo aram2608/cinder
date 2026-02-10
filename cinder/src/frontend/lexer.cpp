@@ -7,29 +7,32 @@
 
 #include "cinder/frontend/tokens.hpp"
 
+using namespace cinder;
+
 /// TODO: Fix the typing system so it is more ergonomic to work with
 /// Handling the types at parse time and IR gen time is a bit awkward
-static const std::unordered_map<std::string, TokenType> key_words = {
-    {"int32", TT_INT32_SPECIFIER},
-    {"int64", TT_INT64_SPECIFIER},
-    {"flt32", TT_FLT32_SPECIFIER},
-    {"str", TT_STR_SPECIFIER},
-    {"bool", TT_BOOL_SPECIFIER},
-    {"def", TT_DEF},
-    {"end", TT_END},
-    {"if", TT_IF},
-    {"elif", TT_ELSEIF},
-    {"else", TT_ELSE},
-    {"for", TT_FOR},
-    {"while", TT_WHILE},
-    {"true", TT_TRUE},
-    {"false", TT_FALSE},
-    {"return", TT_RETURN},
-    {"void", TT_VOID_SPECIFIER},
-    {"extern", TT_EXTERN},
-    {"mod", TT_MOD},
-    {"import", TT_IMPORT},
-    {"...", TT_ELLIPSIS},
+static const std::unordered_map<std::string, Token::Type> key_words = {
+    {"int32", Token::Type::INT32_SPECIFIER},
+    {"int64", Token::Type::INT64_SPECIFIER},
+    {"flt32", Token::Type::FLT32_SPECIFIER},
+    {"str", Token::Type::STR_SPECIFIER},
+    {"bool", Token::Type::BOOL_SPECIFIER},
+    {"struct", Token::Type::STRUCT_SPECIFIER},
+    {"def", Token::Type::DEF},
+    {"end", Token::Type::END},
+    {"if", Token::Type::IF},
+    {"elif", Token::Type::ELSEIF},
+    {"else", Token::Type::ELSE},
+    {"for", Token::Type::FOR},
+    {"while", Token::Type::WHILE},
+    {"true", Token::Type::TRUE},
+    {"false", Token::Type::FALSE},
+    {"return", Token::Type::RETURN},
+    {"void", Token::Type::VOID_SPECIFIER},
+    {"extern", Token::Type::EXTERN},
+    {"mod", Token::Type::MOD},
+    {"import", Token::Type::IMPORT},
+    {"...", Token::Type::ELLIPSIS},
 };
 
 Lexer::Lexer(std::string source_str_)
@@ -49,7 +52,7 @@ void Lexer::ScanTokens() {
     start_pos_ = current_pos_;
     Scan();
   }
-  AddToken(TT_EOF);
+  AddToken(Token::Type::EOF_);
 }
 
 void Lexer::Scan() {
@@ -84,65 +87,65 @@ void Lexer::Scan() {
       TokenizeString();
       break;
     case ',':
-      AddToken(TT_COMMA);
+      AddToken(Token::Type::COMMA);
       break;
     case ':':
-      AddToken(TT_COLON);
+      AddToken(Token::Type::COLON);
       break;
     case ';':
-      AddToken(TT_SEMICOLON);
+      AddToken(Token::Type::SEMICOLON);
       break;
     // BINOPS
     case '+':
-      AddToken(Match('+') ? TT_PLUS_PLUS : TT_PLUS);
+      AddToken(Match('+') ? Token::Type::PLUS_PLUS : Token::Type::PLUS);
       break;
     case '-':
       if (Match('>')) {
-        AddToken(TT_ARROW);
+        AddToken(Token::Type::ARROW);
       } else if (Match('-')) {
-        AddToken(TT_MINUS_MINUS);
+        AddToken(Token::Type::MINUS_MINUS);
       } else {
-        AddToken(TT_MINUS);
+        AddToken(Token::Type::MINUS);
       }
       break;
     case '/':
-      Match('/') ? ParseComment() : AddToken(TT_SLASH);
+      Match('/') ? ParseComment() : AddToken(Token::Type::SLASH);
       break;
     case '%':
-      AddToken(TT_MODULO);
+      AddToken(Token::Type::MODULO);
       break;
     case '*':
-      AddToken(TT_STAR);
+      AddToken(Token::Type::STAR);
       break;
     case '>':
-      AddToken(Match('=') ? TT_GREATER_EQ : TT_GREATER);
+      AddToken(Match('=') ? Token::Type::GREATER_EQ : Token::Type::GREATER);
       break;
     case '<':
-      AddToken(Match('=') ? TT_LESSER_EQ : TT_LESSER);
+      AddToken(Match('=') ? Token::Type::LESSER_EQ : Token::Type::LESSER);
       break;
     case '!':
-      AddToken(Match('=') ? TT_BANGEQ : TT_BANG);
+      AddToken(Match('=') ? Token::Type::BANGEQ : Token::Type::BANG);
       break;
     case '=':
-      AddToken(Match('=') ? TT_EQEQ : TT_EQ);
+      AddToken(Match('=') ? Token::Type::EQEQ : Token::Type::EQ);
       break;
     case '[':
-      AddToken(TT_LBRACKET);
+      AddToken(Token::Type::LBRACKET);
       break;
     case ']':
-      AddToken(TT_RBRACKET);
+      AddToken(Token::Type::RBRACKET);
       break;
     case '(':
-      AddToken(TT_LPAREN);
+      AddToken(Token::Type::LPAREN);
       break;
     case ')':
-      AddToken(TT_RPAREN);
+      AddToken(Token::Type::RPAREN);
       break;
     case '{':
-      AddToken(TT_LBRACE);
+      AddToken(Token::Type::LBRACE);
       break;
     case '}':
-      AddToken(TT_RBRACE);
+      AddToken(Token::Type::RBRACE);
       break;
     default:
       assert(0 && "Unreachable");
@@ -198,18 +201,18 @@ bool Lexer::Match(char c) {
   return false;
 }
 
-void Lexer::AddToken(TokenType tok_type) {
+void Lexer::AddToken(Token::Type tok_type) {
   size_t index = current_pos_ - start_pos_;
   std::string temp = source_str_.substr(start_pos_, index);
   tokens_.emplace_back(tok_type, line_count_, temp);
 }
 
-void Lexer::AddToken(TokenType tok_type, std::string lexeme,
+void Lexer::AddToken(Token::Type tok_type, std::string lexeme,
                      std::optional<TokenValue> value) {
   tokens_.emplace_back(tok_type, line_count_, lexeme, value);
 }
 
-void Lexer::AddToken(TokenType tok_type, std::string lexeme) {
+void Lexer::AddToken(Token::Type tok_type, std::string lexeme) {
   tokens_.emplace_back(tok_type, line_count_, lexeme);
 }
 
@@ -240,7 +243,7 @@ void Lexer::TokenizeString() {
   EscapeCharacters(value);
   std::optional<TokenValue> literal;
   literal.emplace(std::in_place_type<std::string>, value);
-  AddToken(TT_STR_LITERAL, value, literal);
+  AddToken(Token::Type::STR_LITERAL, value, literal);
 }
 
 void Lexer::EscapeCharacters(std::string& str) {
@@ -281,7 +284,7 @@ void Lexer::TokenizeIdentifier() {
     AddToken(match->second, temp);
     return;
   }
-  AddToken(TT_IDENTIFER, temp);
+  AddToken(Token::Type::IDENTIFER, temp);
 }
 
 void Lexer::TokenizeNumber() {
@@ -297,13 +300,13 @@ void Lexer::TokenizeNumber() {
     std::string temp = source_str_.substr(start_pos_, index);
     std::optional<TokenValue> literal;
     literal.emplace(std::in_place_type<float>, std::stof(temp));
-    AddToken(TT_FLT_LITERAL, temp, literal);
+    AddToken(Token::Type::FLT_LITERAL, temp, literal);
   } else {
     size_t index = current_pos_ - start_pos_;
     std::string temp = source_str_.substr(start_pos_, index);
     std::optional<TokenValue> literal;
     literal.emplace(std::in_place_type<int>, std::stoi(temp));
-    AddToken(TT_INT_LITERAL, temp, literal);
+    AddToken(Token::Type::INT_LITERAL, temp, literal);
   }
 }
 
@@ -311,9 +314,9 @@ void Lexer::TokenizeDot() {
   if (PeekChar() == '.' && PeekNextChar() == '.') {
     Advance();
     Advance();
-    AddToken(TT_ELLIPSIS);
+    AddToken(Token::Type::ELLIPSIS);
   } else {
-    AddToken(TT_DOT);
+    AddToken(Token::Type::DOT);
   }
 }
 
@@ -322,111 +325,111 @@ bool Lexer::LookAheadOkay() {
 }
 
 std::string Lexer::TokenToString(Token tok) {
-  switch (tok.type) {
-    case TT_QUOTE:
+  switch (tok.kind) {
+    case Token::Type::QUOTE:
       return "\"";
-    case TT_PLUS:
+    case Token::Type::PLUS:
       return "+";
-    case TT_PLUS_PLUS:
+    case Token::Type::PLUS_PLUS:
       return "++";
-    case TT_MINUS:
+    case Token::Type::MINUS:
       return "-";
-    case TT_MINUS_MINUS:
+    case Token::Type::MINUS_MINUS:
       return "--";
-    case TT_MODULO:
+    case Token::Type::MODULO:
       return "%";
-    case TT_STAR:
+    case Token::Type::STAR:
       return "*";
-    case TT_SLASH:
+    case Token::Type::SLASH:
       return "/";
-    case TT_BANG:
+    case Token::Type::BANG:
       return "!";
-    case TT_BANGEQ:
+    case Token::Type::BANGEQ:
       return "!=";
-    case TT_EQ:
+    case Token::Type::EQ:
       return "=";
-    case TT_EQEQ:
+    case Token::Type::EQEQ:
       return "==";
-    case TT_LESSER:
+    case Token::Type::LESSER:
       return ">";
-    case TT_LESSER_EQ:
+    case Token::Type::LESSER_EQ:
       return ">=";
-    case TT_GREATER:
+    case Token::Type::GREATER:
       return "<";
-    case TT_GREATER_EQ:
+    case Token::Type::GREATER_EQ:
       return "<=";
-    case TT_ARROW:
+    case Token::Type::ARROW:
       return "->";
-    case TT_LPAREN:
+    case Token::Type::LPAREN:
       return "(";
-    case TT_RPAREN:
+    case Token::Type::RPAREN:
       return ")";
-    case TT_LBRACE:
+    case Token::Type::LBRACE:
       return "{";
-    case TT_RBRACE:
+    case Token::Type::RBRACE:
       return "}";
-    case TT_LBRACKET:
+    case Token::Type::LBRACKET:
       return "[";
-    case TT_RBRACKET:
+    case Token::Type::RBRACKET:
       return "]";
-    case TT_COLON:
+    case Token::Type::COLON:
       return ":";
-    case TT_SEMICOLON:
+    case Token::Type::SEMICOLON:
       return ";";
-    case TT_COMMA:
+    case Token::Type::COMMA:
       return ",";
-    case TT_MOD:
+    case Token::Type::MOD:
       return "MOD";
-    case TT_TRUE:
+    case Token::Type::TRUE:
       return "true";
-    case TT_FALSE:
+    case Token::Type::FALSE:
       return "false";
-    case TT_IF:
+    case Token::Type::IF:
       return "IF";
-    case TT_ELSEIF:
+    case Token::Type::ELSEIF:
       return "ELIF";
-    case TT_ELSE:
+    case Token::Type::ELSE:
       return "ELSE";
-    case TT_RETURN:
+    case Token::Type::RETURN:
       return "RETURN";
-    case TT_EXTERN:
+    case Token::Type::EXTERN:
       return "EXTERN";
-    case TT_FOR:
+    case Token::Type::FOR:
       return "FOR";
-    case TT_WHILE:
+    case Token::Type::WHILE:
       return "WHILE";
-    case TT_IDENTIFER:
+    case Token::Type::IDENTIFER:
       return "IDENTIFIER: " + tok.lexeme;
-    case TT_DEF:
+    case Token::Type::DEF:
       return "DEF";
-    case TT_END:
+    case Token::Type::END:
       return "END";
-    case TT_EOF:
+    case Token::Type::EOF_:
       return "EOF";
-    case TT_ELLIPSIS:
+    case Token::Type::ELLIPSIS:
       return "ELIPSIS";
-    case TT_INT32_SPECIFIER:
+    case Token::Type::INT32_SPECIFIER:
       return "INT32 TYPE";
-    case TT_INT64_SPECIFIER:
+    case Token::Type::INT64_SPECIFIER:
       return "INT64 TYPE";
-    case TT_FLT32_SPECIFIER:
+    case Token::Type::FLT32_SPECIFIER:
       return "FLOAT32 TYPE";
-    case TT_FLT64_SPECIFIER:
+    case Token::Type::FLT64_SPECIFIER:
       return "FLOAT64 TYPE";
-    case TT_STR_SPECIFIER:
+    case Token::Type::STR_SPECIFIER:
       return "STR TYPE";
-    case TT_BOOL_SPECIFIER:
+    case Token::Type::BOOL_SPECIFIER:
       return "BOOL TYPE";
-    case TT_INT_LITERAL:
+    case Token::Type::INT_LITERAL:
       return "INT LITERAL: " + tok.lexeme;
-    case TT_FLT_LITERAL:
+    case Token::Type::FLT_LITERAL:
       return "FLT LITERAL: " + tok.lexeme;
-    case TT_STR_LITERAL:
+    case Token::Type::STR_LITERAL:
       return "STR LITERAL: " + tok.lexeme;
-    case TT_COUNT:
+    case Token::Type::COUNT:
       return "Number of tokens_";
     default:
-      std::cout << "UNREACHABLE " << tok.type << " " << tok.lexeme << "\n";
+      std::cout << "UNREACHABLE " << (int)tok.kind << " " << tok.lexeme << "\n";
       exit(1);
   }
 }

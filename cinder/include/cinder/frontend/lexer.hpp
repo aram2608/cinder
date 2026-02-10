@@ -15,7 +15,7 @@ class Lexer {
   size_t current_pos_;     /**< The current positon in the lexeme */
   size_t line_count_;      /**< The line count */
   std::string source_str_; /** The source string provided */
-  std::vector<Token> tokens_; /** Stores the lexed tokens */
+  std::vector<cinder::Token> tokens_; /** Stores the lexed tokens */
 
  public:
   /**
@@ -33,7 +33,7 @@ class Lexer {
   /// @brief Method to tokenize the source code
   void ScanTokens();
 
-  std::vector<Token> GetTokens();
+  std::vector<cinder::Token> GetTokens();
 
   /// @brief Method to help during debugging, prints the tokens incrementally
   void EmitTokens();
@@ -97,9 +97,9 @@ class Lexer {
    * @brief Method to add simple tokens
    * @param tok_type The type of token to be added
    */
-  void AddToken(TokenType tok_type);
+  void AddToken(cinder::Token::Type tok_type);
 
-  void AddToken(TokenType tok_type, std::string lexeme);
+  void AddToken(cinder::Token::Type tok_type, std::string lexeme);
 
   /**
    * @brief Method to add complex tokens
@@ -108,8 +108,8 @@ class Lexer {
    * @param value_type
    * @param value
    */
-  void AddToken(TokenType tok_type, std::string lexeme,
-                std::optional<TokenValue> value);
+  void AddToken(cinder::Token::Type tok_type, std::string lexeme,
+                std::optional<cinder::TokenValue> value);
 
   /// @brief Method to parse comments
   void ParseComment();
@@ -143,7 +143,7 @@ class Lexer {
    * @brief A simple helper method to parse token types into strings
    * @param tok_type The token to be formatted
    */
-  std::string TokenToString(Token tok);
+  std::string TokenToString(cinder::Token tok);
 };
 
 #endif

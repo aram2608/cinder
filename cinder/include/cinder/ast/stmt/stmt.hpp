@@ -4,8 +4,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
-// #include "common.hpp"
 #include "cinder/ast/expr/expr.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
@@ -112,10 +112,10 @@ struct Stmt {
 /// @struct ModuleStmt
 /// @brief The top level statement in a program
 struct ModuleStmt : Stmt {
-  Token name;                               /**< Name of the module */
+  cinder::Token name;                               /**< Name of the module */
   std::vector<std::unique_ptr<Stmt>> stmts; /**< Statements in the module */
 
-  ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts);
+  ModuleStmt(cinder::Token name, std::vector<std::unique_ptr<Stmt>> stmts);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -159,12 +159,12 @@ struct ExpressionStmt : Stmt {
 /// @struct FunctionProto
 /// @brief Function prototype node
 struct FunctionProto : Stmt {
-  Token name;                /**< The name of the function */
-  Token return_type;         /**< The return type of the method */
-  std::vector<FuncArg> args; /**< The function arguments */
+  cinder::Token name;                /**< The name of the function */
+  cinder::Token return_type;         /**< The return type of the method */
+  std::vector<cinder::FuncArg> args; /**< The function arguments */
   bool is_variadic;          /**< Whether the function is variadic */
 
-  FunctionProto(Token name, Token return_type, std::vector<FuncArg> args,
+  FunctionProto(cinder::Token name, cinder::Token return_type, std::vector<cinder::FuncArg> args,
                 bool is_variadic);
 
   /**
@@ -211,10 +211,10 @@ struct FunctionStmt : Stmt {
 /// @struct ReturnStmt
 /// @brief Return stmt node
 struct ReturnStmt : Stmt {
-  Token ret_token;
+  cinder::Token ret_token;
   std::unique_ptr<Expr> value;
 
-  ReturnStmt(Token ret_toke, std::unique_ptr<Expr> value);
+  ReturnStmt(cinder::Token ret_token, std::unique_ptr<Expr> value);
 
   /**
    * @brief Method used to emply the visitor pattern
@@ -235,11 +235,11 @@ struct ReturnStmt : Stmt {
 /// @struct VarDeclarationStmt
 /// @brief Variable declaration node
 struct VarDeclarationStmt : Stmt {
-  Token type;
-  Token name;
+  cinder::Token type;
+  cinder::Token name;
   std::unique_ptr<Expr> value;
 
-  VarDeclarationStmt(Token type, Token name, std::unique_ptr<Expr> value);
+  VarDeclarationStmt(cinder::Token type, cinder::Token name, std::unique_ptr<Expr> value);
 
   /**
    * @brief Method used to emply the visitor pattern

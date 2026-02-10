@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cinder/semantic/symbol.hpp"
+#include "cinder/support/error_category.hpp"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
@@ -20,6 +21,15 @@ struct Binding {
 
   bool IsFunction() const;
   bool IsVariable() const;
+
+  template <typename T>
+  T* CastTo(std::error_code& ec) {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      ec = Errors::BadCast;
+    }
+    return p;
+  }
 };
 
 struct VarBinding : Binding {

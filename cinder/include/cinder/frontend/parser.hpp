@@ -1,10 +1,9 @@
 #ifndef PARSER_H_
 #define PARSER_H_
 
-// #include "common.hpp"
 #include <initializer_list>
-#include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "cinder/ast/expr/expr.hpp"
@@ -14,10 +13,10 @@
 /// @struct Parser
 /// @brief Main class for parsing tokens in a program
 struct Parser {
-  std::vector<Token> tokens_; /**< The vector of tokens */
+  std::vector<cinder::Token> tokens_; /**< The vector of tokens */
   size_t current_tok_;        /**< The current token position */
 
-  explicit Parser(std::vector<Token> tokens);
+  explicit Parser(std::vector<cinder::Token> tokens);
 
   /// @brief Top level method to parse a program
   /// @return A pointer to a Module statement
@@ -105,22 +104,39 @@ struct Parser {
    * @param types An initializer list of token types
    * @return True or False depending if the match is made
    */
-  bool MatchType(std::initializer_list<TokenType> types);
+  bool MatchType(std::initializer_list<cinder::Token::Type> types);
+
+  /// Alias for invoking a Token member method from a pointer
+  using TokenMethod = bool (cinder::Token::*)();
+
+  /**
+   * @brief Method to match a current token's type
+   *
+   * Advances the token position if a match is made. This method is an
+   * alternative to the above method, instead using std::invoke from the
+   * functional header to invoke the function pointer given the current token.
+   * The token struct offers some testing methods which helps clean up some of
+   * the longer matching patterns.
+   *
+   * @param func The function pointer to the token member method
+   * @return True or False depending if the match is made
+   */
+  bool MatchType(TokenMethod func);
 
   /**
    * @brief Method to check the underlying type of a token
    * @param type An token type
    * @return True or False depending if the match is made
    */
-  bool CheckType(TokenType type);
+  bool CheckType(cinder::Token::Type type);
 
   /// @brief Peeks at the current token, does not advance
   /// @return The current token
-  Token Peek();
+  cinder::Token Peek();
 
   /// @brief Method to return the previous token
   /// @return The previous token
-  Token Previous();
+  cinder::Token Previous();
 
   /// @brief Method to check if we are at the end of the token list
   /// @return True or False
@@ -132,7 +148,7 @@ struct Parser {
    * Has a boundary check
    * @return The next token in the list
    */
-  Token Advance();
+  cinder::Token Advance();
 
   /**
    * @brief Method to consume a token type, errors out if not matched
@@ -144,7 +160,7 @@ struct Parser {
    * @param message An error message to error out with
    * @return The next token
    */
-  Token Consume(TokenType type, std::string message);
+  cinder::Token Consume(cinder::Token::Type type, std::string message);
 
   /// @brief Method to print out the ast
   /// @param statements The statements to be printed
