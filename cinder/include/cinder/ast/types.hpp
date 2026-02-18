@@ -11,6 +11,7 @@ namespace cinder {
 
 namespace types {
 
+/** @brief Discriminant for all semantic types in the compiler. */
 enum class TypeKind {
   Void,
   Int,
@@ -28,22 +29,39 @@ struct StructType;
 struct FunctionType;
 struct StructType;
 
+/** @brief Base class for all semantic type descriptors. */
 struct Type {
   TypeKind kind;
   virtual ~Type() = default;
   explicit Type(TypeKind kind) : kind(kind) {}
 
+  /** @brief Returns whether this is `TypeKind::Void`. */
   bool Void();
+  /** @brief Returns whether this is `TypeKind::Int`. */
   bool Int();
+  /** @brief Returns whether this is `TypeKind::Float`. */
   bool Float();
+  /** @brief Returns whether this is `TypeKind::Bool`. */
   bool Bool();
+  /** @brief Returns whether this is `TypeKind::String`. */
   bool String();
+  /** @brief Returns whether this is `TypeKind::Function`. */
   bool Function();
+  /** @brief Returns whether this is `TypeKind::Struct`. */
   bool Struct();
+  /** @brief Returns whether this and `type` have the same `TypeKind`. */
   bool IsThisType(Type* type);
+  /** @brief Returns whether this and `type` have the same `TypeKind`. */
   bool IsThisType(Type& type);
+  /** @brief Returns whether this has exactly `type` kind. */
   bool IsThisType(TypeKind type);
 
+  /**
+   * @brief Dynamically casts this type to `T` with error-code reporting.
+   * @tparam T Target type node.
+   * @param ec Set to `Errors::BadCast` on failure.
+   * @return Pointer to `T` on success; otherwise `nullptr`.
+   */
   template <typename T>
   T* CastTo(std::error_code& ec) {
     T* p = dynamic_cast<T*>(this);
@@ -55,34 +73,39 @@ struct Type {
   }
 };
 
+/** @brief Integer type descriptor. */
 struct IntType : Type {
-  unsigned int bits;
-  bool is_signed;
+  unsigned int bits; /**< Bit width (for example 32 or 64). */
+  bool is_signed;    /**< Signedness flag. */
 
   IntType(unsigned bits, bool is_signed = true)
       : Type(TypeKind::Int), bits(bits), is_signed(is_signed) {}
 };
 
+/** @brief Floating-point type descriptor. */
 struct FloatType : Type {
-  unsigned int bits;
+  unsigned int bits; /**< Bit width (for example 32 or 64). */
 
   explicit FloatType(unsigned bits) : Type(TypeKind::Float), bits(bits) {}
 };
 
+/** @brief Boolean type descriptor. */
 struct BoolType : Type {
-  unsigned int bits;
+  unsigned int bits; /**< Storage width in bits. */
 
   explicit BoolType(unsigned int bits) : Type(TypeKind::Bool), bits(bits) {}
 };
 
+/** @brief String type descriptor. */
 struct StringType : Type {
   explicit StringType() : Type(TypeKind::String) {}
 };
 
+/** @brief Function type descriptor containing signature metadata. */
 struct FunctionType : Type {
-  Type* return_type;
-  std::vector<Type*> params;
-  bool is_variadic;
+  Type* return_type;         /**< Function return type. */
+  std::vector<Type*> params; /**< Ordered fixed parameter types. */
+  bool is_variadic;          /**< Whether additional varargs are accepted. */
 
   FunctionType(Type* ret, std::vector<Type*> params, bool is_variadic)
       : Type(TypeKind::Function),
@@ -90,13 +113,14 @@ struct FunctionType : Type {
         params(std::move(params)),
         is_variadic(is_variadic) {}
 
+  /** @brief Returns whether this function type is variadic. */
   bool IsVariadic();
 };
 
-/// TODO: Find a way to implement this
+/** @brief Struct type descriptor (currently minimal metadata only). */
 struct StructType : Type {
-  std::string name;
-  std::vector<Type*> fields;
+  std::string name;          /**< Struct name. */
+  std::vector<Type*> fields; /**< Field types in declaration order. */
 
   StructType(std::string name, std::vector<Type*> fields)
       : Type(TypeKind::Struct),

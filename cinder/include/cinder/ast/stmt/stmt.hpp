@@ -24,8 +24,7 @@ struct IfStmt;
 struct ForStmt;
 struct WhileStmt;
 
-/// @struct StmtVisitor
-/// @brief The statement visitor interface
+/** @brief Code generation visitor interface for statement nodes. */
 struct StmtVisitor {
   virtual ~StmtVisitor() = default;
   virtual llvm::Value* Visit(ExpressionStmt& stmt) = 0;
@@ -39,6 +38,7 @@ struct StmtVisitor {
   virtual llvm::Value* Visit(WhileStmt& stmt) = 0;
 };
 
+/** @brief Semantic analysis visitor interface for statement nodes. */
 struct SemanticStmtVisitor {
   virtual ~SemanticStmtVisitor() = default;
   virtual void Visit(ExpressionStmt& stmt) = 0;
@@ -52,8 +52,7 @@ struct SemanticStmtVisitor {
   virtual void Visit(WhileStmt& stmt) = 0;
 };
 
-/// @struct Stmt
-/// @brief The abstract class used to define stmts
+/** @brief Abstract base class for all statement AST nodes. */
 struct Stmt {
   enum class StmtType {
     Module,
@@ -71,33 +70,61 @@ struct Stmt {
   Stmt(StmtType type) : stmt_type(type) {};
 
   virtual ~Stmt() = default;
-  std::optional<SymbolId> id = std::nullopt;
+  std::optional<SymbolId> id = std::nullopt; /**< Bound symbol id, if any. */
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   virtual llvm::Value* Accept(StmtVisitor& visitor) = 0;
+
+  /**
+   * @brief Accepts a semantic analysis visitor.
+   * @param visitor Semantic visitor.
+   */
   virtual void Accept(SemanticStmtVisitor& visitor) = 0;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of the statement subtree.
    */
   virtual std::string ToString() = 0;
 
+  /** @brief Returns whether this node is `ModuleStmt`. */
   bool IsModule();
+  /** @brief Returns whether this node is `ExpressionStmt`. */
   bool IsExpression();
+  /** @brief Returns whether this node is `FunctionStmt`. */
   bool IsFunction();
+  /** @brief Returns whether this node is `FunctionProto`. */
   bool IsFunctionP();
+  /** @brief Returns whether this node is `ReturnStmt`. */
   bool IsReturn();
+  /** @brief Returns whether this node is `VarDeclarationStmt`. */
   bool IsVarDeclaration();
+  /** @brief Returns whether this node is `IfStmt`. */
   bool IsIf();
+  /** @brief Returns whether this node is `ForStmt`. */
   bool IsFor();
+  /** @brief Returns whether this node is `WhileStmt`. */
   bool IsWhile();
 
+  template <typename T>
+  llvm::ErrorOr<T*> CastTo() {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      return make_error_code(Errors::BadCast);
+    }
+    return p;
+  }
+
+  /**
+   * @brief Dynamically casts this node to `T` with error-code reporting.
+   * @tparam T Target node type.
+   * @param ec Set to `Errors::BadCast` on failure.
+   * @return Pointer to `T` on success; otherwise `nullptr`.
+   */
   template <typename T>
   T* CastTo(std::error_code& ec) {
     T* p = dynamic_cast<T*>(this);
@@ -109,219 +136,210 @@ struct Stmt {
   }
 };
 
-/// @struct ModuleStmt
-/// @brief The top level statement in a program
+/** @brief Root AST node for a translation unit/module. */
 struct ModuleStmt : Stmt {
-  cinder::Token name;                               /**< Name of the module */
-  std::vector<std::unique_ptr<Stmt>> stmts; /**< Statements in the module */
+  cinder::Token name;                       /**< Module identifier token. */
+  std::vector<std::unique_ptr<Stmt>> stmts; /**< Top-level statements. */
 
   ModuleStmt(cinder::Token name, std::vector<std::unique_ptr<Stmt>> stmts);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct ExpressionStmt
-/// @brief Basic expression statement node
+/** @brief Statement wrapper around an expression. */
 struct ExpressionStmt : Stmt {
-  std::unique_ptr<Expr> expr; /*< The underlying expression to evalute */
+  std::unique_ptr<Expr> expr; /**< Underlying expression to evaluate. */
 
   ExpressionStmt(std::unique_ptr<Expr> expr);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct FunctionProto
-/// @brief Function prototype node
+/** @brief Function signature statement node. */
 struct FunctionProto : Stmt {
-  cinder::Token name;                /**< The name of the function */
-  cinder::Token return_type;         /**< The return type of the method */
-  std::vector<cinder::FuncArg> args; /**< The function arguments */
-  bool is_variadic;          /**< Whether the function is variadic */
+  cinder::Token name;                /**< Function identifier token. */
+  cinder::Token return_type;         /**< Return type token. */
+  std::vector<cinder::FuncArg> args; /**< Function parameter list. */
+  bool is_variadic; /**< True when prototype accepts varargs. */
 
-  FunctionProto(cinder::Token name, cinder::Token return_type, std::vector<cinder::FuncArg> args,
-                bool is_variadic);
+  FunctionProto(cinder::Token name, cinder::Token return_type,
+                std::vector<cinder::FuncArg> args, bool is_variadic);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct FunctionStmt
-/// @brief Function statement node
+/** @brief Function definition statement node. */
 struct FunctionStmt : Stmt {
-  std::unique_ptr<Stmt> proto;
-  std::vector<std::unique_ptr<Stmt>> body;
+  std::unique_ptr<Stmt> proto;             /**< Function prototype node. */
+  std::vector<std::unique_ptr<Stmt>> body; /**< Function body statements. */
 
   FunctionStmt(std::unique_ptr<Stmt> proto,
                std::vector<std::unique_ptr<Stmt>> body);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct ReturnStmt
-/// @brief Return stmt node
+/** @brief Return statement node. */
 struct ReturnStmt : Stmt {
-  cinder::Token ret_token;
-  std::unique_ptr<Expr> value;
+  cinder::Token ret_token;     /**< `return` token. */
+  std::unique_ptr<Expr> value; /**< Optional returned expression. */
 
   ReturnStmt(cinder::Token ret_token, std::unique_ptr<Expr> value);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct VarDeclarationStmt
-/// @brief Variable declaration node
+/** @brief Variable declaration statement node. */
 struct VarDeclarationStmt : Stmt {
-  cinder::Token type;
-  cinder::Token name;
-  std::unique_ptr<Expr> value;
+  cinder::Token type;          /**< Declared type token. */
+  cinder::Token name;          /**< Variable identifier token. */
+  std::unique_ptr<Expr> value; /**< Initializer expression. */
 
-  VarDeclarationStmt(cinder::Token type, cinder::Token name, std::unique_ptr<Expr> value);
+  VarDeclarationStmt(cinder::Token type, cinder::Token name,
+                     std::unique_ptr<Expr> value);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @IfStmt
-/// @brief If statement node
+/** @brief If/else statement node. */
 struct IfStmt : Stmt {
-  std::unique_ptr<Expr> cond;
-  std::unique_ptr<Stmt> then;
-  std::unique_ptr<Stmt> otherwise;
+  std::unique_ptr<Expr> cond;      /**< Condition expression. */
+  std::unique_ptr<Stmt> then;      /**< Then-branch statement. */
+  std::unique_ptr<Stmt> otherwise; /**< Optional else-branch statement. */
 
   IfStmt(std::unique_ptr<Expr> cond, std::unique_ptr<Stmt> then,
          std::unique_ptr<Stmt> otherwise);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct ForStmt
-/// @brief For statement node
+/** @brief For-loop statement node. */
 struct ForStmt : Stmt {
-  std::unique_ptr<Stmt> initializer;
-  std::unique_ptr<Expr> condition;
-  std::unique_ptr<Expr> step;
-  std::vector<std::unique_ptr<Stmt>> body;
+  std::unique_ptr<Stmt> initializer;       /**< Loop initializer statement. */
+  std::unique_ptr<Expr> condition;         /**< Loop continuation condition. */
+  std::unique_ptr<Expr> step;              /**< Optional step expression. */
+  std::vector<std::unique_ptr<Stmt>> body; /**< Loop body statements. */
 
   ForStmt(std::unique_ptr<Stmt> initializer, std::unique_ptr<Expr> condition,
           std::unique_ptr<Expr> step, std::vector<std::unique_ptr<Stmt>> body);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  void Accept(SemanticStmtVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of this subtree.
    */
   std::string ToString() override;
 };
 
-/// @struct WhileStmt
-/// @brief While stmt node
+/** @brief While-loop statement node. */
 struct WhileStmt : Stmt {
-  std::unique_ptr<Expr> condition;
-  std::vector<std::unique_ptr<Stmt>> body;
+  std::unique_ptr<Expr> condition;         /**< Loop continuation condition. */
+  std::vector<std::unique_ptr<Stmt>> body; /**< Loop body statements. */
 
   WhileStmt(std::unique_ptr<Expr> condition,
             std::vector<std::unique_ptr<Stmt>> body);
 
+  /**
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
+   */
   llvm::Value* Accept(StmtVisitor& visitor) override;
-  virtual void Accept(SemanticStmtVisitor& visitor) override;
+  /** @brief Accepts a semantic analysis visitor. */
+  void Accept(SemanticStmtVisitor& visitor) override;
 
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 

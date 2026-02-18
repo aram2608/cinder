@@ -38,13 +38,15 @@ static const std::unordered_map<std::string, Token::Type> key_words = {
 Lexer::Lexer(std::string source_str_)
     : start_pos_(0),
       current_pos_(0),
-      line_count_(1),
+      line_(1),
+      column_(1),
       source_str_(source_str_) {}
 
 Lexer::Lexer(const char* source_str_)
     : start_pos_(0),
       current_pos_(0),
-      line_count_(0),
+      line_(1),
+      column_(1),
       source_str_(source_str_) {}
 
 void Lexer::ScanTokens() {
@@ -70,7 +72,8 @@ void Lexer::Scan() {
 
   switch (c) {
     case '\n':
-      line_count_++;
+      line_++;
+      column_ = 1;
       break;
     case '\r':
       break;
@@ -150,6 +153,7 @@ void Lexer::Scan() {
     default:
       assert(0 && "Unreachable");
   }
+  ++column_;
 }
 
 char Lexer::Advance() {
@@ -204,16 +208,20 @@ bool Lexer::Match(char c) {
 void Lexer::AddToken(Token::Type tok_type) {
   size_t index = current_pos_ - start_pos_;
   std::string temp = source_str_.substr(start_pos_, index);
-  tokens_.emplace_back(tok_type, line_count_, temp);
+  SourceLocation loc{current_pos_, line_, column_};
+  tokens_.emplace_back(tok_type, loc, temp);
 }
 
 void Lexer::AddToken(Token::Type tok_type, std::string lexeme,
                      std::optional<TokenValue> value) {
-  tokens_.emplace_back(tok_type, line_count_, lexeme, value);
+  SourceLocation loc{current_pos_, line_, column_};
+
+  tokens_.emplace_back(tok_type, loc, lexeme, value);
 }
 
 void Lexer::AddToken(Token::Type tok_type, std::string lexeme) {
-  tokens_.emplace_back(tok_type, line_count_, lexeme);
+  SourceLocation loc{current_pos_, line_, column_};
+  tokens_.emplace_back(tok_type, loc, lexeme);
 }
 
 void Lexer::ParseComment() {
@@ -233,8 +241,7 @@ void Lexer::TokenizeString() {
     Advance();
   }
   if (IsEnd()) {
-    std::cout << "Unterminated string at " << std::to_string(line_count_)
-              << "\n";
+    std::cout << "Unterminated string at " << std::to_string(line_) << "\n";
     exit(1);
   }
   Advance();

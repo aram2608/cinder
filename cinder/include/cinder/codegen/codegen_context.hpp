@@ -22,25 +22,38 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Target/TargetMachine.h"
 
+/**
+ * @brief Owns LLVM IR construction state for a single compilation unit.
+ *
+ * This context centralizes the LLVM context, module, builder, and pass-manager
+ * objects needed by code generation.
+ */
 class CodegenContext {
-  std::unique_ptr<llvm::LLVMContext> llvm_ctx_;
-  std::unique_ptr<llvm::Module> module_;
-  std::unique_ptr<llvm::IRBuilder<>> builder_;
+  std::unique_ptr<llvm::LLVMContext> llvm_ctx_; /**< Core LLVM context. */
+  std::unique_ptr<llvm::Module> module_;        /**< Active LLVM module. */
+  std::unique_ptr<llvm::IRBuilder<>> builder_;  /**< Active IR builder. */
   std::unique_ptr<llvm::FunctionPassManager>
-      TheFPM_; /**< Func pass optimizer */
-  std::unique_ptr<llvm::LoopAnalysisManager> TheLAM_; /** Loop optimizer */
+      TheFPM_; /**< Function-level optimization passes. */
+  std::unique_ptr<llvm::LoopAnalysisManager> TheLAM_; /**< Loop analyses. */
   std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM_;
   std::unique_ptr<llvm::CGSCCAnalysisManager> TheCGAM_;
   std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM_;
   std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC_;
   std::unique_ptr<llvm::StandardInstrumentations> TheSI_;
-  BindingMap bindings;
+  BindingMap bindings; /**< Reserved binding storage for context-local use. */
 
  public:
+  /**
+   * @brief Creates and initializes LLVM state for `module_name`.
+   * @param module_name Name of the generated LLVM module.
+   */
   explicit CodegenContext(const std::string& module_name);
 
+  /** @brief Returns the mutable LLVM context. */
   llvm::LLVMContext& GetContext();
+  /** @brief Returns the mutable LLVM module. */
   llvm::Module& GetModule();
+  /** @brief Returns the mutable IR builder. */
   llvm::IRBuilder<>& GetBuilder();
 };
 

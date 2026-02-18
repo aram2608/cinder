@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <memory>
-#include <variant>
 
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/support/utils.hpp"
@@ -20,6 +19,9 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Scalar.h"
+
+/// TODO: Refactor some of the functions in this file, a bit redundant and
+/// sloppy
 
 using namespace llvm;
 using namespace cinder;
@@ -585,7 +587,7 @@ Value* Codegen::Visit(Variable& expr) {
   }
 
   // Instead of tracking a scope, we simply search the parent block and see if
-  // the variable is define there
+  // the variable is defined there
   if (ctx_->GetBuilder().GetInsertBlock()) {
     Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
     if (func) {

@@ -30,12 +30,12 @@ void SemanticAnalyzer::Visit(FunctionProto& stmt) {
 
   std::optional<SymbolId> id =
       Declare(stmt.name.lexeme, types_.Function(ret, params, stmt.is_variadic),
-              true, {stmt.name.line_num});
+              true, {stmt.name.location.line});
   if (id.has_value()) {
     stmt.id = id.value();
   } else {
     std::string err = "Function could not be declared: " + stmt.name.lexeme;
-    diagnose_.Error({stmt.name.line_num}, err);
+    diagnose_.Error({stmt.name.location.line}, err);
   }
 }
 
@@ -55,7 +55,8 @@ void SemanticAnalyzer::Visit(FunctionStmt& stmt) {
 
   for (auto& arg : proto->args) {
     types::Type* arg_type = ResolveArgType(arg.type_token);
-    Declare(arg.identifier.lexeme, arg_type, false, {arg.identifier.line_num});
+    Declare(arg.identifier.lexeme, arg_type, false,
+            {arg.identifier.location.line});
   }
 
   for (auto& s : stmt.body) {
@@ -102,14 +103,14 @@ void SemanticAnalyzer::Visit(ExpressionStmt& stmt) {
 
 void SemanticAnalyzer::Visit(ReturnStmt& stmt) {
   if (!current_return) {
-    diagnose_.Error({stmt.ret_token.line_num},
+    diagnose_.Error({stmt.ret_token.location.line},
                     "Return statement outside function body");
     return;
   }
 
   if (!stmt.value) {
     if (!current_return->IsThisType(types::TypeKind::Void)) {
-      diagnose_.Error({stmt.ret_token.line_num},
+      diagnose_.Error({stmt.ret_token.location.line},
                       "Return value does not match current return type");
     }
     return;
@@ -117,7 +118,7 @@ void SemanticAnalyzer::Visit(ReturnStmt& stmt) {
 
   Resolve(*stmt.value);
   if (!stmt.value->type->IsThisType(current_return)) {
-    diagnose_.Error({stmt.ret_token.line_num},
+    diagnose_.Error({stmt.ret_token.location.line},
                     "Return value does not match current return type");
     return;
   }
@@ -126,7 +127,7 @@ void SemanticAnalyzer::Visit(ReturnStmt& stmt) {
 void SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
   if (env_.IsDeclaredInCurrentScope(stmt.name.lexeme)) {
     std::string error = "Variable already declared: " + stmt.name.lexeme;
-    diagnose_.Error({stmt.name.line_num}, error);
+    diagnose_.Error({stmt.name.location.line}, error);
     return;
   }
 
@@ -136,13 +137,13 @@ void SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
   if (!stmt.value->type->IsThisType(declared_type)) {
     std::string error =
         "Type mismatch in variable declaration: " + stmt.name.lexeme;
-    diagnose_.Error({stmt.name.line_num}, error);
+    diagnose_.Error({stmt.name.location.line}, error);
     return;
   }
 
   stmt.value->type = declared_type;
-  std::optional<SymbolId> id =
-      Declare(stmt.name.lexeme, declared_type, false, {stmt.name.line_num});
+  std::optional<SymbolId> id = Declare(stmt.name.lexeme, declared_type, false,
+                                       {stmt.name.location.line});
   if (id.has_value()) {
     stmt.id = id.value();
   }
@@ -152,7 +153,7 @@ void SemanticAnalyzer::Visit(Variable& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Undeclared variable: " + expr.name.lexeme;
-    diagnose_.Error({expr.name.line_num}, err);
+    diagnose_.Error({expr.name.location.line}, err);
     return;
   }
   expr.type = sym->type;
@@ -165,7 +166,7 @@ void SemanticAnalyzer::Visit(Binary& expr) {
 
   if (!expr.left->type->IsThisType(expr.right->type)) {
     std::string err = "Type mismatch: " + expr.op.lexeme;
-    diagnose_.Error({expr.op.line_num}, err);
+    diagnose_.Error({expr.op.location.line}, err);
     return;
   }
 
@@ -190,13 +191,13 @@ void SemanticAnalyzer::Visit(Assign& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Assignment to undelcared variable: " + expr.name.lexeme;
-    diagnose_.Error({expr.name.line_num}, err);
+    diagnose_.Error({expr.name.location.line}, err);
     return;
   }
 
   if (!sym->type->IsThisType(expr.value->type)) {
     std::string err = "Type mismatch in assignment: " + expr.name.lexeme;
-    diagnose_.Error({expr.name.line_num}, err);
+    diagnose_.Error({expr.name.location.line}, err);
     return;
   }
 
@@ -208,7 +209,7 @@ void SemanticAnalyzer::Visit(PreFixOp& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Variable is not defined: " + expr.name.lexeme;
-    diagnose_.Error({expr.op.line_num}, err);
+    diagnose_.Error({expr.op.location.line}, err);
     return;
   }
 
@@ -228,7 +229,7 @@ void SemanticAnalyzer::Visit(Conditional& expr) {
   Resolve(*expr.right);
   if (expr.left->type->kind != expr.right->type->kind) {
     std::string err = "Type mismatch: " + expr.op.lexeme;
-    diagnose_.Error({expr.op.line_num}, err);
+    diagnose_.Error({expr.op.location.line}, err);
     return;
   }
   expr.type = types_.Bool();
@@ -244,7 +245,7 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
 
   if (ec) {
     std::string err = callee->name.lexeme + " is not callable";
-    diagnose_.Error({callee->name.line_num}, err);
+    diagnose_.Error({callee->name.location.line}, err);
     return;
   }
 
@@ -252,7 +253,7 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
 
   if (!symbol) {
     std::string err = "Undefined function: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.line_num}, err);
+    diagnose_.Error({callee->name.location.line}, err);
     return;
   }
 
@@ -261,14 +262,14 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
 
   if (!symbol->is_function) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.line_num}, err);
+    diagnose_.Error({callee->name.location.line}, err);
     return;
   }
 
   auto* func_type = symbol->type->CastTo<types::FunctionType>(ec);
   if (ec) {
     std::string err = "Symbol is not callable: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.line_num}, err);
+    diagnose_.Error({callee->name.location.line}, err);
     return;
   }
 
@@ -279,12 +280,12 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
     if (num_args < num_params) {
       std::string err =
           "Too few arguments for variadic function: " + callee->name.lexeme;
-      diagnose_.Error({callee->name.line_num}, err);
+      diagnose_.Error({callee->name.location.line}, err);
       return;
     }
   } else if (num_args != num_params) {
     std::string err = "Argument count mismatch for: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.line_num}, err);
+    diagnose_.Error({callee->name.location.line}, err);
     return;
   }
 
@@ -292,7 +293,7 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
     Resolve(*expr.args[i]);
     if (i < num_params) {
       if (expr.args[i]->type->kind != func_type->params[i]->kind) {
-        diagnose_.Error({callee->name.line_num},
+        diagnose_.Error({callee->name.location.line},
                         "Type mismatch in fixed argument");
         return;
       }
@@ -336,7 +337,7 @@ types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
     // Not valid in args
     case Token::Type::VOID_SPECIFIER:
     default:
-      diagnose_.Error({type.line_num}, "Invalid type");
+      diagnose_.Error({type.location.line}, "Invalid type");
   }
   return nullptr;
 }
@@ -357,7 +358,7 @@ types::Type* SemanticAnalyzer::ResolveType(Token type) {
       return types_.Bool();
     case Token::Type::INT64_SPECIFIER:
     default:
-      diagnose_.Error({type.line_num}, "Invalid type: " + type.lexeme);
+      diagnose_.Error({type.location.line}, "Invalid type: " + type.lexeme);
   }
   return nullptr;
 }

@@ -2,9 +2,9 @@
 
 using namespace cinder;
 
-Token::Token(Token::Type kind, size_t line_num, std::string lexeme,
+Token::Token(Token::Type kind, SourceLocation loc, std::string lexeme,
              std::optional<TokenValue> literal)
-    : kind(kind), line_num(line_num), lexeme(lexeme), literal(literal) {}
+    : kind(kind), location(loc), lexeme(lexeme), literal(literal) {}
 
 bool Token::IsLiteral() {
   return kind == Type::FLT_LITERAL || kind == Type::INT_LITERAL ||

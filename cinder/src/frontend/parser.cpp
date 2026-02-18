@@ -2,7 +2,9 @@
 
 #include <functional>
 #include <iostream>
+#include <optional>
 
+#include "cinder/frontend/tokens.hpp"
 #include "cinder/support/raw_outstream.hpp"
 
 using namespace cinder;
@@ -321,7 +323,8 @@ Token Parser::Consume(Token::Type type, std::string message) {
   }
   ostream::ErrorOutln(errors, message);
   // Not used, simply to suppress compiler warning
-  return {type, 0, "", std::nullopt};
+  Token tok{type, {0, 0, 0}, "", std::nullopt};
+  return tok;
 }
 
 void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {

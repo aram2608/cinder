@@ -10,107 +10,96 @@
 #include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/frontend/tokens.hpp"
 
-/// @struct Parser
-/// @brief Main class for parsing tokens in a program
+/**
+ * @brief Recursive-descent parser that converts tokens into an AST.
+ *
+ * The parser consumes a flat token stream and produces a `ModuleStmt` root.
+ */
 struct Parser {
-  std::vector<cinder::Token> tokens_; /**< The vector of tokens */
-  size_t current_tok_;        /**< The current token position */
+  std::vector<cinder::Token> tokens_; /**< Input token stream. */
+  size_t current_tok_; /**< Index of the next token to consume. */
 
+  /**
+   * @brief Creates a parser for a token sequence.
+   * @param tokens Tokens to parse.
+   */
   explicit Parser(std::vector<cinder::Token> tokens);
 
-  /// @brief Top level method to parse a program
-  /// @return A pointer to a Module statement
+  /** @brief Parses a full translation unit. */
   std::unique_ptr<Stmt> Parse();
 
-  /// @brief Method to parse a module
-  /// @return A pointer to the module
+  /** @brief Parses the top-level module declaration and contents. */
   std::unique_ptr<Stmt> ParseModule();
 
-  /// @brief Method to parse a function prototype
-  /// @return A pointer to the function prototype
+  /** @brief Parses a function prototype signature. */
   std::unique_ptr<Stmt> FunctionPrototype();
 
-  /// @brief Method to parse an externally declared function
-  /// @return A pointer to the extern function
+  /** @brief Parses either an extern prototype or a full function definition. */
   std::unique_ptr<Stmt> ExternFunction();
 
-  /// @brief Method to parse a function
-  /// @return A pointer to the function
+  /** @brief Parses a function definition or falls back to a statement. */
   std::unique_ptr<Stmt> Function();
 
-  /// @brief Top level method to parse statements
-  /// @return A pointer to a statement
+  /** @brief Parses a single statement. */
   std::unique_ptr<Stmt> Statement();
 
+  /** @brief Parses a `while` statement. */
   std::unique_ptr<Stmt> WhileStatement();
 
-  /// @brief Method to parse a for statement
-  /// @return A pointer to a for statement
+  /** @brief Parses a `for` statement. */
   std::unique_ptr<Stmt> ForStatement();
 
-  /// @brief Method to parse an if statement
-  /// @return A pointer to an if statement
+  /** @brief Parses an `if` statement with optional `else` branch. */
   std::unique_ptr<Stmt> IfStatement();
 
-  /// @brief Method to parse return statements
-  /// @return A pointer to a return statement
+  /** @brief Parses a `return` statement. */
   std::unique_ptr<Stmt> ReturnStatement();
 
-  /// @brief Method to parse a variable declaration
-  /// @return A pointer to a variable declaration
+  /** @brief Parses a variable declaration statement. */
   std::unique_ptr<Stmt> VarDeclaration();
 
-  /// @brief Method to parse an expression statement
-  /// @return A pointer to the expression statement
+  /** @brief Parses an expression statement terminated by `;`. */
   std::unique_ptr<Stmt> ExpressionStatement();
 
-  /// @brief Top level method to parse expressions
-  /// @return A pointer to an expression
+  /** @brief Parses an expression root. */
   std::unique_ptr<Expr> Expression();
 
-  /// @brief Method to parse an assignment
-  /// @return A pointer to the assignment
+  /** @brief Parses assignment expressions. */
   std::unique_ptr<Expr> Assignment();
 
-  /// @brief Method to parse a comparison
-  /// @return A pointer to the comparison
+  /** @brief Parses comparison expressions. */
   std::unique_ptr<Expr> Comparison();
 
-  /// @brief Method to parse addition and subtraction
-  /// @return A pointer to the binary operation
+  /** @brief Parses additive (`+`, `-`) expressions. */
   std::unique_ptr<Expr> Term();
 
-  /// @brief Method to parse mulitplication and division
-  /// @return A pointer to the binary operation
+  /** @brief Parses multiplicative (`*`, `/`) expressions. */
   std::unique_ptr<Expr> Factor();
 
-  /// @brief Method to parse a pre increment operation
-  /// @return A pointer to the pre increment operation
+  /** @brief Parses prefix increment/decrement expressions. */
   std::unique_ptr<Expr> PreIncrement();
 
-  /// @brief Method to parse a function call
-  /// @return A pointer to the call
+  /** @brief Parses call expressions. */
   std::unique_ptr<Expr> Call();
 
-  /// @brief Method to parse language primitives
-  /// @return A pointer to the primitive
+  /** @brief Parses expression atoms (literals, identifiers, groupings). */
   std::unique_ptr<Expr> Atom();
 
   /**
-   * @brief Method to match a list of tokens to the current token
+   * @brief Tests current token against any type in `types`.
    *
    * Advances the token position if a match is made
    *
-   * @param types An initializer list of token types
-   * @return True or False depending if the match is made
+   * @param types Candidate token kinds.
+   * @return `true` if a match was found and consumed.
    */
   bool MatchType(std::initializer_list<cinder::Token::Type> types);
 
-  /// Alias for invoking a Token member method from a pointer
+  /** @brief Convenience alias for token predicate member pointers. */
   using TokenMethod = bool (cinder::Token::*)();
 
   /**
-   * @brief Method to match a current token's type
+   * @brief Tests current token through a token predicate member function.
    *
    * Advances the token position if a match is made. This method is an
    * alternative to the above method, instead using std::invoke from the
@@ -118,56 +107,51 @@ struct Parser {
    * The token struct offers some testing methods which helps clean up some of
    * the longer matching patterns.
    *
-   * @param func The function pointer to the token member method
-   * @return True or False depending if the match is made
+   * @param func Predicate on `cinder::Token` (for example `&Token::IsLiteral`).
+   * @return `true` if predicate succeeds and token is consumed.
    */
   bool MatchType(TokenMethod func);
 
   /**
-   * @brief Method to check the underlying type of a token
-   * @param type An token type
-   * @return True or False depending if the match is made
+   * @brief Checks whether the current token has kind `type`.
+   * @param type Token kind to compare.
+   * @return `true` when the current token matches `type`.
    */
   bool CheckType(cinder::Token::Type type);
 
-  /// @brief Peeks at the current token, does not advance
-  /// @return The current token
+  /** @brief Returns the current token without consuming it. */
   cinder::Token Peek();
 
-  /// @brief Method to return the previous token
-  /// @return The previous token
+  /** @brief Returns the most recently consumed token. */
   cinder::Token Previous();
 
-  /// @brief Method to check if we are at the end of the token list
-  /// @return True or False
+  /** @brief Returns whether the parser reached the EOF token. */
   bool IsEnd();
 
   /**
-   * @brief Method to Advance forward in the list of tokens
+   * @brief Consumes the current token and advances.
    *
    * Has a boundary check
-   * @return The next token in the list
+   * @return The consumed token.
    */
   cinder::Token Advance();
 
   /**
-   * @brief Method to consume a token type, errors out if not matched
+   * @brief Consumes `type` or emits a parse error.
    *
    * The provided token type must match the current token
    * This method advances to the next token
    *
-   * @param type The token type to best tested
-   * @param message An error message to error out with
-   * @return The next token
+   * @param type Required token kind.
+   * @param message Error message used when the token does not match.
+   * @return The consumed token when matched.
    */
   cinder::Token Consume(cinder::Token::Type type, std::string message);
 
-  /// @brief Method to print out the ast
-  /// @param statements The statements to be printed
+  /** @brief Prints statements as formatted AST debug output. */
   void EmitAST(std::vector<std::unique_ptr<Stmt>> statements);
 
-  /// @brief Method to print out the ast
-  /// @param statement The statement to be printed
+  /** @brief Prints a statement as formatted AST debug output. */
   void EmitAST(std::unique_ptr<Stmt> statement);
 };
 

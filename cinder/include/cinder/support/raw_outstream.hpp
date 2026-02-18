@@ -16,11 +16,10 @@ namespace ostream {
 using FD = int;
 
 /**
- * @class RawOutStream
- * @brief A raw output stream similar to LLVM's
- * This implementation is much smaller and simpler
- * It is essentially an overglorified char* buffer that manages its contents
- * internally. This class is POSIX based and will not work on windows.
+ * @brief Buffered POSIX file-descriptor output stream.
+ *
+ * This utility is intentionally small and only supports common write patterns
+ * needed by the compiler diagnostics path.
  */
 class RawOutStream {
   static constexpr size_t BUF_SIZE = 4096;
@@ -31,57 +30,55 @@ class RawOutStream {
   void FlushBuffer();
 
  public:
+  /**
+   * @brief Creates a stream bound to a file descriptor.
+   * @param fd POSIX file descriptor (for example `1` stdout or `2` stderr).
+   */
   RawOutStream(FD fd);
 
   /**
-   * @brief RawOutstream destructor
-   * This method is virtual to ensure that the appropriate destructor is
-   * invoked for any derived class
+   * @brief Flushes remaining buffered bytes and releases stream resources.
    */
   virtual ~RawOutStream();
 
   /**
-   * @brief The main work horse of the buffer, writes data to console
-   * @param data The data to be printed
-   * @param size The size of the data to be written
-   * @return A pointer to this, lets us chain functions
+   * @brief Writes a byte range to the stream buffer.
+   * @param data Bytes to write.
+   * @param size Number of bytes to write.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& Write(const char* data, size_t size);
 
   /**
-   * @brief Insertion overload for a string view
-   * @return A pointer to this so we can chain insertions
+   * @brief Insertion overload for `std::string_view`.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(std::string_view s) {
     return Write(s.data(), s.size());
   }
 
   /**
-   * @brief Insertion overload for C string
-   * @param c The C string to be printed
-   * @return A pointer to this so we can chain insertions
+   * @brief Insertion overload for C strings.
+   * @param s Null-terminated character buffer.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(const char* s) {
     return Write(s, std::strlen(s));
   }
 
   /**
-   * @brief Insertion overload for C string
-   * @param s The string to be inserted
-   * @return A pointer to this so we can chain insertions
+   * @brief Insertion overload for `std::string`.
+   * @param s String value to write.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(const std::string s) {
     return Write(s.data(), s.size());
   }
 
   /**
-   * @brief Insertion overload for an integer
-   * The int is converted to a char* using the std::to_chars method for
-   * minimal overhead compared to fprintf or sprintf.
-   *
-   * std::to_chars returns a range where t
-   * @param n The integer to be printed
-   * @return A pointer to this so insertions can be chained
+   * @brief Insertion overload for `int` using `std::to_chars`.
+   * @param n Integer value to write.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(int n) {
     char num_buf[12];
@@ -90,11 +87,9 @@ class RawOutStream {
   }
 
   /**
-   * @brief Insertion overload for a size_t
-   * Converted to a char* using the std::to_chars method for minimal overhead
-   *
-   * @param n The size_t to be printed
-   * @return A pointer to this so we can chain commands
+   * @brief Insertion overload for `size_t` using `std::to_chars`.
+   * @param n Size value to write.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(size_t n) {
     char num_buf[21];
@@ -103,15 +98,9 @@ class RawOutStream {
   }
 
   /**
-   * @brief Insertion overload for a float
-   * Converted to char* using the std::to_chars method for minimal overhead
-   * Floats are tricky to convert since they do not necessarily fit into a neat
-   * consistent buffer. Different buffer sizes may be needed depending on size
-   * and precision. Here chars_format::general is used to try and minimize the
-   * buffer size. Use this method with caution
-   *
-   * @param n Float to be printed
-   * @return A pointer to this so we can chain insertions
+   * @brief Insertion overload for `float` using `std::to_chars`.
+   * @param n Floating-point value to write.
+   * @return Reference to this stream for chaining.
    */
   RawOutStream& operator<<(float n) {
     char num_buf[64];
@@ -127,12 +116,10 @@ class RawOutStream {
 };
 
 /**
- * @brief Function to print errors messages and exit out
- * A variadic template method to take any abritray number of arguments
- * and print the raw out stream. This assumes the operator<< has been
- * overloaded for the passed in type.
- *
- * A space is explicitly printed between each argument.
+ * @brief Writes a space-separated message, appends newline, then exits.
+ * @tparam Args Printable argument types.
+ * @param stream Destination stream.
+ * @param args Values to print in order.
  */
 template <typename... Args>
 inline void ErrorOutln(RawOutStream& stream, Args const&... args) {

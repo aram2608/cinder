@@ -10,18 +10,20 @@ enum class Errors {
   BadCast,
 };
 
-// 2. Create the Category class
+/** @brief Custom `std::error_category` for project-local error codes. */
 class ErrorCategory : public std::error_category {
  public:
+  /** @brief Returns a stable category name. */
   const char* name() const noexcept override;
 
+  /** @brief Converts an error value to human-readable text. */
   std::string message(int ev) const override;
 };
 
-// 3. Provide a global way to access the category instance
+/** @brief Returns the singleton error category instance. */
 const ErrorCategory& GetErrorCategory();
 
-/// @brief Overload for make_error_code func
+/** @brief Creates `std::error_code` from `Errors`. */
 std::error_code make_error_code(Errors e);
 
 namespace std {

@@ -1,6 +1,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include <cstddef>
 #include <vector>
 
 #include "cinder/frontend/tokens.hpp"
@@ -8,140 +9,157 @@
 #define LEXER_INIT 300
 #define BUMP_CAP 50
 
-/// @class Lexer
-/// @brief The main structure used during tokenization of source code
+/**
+ * @brief Converts source text into a stream of lexical tokens.
+ *
+ * `Lexer` performs a single left-to-right pass over the input and stores the
+ * produced tokens in insertion order. Location metadata is attached to each
+ * token as it is emitted.
+ */
 class Lexer {
-  size_t start_pos_;       /**< The starting position for the current lexeme */
-  size_t current_pos_;     /**< The current positon in the lexeme */
-  size_t line_count_;      /**< The line count */
-  std::string source_str_; /** The source string provided */
-  std::vector<cinder::Token> tokens_; /** Stores the lexed tokens */
+  size_t start_pos_;   /**< Byte offset where the current lexeme starts. */
+  size_t current_pos_; /**< Current byte offset in the source string. */
+
+  size_t line_;   /**< 1-based source line counter. */
+  size_t column_; /**< 1-based source column counter. */
+
+  std::string source_str_;            /**< Input source text. */
+  std::vector<cinder::Token> tokens_; /**< Tokens emitted during scanning. */
 
  public:
   /**
-   * @brief Constructor for std::string
-   * @param source_str Source string
+   * @brief Creates a lexer from an owned source string.
+   * @param source_str Source program text.
    */
   Lexer(std::string source_str);
 
   /**
-   * @brief Constructor for const char*
-   * @param source_str
+   * @brief Creates a lexer from a C string.
+   * @param source_str Null-terminated source program text.
    */
   Lexer(const char* source_str);
 
-  /// @brief Method to tokenize the source code
+  /** @brief Scans the full input and appends an explicit EOF token. */
   void ScanTokens();
 
+  /**
+   * @brief Returns a copy of all produced tokens.
+   * @return Token vector in source order.
+   */
   std::vector<cinder::Token> GetTokens();
 
-  /// @brief Method to help during debugging, prints the tokens incrementally
+  /** @brief Prints a human-readable token stream for debugging. */
   void EmitTokens();
 
  private:
-  /// @brief Method to scan an individual char
+  /** @brief Scans a single lexical unit starting at `current_pos_`. */
   void Scan();
 
   /**
-   * @brief Method to advance forward in the source string
-   * @return The next character in the source code
+   * @brief Consumes and returns the current character.
+   * @return The consumed character, or `'\0'` at end-of-input.
    */
   char Advance();
 
   /**
-   * @brief Method to test if we are at the end of the soure cdoe
-   * @return Either true or false
+   * @brief Checks whether scanning reached the end of the source.
+   * @return `true` when no characters remain; otherwise `false`.
    */
   bool IsEnd();
 
   /**
-   * @brief Method to test if a current character is in the alphabet
-   * @param c The char to be tested
-   * @return Either true or false
+   * @brief Checks whether a character is alphabetic or underscore.
+   * @param c Character to test.
+   * @return `true` if `c` is `[A-Za-z_]`; otherwise `false`.
    */
   bool IsAlpha(char c);
 
   /**
-   * @brief Method to test if a current character is numeric
-   * @param c The char to be tested
-   * @return Either true or false
+   * @brief Checks whether a character is an ASCII digit.
+   * @param c Character to test.
+   * @return `true` if `c` is `[0-9]`; otherwise `false`.
    */
   bool IsNumeric(char c);
 
   /**
-   * @brief Method to test if a current character is alpha numeric
-   * @param c The char to be tested
-   * @return Either true or false
+   * @brief Checks whether a character is alphanumeric or underscore.
+   * @param c Character to test.
+   * @return `true` when `IsAlpha(c)` or `IsNumeric(c)` is true.
    */
   bool IsAlphaNumeric(char c);
 
   /**
-   * @brief Method to peek at the current character in the source code
-   * @return The current character in the source code
+   * @brief Returns the current character without consuming it.
+   * @return Current character, or `'\0'` at end-of-input.
    */
   char PeekChar();
 
   /**
-   * @brief Method to peek at the next character if possible
-   * @return The next character in the source code
+   * @brief Returns the character one position ahead without consuming.
+   * @return Lookahead character, or `'\0'` when unavailable.
    */
   char PeekNextChar();
 
   /**
-   * @brief Method to test if a current chararacter matches the provided type
-   * @param c The character to be tested against the current_pos
+   * @brief Conditionally consumes the current character when it matches `c`.
+   * @param c Expected character.
+   * @return `true` if a match was consumed; otherwise `false`.
    */
   bool Match(char c);
 
   /**
-   * @brief Method to add simple tokens
-   * @param tok_type The type of token to be added
+   * @brief Emits a token whose lexeme is sliced from the current source range.
+   * @param tok_type Token kind to emit.
    */
   void AddToken(cinder::Token::Type tok_type);
 
+  /**
+   * @brief Emits a token with an explicit lexeme.
+   * @param tok_type Token kind to emit.
+   * @param lexeme Lexeme text to store in the token.
+   */
   void AddToken(cinder::Token::Type tok_type, std::string lexeme);
 
   /**
-   * @brief Method to add complex tokens
-   * @param tok_type
-   * @param lexeme
-   * @param value_type
-   * @param value
+   * @brief Emits a token with explicit lexeme and literal payload.
+   * @param tok_type Token kind to emit.
+   * @param lexeme Lexeme text to store in the token.
+   * @param value Optional literal value associated with the lexeme.
    */
   void AddToken(cinder::Token::Type tok_type, std::string lexeme,
                 std::optional<cinder::TokenValue> value);
 
-  /// @brief Method to parse comments
+  /** @brief Consumes a single-line comment. */
   void ParseComment();
 
-  /// @brief Method to tokenize string literals
+  /** @brief Scans and emits a string literal token. */
   void TokenizeString();
 
   /**
-   * @brief Method to escape characters in a tokenized string
-   *
-   * This method is somewhat of a hack since the way I currently tokenize a
-   * string is by checking for the final quotation. This is probably inefficient
-   * but most C++ project take 5 minutes to compile anyways so its not like my
-   * compile time really matters.
-   *
-   * @param str String to be reanalyzed for
+   * @brief Decodes supported backslash escapes in a string literal payload.
+   * @param str String contents to unescape in place.
    */
   void EscapeCharacters(std::string& str);
 
-  /// @brief Method to lex identifiers and key words
+  /** @brief Scans an identifier or reserved keyword token. */
   void TokenizeIdentifier();
 
-  /// @brief Method to lex numeric types
+  /** @brief Scans an integer or floating-point literal token. */
   void TokenizeNumber();
 
+  /** @brief Scans either `.` or `...` tokens. */
   void TokenizeDot();
 
+  /**
+   * @brief Checks whether `PeekNextChar()` is safe to call.
+   * @return `true` when one-character lookahead is available.
+   */
   bool LookAheadOkay();
 
   /**
-   * @brief A simple helper method to parse token types into strings
-   * @param tok_type The token to be formatted
+   * @brief Formats a token for debugging output.
+   * @param tok Token to format.
+   * @return Human-readable representation of `tok`.
    */
   std::string TokenToString(cinder::Token tok);
 };

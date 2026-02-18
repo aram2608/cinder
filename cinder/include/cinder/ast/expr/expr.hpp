@@ -12,6 +12,7 @@
 #include "cinder/support/error_category.hpp"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/ErrorOr.h"
 
 struct Literal;
 struct Variable;
@@ -22,6 +23,7 @@ struct CallExpr;
 struct Assign;
 struct Conditional;
 
+/** @brief Code generation visitor interface for expression nodes. */
 struct CodegenExprVisitor {
   virtual ~CodegenExprVisitor() = default;
   virtual llvm::Value* Visit(Literal& expr) = 0;
@@ -34,6 +36,7 @@ struct CodegenExprVisitor {
   virtual llvm::Value* Visit(Conditional& expr) = 0;
 };
 
+/** @brief Semantic analysis visitor interface for expression nodes. */
 struct SemanticExprVisitor {
   virtual ~SemanticExprVisitor() = default;
   virtual void Visit(Literal& expr) = 0;
@@ -46,8 +49,7 @@ struct SemanticExprVisitor {
   virtual void Visit(Conditional& expr) = 0;
 };
 
-/// @struct Expr
-/// @brief Base class for the AST nodes for expressions
+/** @brief Abstract base class for all expression AST nodes. */
 struct Expr {
   enum class ExprType {
     Literal,
@@ -60,40 +62,66 @@ struct Expr {
     Conditional,
     Unknown
   };
-  cinder::types::Type* type =
-      nullptr; /**< The underlying type of the expression */
-  std::optional<SymbolId> id = std::nullopt; /**< ID produced during sem pass */
+  cinder::types::Type* type = nullptr; /**< Resolved semantic type, if known. */
+  std::optional<SymbolId> id = std::nullopt; /**< Bound symbol id, if any. */
   ExprType expr_type;
 
   Expr(ExprType type) : expr_type(type) {}
 
-  /// @brief Default so the appropriate destructor is called for derived classes
+  /** @brief Virtual destructor for polymorphic ownership. */
   virtual ~Expr() = default;
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   virtual llvm::Value* Accept(CodegenExprVisitor& visitor) = 0;
+
+  /**
+   * @brief Accepts a semantic visitor.
+   * @param visitor Semantic visitor.
+   */
   virtual void Accept(SemanticExprVisitor& visitor) = 0;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Renders this node as a debug string.
+   * @return String representation of the expression subtree.
    */
   virtual std::string ToString() = 0;
 
+  /** @brief Returns whether this node is `Literal`. */
   bool IsLiteral();
+  /** @brief Returns whether this node is `Variable`. */
   bool IsVariable();
+  /** @brief Returns whether this node is `Grouping`. */
   bool IsGrouping();
+  /** @brief Returns whether this node is `PreFix`. */
   bool IsPreFixOp();
+  /** @brief Returns whether this node is `Binary`. */
   bool IsBinary();
+  /** @brief Returns whether this node is `Call`. */
   bool IsCallExpr();
+  /** @brief Returns whether this node is `Assign`. */
   bool IsAssign();
+  /** @brief Returns whether this node is `Conditional`. */
   bool IsConditional();
 
+  template <typename T>
+  llvm::ErrorOr<T*> CastTo() {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      return make_error_code(Errors::BadCast);
+    }
+    return p;
+  }
+
+  /**
+   * @brief Dynamically casts this node to `T` with error-code reporting.
+   * @tparam T Target node type.
+   * @param ec Set to `Errors::BadCast` on failure.
+   * @return Pointer to `T` on success; otherwise `nullptr`.
+   */
   template <typename T>
   T* CastTo(std::error_code& ec) {
     T* p = dynamic_cast<T*>(this);
@@ -105,188 +133,176 @@ struct Expr {
   }
 };
 
-/// @struct Literal
-/// @brief Numeric Node, stores floats and ints as of now
+/** @brief Literal expression node. */
 struct Literal : Expr {
-  cinder::TokenValue value; /**< Appropriate value for the given value type */
+  cinder::TokenValue value; /**< Literal value payload. */
 
   explicit Literal(cinder::TokenValue value);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
-  void Accept(SemanticExprVisitor& visitor) override;
 
   /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
+   * @brief Accepts a semantic visitor.
+   * @param visitor Semantic visitor.
    */
+  void Accept(SemanticExprVisitor& visitor) override;
+
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
-/// @struct Variable
-/// @brief Variable node
+/** @brief Variable reference expression node. */
 struct Variable : Expr {
-  cinder::Token name; /** Name of the variable */
+  cinder::Token name; /**< Identifier token for the variable. */
 
   explicit Variable(cinder::Token name);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
-/// @struct Grouping
-/// @brief Grouping node
+/** @brief Parenthesized expression node. */
 struct Grouping : Expr {
-  std::unique_ptr<Expr> expr; /** Expression inside of the paren, '( expr )' */
+  std::unique_ptr<Expr> expr; /**< Expression inside parentheses. */
 
   explicit Grouping(std::unique_ptr<Expr> expr);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
+/** @brief Prefix increment/decrement expression node. */
 struct PreFixOp : Expr {
-  cinder::Token op;   /**< Operator cinder::Token */
-  cinder::Token name; /**< Name of variable */
+  cinder::Token op;   /**< Prefix operator token. */
+  cinder::Token name; /**< Target variable identifier token. */
 
   PreFixOp(cinder::Token op, cinder::Token name);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
-/// @struct Binary
-/// @brief Binary operation node
+/** @brief Binary arithmetic expression node. */
 struct Binary : Expr {
-  std::unique_ptr<Expr> left;  /**< The lhs expression */
-  std::unique_ptr<Expr> right; /**< The rhs expression */
-  cinder::Token op;                    /** The binary operator */
+  std::unique_ptr<Expr> left;  /**< Left-hand side expression. */
+  std::unique_ptr<Expr> right; /**< Right-hand side expression. */
+  cinder::Token op;            /**< Binary operator token. */
 
-  Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, cinder::Token op);
+  Binary(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
+         cinder::Token op);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
+/** @brief Binary comparison expression node. */
 struct Conditional : Expr {
-  std::unique_ptr<Expr> left;  /**< The lhs expression */
-  std::unique_ptr<Expr> right; /**< The rhs expression */
-  cinder::Token op;                    /**< The bianry operator */
+  std::unique_ptr<Expr> left;  /**< Left-hand side expression. */
+  std::unique_ptr<Expr> right; /**< Right-hand side expression. */
+  cinder::Token op;            /**< Comparison operator token. */
 
   Conditional(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right,
               cinder::Token op);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
+/** @brief Assignment expression node. */
 struct Assign : Expr {
-  cinder::Token name;                  /**< Variable name */
-  std::unique_ptr<Expr> value; /**< The variables new value */
+  cinder::Token name;          /**< Target variable identifier token. */
+  std::unique_ptr<Expr> value; /**< Value expression to assign. */
 
   Assign(cinder::Token name, std::unique_ptr<Expr> value);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 
+/** @brief Function call expression node. */
 struct CallExpr : Expr {
-  std::unique_ptr<Expr> callee; /**< The name of the callee as an expr */
-  std::vector<std::unique_ptr<Expr>> args; /**< List of arguments in the call */
+  std::unique_ptr<Expr> callee;            /**< Callee expression. */
+  std::vector<std::unique_ptr<Expr>> args; /**< Call argument expressions. */
 
   CallExpr(std::unique_ptr<Expr> callee,
            std::vector<std::unique_ptr<Expr>> args);
 
   /**
-   * @brief Method used to emply the visitor pattern
-   * All derived classes must implement this method
-   * @param visitor The expression visitor
-   * @return The appropiate visitor method
+   * @brief Accepts a codegen visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
    */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /**
-   * @brief Method to return the string representation of the node
-   * @return The string represention
-   */
+  /** @brief Renders this node as a debug string. */
   std::string ToString() override;
 };
 

@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-/// @brief Simple utility macro to error out at unreachable points in source
+/** @brief Aborts execution when an allegedly unreachable code path executes. */
 #define UNREACHABLE(x, y)                                     \
   do {                                                        \
     std::cout << "UNREACHABLE " << #x << " " << #y << "\n";   \
@@ -11,7 +11,7 @@
     exit(1);                                                  \
   } while (0)
 
-/// @brief Simple utility macro to error out for unimplemented components
+/** @brief Aborts execution for intentionally unimplemented paths. */
 #define IMPLEMENT(x)                              \
   do {                                            \
     std::cout << "Implement me.\n";               \
@@ -21,6 +21,7 @@
     exit(1);                                      \
   } while (0);
 
+/** @brief Marks a variable intentionally unused. */
 #define UNUSED(x) (void)(x)
 
 #endif

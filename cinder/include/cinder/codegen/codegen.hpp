@@ -34,33 +34,46 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 
 /**
- * @struct Compiler
- * @brief The main compiler structure
- * Employs the visitor method to resolve the different nodes of the AST
+ * @brief LLVM code generation driver for a parsed module AST.
+ *
+ * `Codegen` runs semantic analysis, lowers AST nodes to LLVM IR through
+ * visitor dispatch, and emits/links output according to `CodegenOpts`.
  */
 struct Codegen : CodegenExprVisitor, StmtVisitor {
   /// TODO:  make this a vector or a map of mods to handle imports
-  std::unique_ptr<Stmt> mod; /**< module */
+  std::unique_ptr<Stmt> mod; /**< Root module statement. */
 
-  CodegenOpts opts;                     /**< The compiler options */
-  std::unique_ptr<CodegenContext> ctx_; /**< Codegen ctx, stores IR objs */
-  BindingMap ir_bindings_;              /**< Stores the llvm IR instructions */
-  DiagnosticEngine diagnose_;           /**< Engine to handle erros/warnings/ */
-  TypeContext types_;                   /**< Stores type information */
-  SemanticAnalyzer pass_;               /**< Semantic analyzer */
+  CodegenOpts opts; /**< Backend options. */
+  std::unique_ptr<CodegenContext>
+      ctx_;                   /**< Owned LLVM context and module state. */
+  BindingMap ir_bindings_;    /**< Symbol-to-IR binding table. */
+  DiagnosticEngine diagnose_; /**< Internal diagnostic reporter. */
+  TypeContext types_;         /**< Canonical semantic types. */
+  SemanticAnalyzer pass_;     /**< Semantic analysis pass. */
 
+  /**
+   * @brief Creates a codegen driver for a parsed module.
+   * @param mod Module AST to lower.
+   * @param opts Backend options.
+   */
   Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts);
 
+  /** @brief Runs full backend flow according to configured mode. */
   bool Generate();
+  /** @brief Lowers AST into in-memory LLVM IR. */
   void GenerateIR();
+  /** @brief Writes LLVM IR text to `opts.out_path`. */
   void EmitLLVM();
+  /** @brief Compiles and executes output (currently not implemented). */
   void CompileRun();
+  /** @brief Emits object code and links final binary. */
   void CompileBinary(llvm::TargetMachine* target_machine);
 
   using CodegenExprVisitor::Visit;
   using StmtVisitor::Visit;
 
-  // Statements
+  /** @name Statement visitor overrides */
+  ///@{
   llvm::Value* Visit(ModuleStmt& stmt) override;
   llvm::Value* Visit(ForStmt& stmt) override;
   llvm::Value* Visit(WhileStmt& stmt) override;
@@ -70,8 +83,10 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   llvm::Value* Visit(FunctionProto& stmt) override;
   llvm::Value* Visit(ReturnStmt& stmt) override;
   llvm::Value* Visit(VarDeclarationStmt& stmt) override;
+  ///@}
 
-  // Expressions
+  /** @name Expression visitor overrides */
+  ///@{
   llvm::Value* Visit(Assign& expr) override;
   llvm::Value* Visit(Conditional& expr) override;
   llvm::Value* Visit(Binary& expr) override;
@@ -80,12 +95,21 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   llvm::Value* Visit(Grouping& expr) override;
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Literal& expr) override;
+  ///@}
 
+  /**
+   * @brief Runs semantic analysis and reports diagnostics on failure.
+   * @param mod Module AST node.
+   * @return `true` on success, `false` when semantic errors are present.
+   */
   bool SemanticPass(ModuleStmt& mod);
 
+  /** @brief Emits an integer constant literal value. */
   llvm::Value* EmitInteger(Literal& expr);
 
+  /** @brief Maps semantic function-argument types to LLVM types. */
   llvm::Type* ResolveArgType(cinder::types::Type* type);
+  /** @brief Maps semantic types to LLVM storage/value types. */
   llvm::Type* ResolveType(cinder::types::Type* type);
 };
 
