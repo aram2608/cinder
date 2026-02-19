@@ -176,10 +176,10 @@ bool Expr::IsAssign() {
 bool Expr::IsConditional() {
   return expr_type == ExprType::Conditional;
 }
-bool Expr::HasValue() {
+bool Expr::HasID() {
   return id.has_value();
 }
-SymbolId Expr::GetValue() {
+SymbolId Expr::GetID() {
   return id.value();
 }
 

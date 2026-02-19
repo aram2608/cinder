@@ -174,10 +174,10 @@ bool Stmt::IsFor() {
 bool Stmt::IsWhile() {
   return stmt_type == StmtType::While;
 }
-bool Stmt::HasValue() {
+bool Stmt::HasID() {
   return id.has_value();
 }
-SymbolId Stmt::GetValue() {
+SymbolId Stmt::GetID() {
   return id.value();
 }
 

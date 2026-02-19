@@ -9,6 +9,9 @@ semantic:
 test:
 	./build/bin/cinder --compile -o test ./tests/test.ci
 
+fib:
+	./build/bin/cinder --compile -o fib ./tests/fib.ci
+
 llvm:
 	./build/bin/cinder --emit-llvm -o test.ll ./tests/test.ci
 

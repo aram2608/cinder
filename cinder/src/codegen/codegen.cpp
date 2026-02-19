@@ -1,9 +1,12 @@
 #include "cinder/codegen/codegen.hpp"
 
 #include <cstdlib>
+#include <functional>
 #include <memory>
 #include <system_error>
+#include <unordered_map>
 
+#include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/APFloat.h"
@@ -11,6 +14,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
@@ -359,8 +363,8 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
   AllocaInst* slot = ctx_->CreateAlloca(ty, nullptr, stmt.name.lexeme);
   ctx_->CreateStore(init, slot);
 
-  if (stmt.HasValue()) {
-    std::unique_ptr<Binding>& b = ir_bindings_[stmt.GetValue()];
+  if (stmt.HasID()) {
+    std::unique_ptr<Binding>& b = ir_bindings_[stmt.GetID()];
     if (!b || !b->IsVariable()) {
       b = std::make_unique<VarBinding>();
     }
@@ -408,11 +412,11 @@ Value* Codegen::Visit(Binary& expr) {
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
-  if (!expr.HasValue()) {
+  if (!expr.HasID()) {
     return nullptr;
   }
 
-  auto symbol = ir_bindings_.find(expr.id.value());
+  auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
     return nullptr;
@@ -431,56 +435,18 @@ Value* Codegen::Visit(PreFixOp& expr) {
   Type* type = a->getAllocatedType();
   std::string name = expr.name.lexeme;
 
-  Value* var = ctx_->GetBuilder().CreateLoad(type, a, name);
+  Value* var = ctx_->CreateLoad(type, a, name);
 
-  Value* inc = nullptr;
-  Value* value = nullptr;
-
-  /// TODO: maybe refactor this or find a better way to match this
-  switch (expr.op.kind) {
-    case Token::Type::PlusPlus:
-      switch (expr.type->kind) {
-        case types::TypeKind::Int:
-          inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
-          value = ctx_->GetBuilder().CreateAdd(var, inc, "addtmp");
-          break;
-        case types::TypeKind::Float:
-          inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
-          value = ctx_->GetBuilder().CreateFAdd(var, inc, "addtmp");
-          break;
-        default:
-          break;
-      }
-      break;
-    case Token::Type::MinusMinus:
-      switch (expr.type->kind) {
-        case types::TypeKind::Int:
-          inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
-          value = ctx_->GetBuilder().CreateSub(var, inc, "subtmp");
-          break;
-        case types::TypeKind::Float:
-          inc = ConstantFP::get(ctx_->GetContext(), APFloat(1.0f));
-          value = ctx_->GetBuilder().CreateFSub(var, inc, "subtmp");
-          break;
-        default:
-          break;
-      }
-      break;
-    default:
-      break;
-  }
-
-  ctx_->GetBuilder().CreateStore(value, a);
-  return value;
+  return ctx_->CreatePreOp(expr.type, expr.op.kind, var, a);
 }
 
 Value* Codegen::Visit(Assign& expr) {
-  auto symbol = ir_bindings_.find(expr.id.value());
+  auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
     return nullptr;
   }
-  // VarBinding* var = dynamic_cast<VarBinding*>(symbol->second.get());
+
   llvm::ErrorOr<VarBinding*> var = symbol->second->CastTo<VarBinding>();
   if (std::error_code ec = var.getError()) {
     return nullptr;
@@ -491,7 +457,7 @@ Value* Codegen::Visit(Assign& expr) {
   }
 
   Value* value = expr.value->Accept(*this);
-  ctx_->GetBuilder().CreateStore(value, var.get()->GetAlloca());
+  ctx_->CreateStore(value, var.get()->GetAlloca());
   return value;
 }
 
@@ -581,21 +547,24 @@ llvm::Value* Codegen::EmitInteger(Literal& expr) {
 }
 
 llvm::Type* Codegen::ResolveArgType(types::Type* type) {
-  switch (type->kind) {
-    case types::TypeKind::Bool:
-      return Type::getInt1Ty(ctx_->GetContext());
-    case types::TypeKind::Float:
-      return Type::getFloatTy(ctx_->GetContext());
-    case types::TypeKind::Int:
-      return Type::getInt32Ty(ctx_->GetContext());
-    case types::TypeKind::String:
-      return PointerType::getInt8Ty(ctx_->GetContext());
-    case types::TypeKind::Struct:
-    case types::TypeKind::Void:
-    default:
-      break;
+  using TypeFunc = std::function<llvm::Type*(llvm::LLVMContext&)>;
+  static const std::unordered_map<types::TypeKind, TypeFunc> BUILTINS = {
+      {types::TypeKind::Bool,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt1Ty(ctx); }},
+      {types::TypeKind::Int,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt32Ty(ctx); }},
+      {types::TypeKind::String,
+       [](llvm::LLVMContext& ctx) { return PointerType::getInt8Ty(ctx); }},
+      {types::TypeKind::Float,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getFloatTy(ctx); }},
+  };
+
+  auto fn = BUILTINS.find(type->kind);
+  if (fn == BUILTINS.end()) {
+    return nullptr;
   }
-  return nullptr;
+
+  return fn->second(ctx_->GetContext());
 }
 
 static Type* ResolveStructType() {
@@ -604,22 +573,33 @@ static Type* ResolveStructType() {
 }
 
 llvm::Type* Codegen::ResolveType(types::Type* type) {
-  switch (type->kind) {
-    case types::TypeKind::Bool:
-      return Type::getInt1Ty(ctx_->GetContext());
-    case types::TypeKind::Float:
-      return Type::getFloatTy(ctx_->GetContext());
-    case types::TypeKind::Int:
-      return Type::getInt32Ty(ctx_->GetContext());
-    case types::TypeKind::String:
-      return PointerType::getInt8Ty(ctx_->GetContext());
-    case types::TypeKind::Void:
-      return Type::getVoidTy(ctx_->GetContext());
-    case types::TypeKind::Struct:
-      ResolveStructType();
-    default:
-      IMPLEMENT(ResolveType);
+  using TypeFunc = std::function<llvm::Type*(llvm::LLVMContext&)>;
+  static const std::unordered_map<types::TypeKind, TypeFunc> BUILTINS = {
+      {types::TypeKind::Bool,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt1Ty(ctx); }},
+      {types::TypeKind::Int,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt32Ty(ctx); }},
+      {types::TypeKind::String,
+       [](llvm::LLVMContext& ctx) { return PointerType::getInt8Ty(ctx); }},
+      {types::TypeKind::Float,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getFloatTy(ctx); }},
+      {types::TypeKind::Void,
+       [](llvm::LLVMContext& ctx) { return llvm::Type::getVoidTy(ctx); }},
+  };
+
+  auto fn = BUILTINS.find(type->kind);
+  if (fn != BUILTINS.end()) {
+    return fn->second(ctx_->GetContext());
   }
+
+  if (type->IsThisType(types::TypeKind::Struct)) {
+    IMPLEMENT(ResolveStructType);
+    ResolveStructType();
+    return nullptr;
+  }
+
+  UNREACHABLE(CodeGen, ResolveType);
+  return nullptr;
 }
 
 // auto* s = dynamic_cast<types::StructType*>(type);

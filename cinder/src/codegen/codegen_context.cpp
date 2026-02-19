@@ -4,6 +4,7 @@
 #include <functional>
 #include <unordered_map>
 
+#include "cinder/ast/types.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/Twine.h"
@@ -13,6 +14,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -35,7 +37,9 @@ using namespace cinder;
 CodegenContext::CodegenContext(const std::string& module_name)
     : llvm_ctx_(std::make_unique<LLVMContext>()),
       module_(std::make_unique<Module>(module_name, *llvm_ctx_)),
-      builder_(std::make_unique<IRBuilder<>>(*llvm_ctx_)) {
+      builder_(std::make_unique<IRBuilder<>>(*llvm_ctx_)),
+      const_int(ConstantInt::get(*llvm_ctx_, APInt(32, 1))),
+      const_flt(ConstantFP::get(*llvm_ctx_, APFloat(1.0f))) {
   TheFPM_ = std::make_unique<FunctionPassManager>();
   TheLAM_ = std::make_unique<LoopAnalysisManager>();
   TheFAM_ = std::make_unique<FunctionAnalysisManager>();
@@ -79,8 +83,7 @@ StoreInst* CodegenContext::CreateStore(Value* value, Value* ptr,
   return builder_->CreateStore(value, ptr, is_volatile);
 }
 
-Value* CodegenContext::CreateIntCmp(cinder::Token::Type ty, Value* left,
-                                    Value* right) {
+Value* CodegenContext::CreateIntCmp(Token::Type ty, Value* left, Value* right) {
   CmpInst::Predicate p;
   switch (ty) {
     case Token::Type::BANGEQ:
@@ -107,8 +110,7 @@ Value* CodegenContext::CreateIntCmp(cinder::Token::Type ty, Value* left,
   return builder_->CreateCmp(p, left, right, "cmptmp");
 }
 
-Value* CodegenContext::CreateFltCmp(cinder::Token::Type ty, Value* left,
-                                    Value* right) {
+Value* CodegenContext::CreateFltCmp(Token::Type ty, Value* left, Value* right) {
   CmpInst::Predicate p;
   switch (ty) {
     case Token::Type::BANGEQ:
@@ -162,7 +164,7 @@ Value* CodegenContext::CreateIntBinop(Token::Type ty, Value* left,
   return fn->second(*builder_, left, right);
 }
 
-Value* CodegenContext::CreateFltBinop(cinder::Token::Type ty, Value* left,
+Value* CodegenContext::CreateFltBinop(Token::Type ty, Value* left,
                                       Value* right) {
   using Builder = IRBuilder<>;
   using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
@@ -191,4 +193,52 @@ Value* CodegenContext::CreateFltBinop(cinder::Token::Type ty, Value* left,
     return nullptr;
   }
   return fn->second(*builder_, left, right);
+}
+
+Value* CodegenContext::CreateLoad(Type* ty, Value* val, const Twine& name) {
+  return builder_->CreateLoad(ty, val, name);
+}
+
+Value* CodegenContext::CreatePreOp(types::Type* ty, Token::Type op, Value* val,
+                                   AllocaInst* alloca) {
+  using Builder = IRBuilder<>;
+  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
+
+  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> flt = {
+      {Token::Type::PlusPlus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFAdd(l, r, "addtmp");
+       }},
+      {Token::Type::MinusMinus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFAdd(l, r, "addtmp");
+       }},
+  };
+
+  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> integer = {
+      {Token::Type::PlusPlus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateAdd(l, r, "addtmp");
+       }},
+      {Token::Type::MinusMinus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateAdd(l, r, "addtmp");
+       }},
+  };
+
+  Value* var;
+
+  switch (ty->kind) {
+    case types::TypeKind::Int:
+      var = integer.find(op)->second(*builder_, val, const_int);
+      break;
+    case types::TypeKind::Float:
+      var = flt.find(op)->second(*builder_, val, const_flt);
+      break;
+    default:
+      UNREACHABLE(CodegenConxt, CreatePreOp);
+  }
+
+  builder_->CreateStore(var, alloca);
+  return var;
 }

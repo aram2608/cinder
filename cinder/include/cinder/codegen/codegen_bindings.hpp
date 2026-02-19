@@ -26,9 +26,9 @@ struct Binding {
   /** @brief Returns whether this binding stores a variable allocation. */
   bool IsVariable() const;
 
-  template <typename T>
-  llvm::ErrorOr<T*> CastTo() {
-    T* p = dynamic_cast<T*>(this);
+  template <typename U>
+  llvm::ErrorOr<U*> CastTo() {
+    U* p = dynamic_cast<U*>(this);
     if (!p) {
       return make_error_code(Errors::BadCast);
     }
@@ -36,14 +36,14 @@ struct Binding {
   }
 
   /**
-   * @brief Dynamically casts this binding to `T` with error-code reporting.
+   * @brief Dynamically casts this binding to `U` with error-code reporting.
    * @tparam T Target binding type.
    * @param ec Set to `Errors::BadCast` on failure.
-   * @return Pointer to `T` on success; otherwise `nullptr`.
+   * @return Pointer to `U` on success; otherwise `nullptr`.
    */
-  template <typename T>
-  T* CastTo(std::error_code& ec) {
-    T* p = dynamic_cast<T*>(this);
+  template <typename U>
+  U* CastTo(std::error_code& ec) {
+    U* p = dynamic_cast<U*>(this);
     if (!p) {
       ec = Errors::BadCast;
     }

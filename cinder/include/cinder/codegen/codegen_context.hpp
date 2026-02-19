@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "llvm/ADT/Twine.h"
@@ -44,6 +45,8 @@ class CodegenContext {
   std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC_;
   std::unique_ptr<llvm::StandardInstrumentations> TheSI_;
   BindingMap bindings; /**< Reserved binding storage for context-local use. */
+  llvm::Value* const_int;
+  llvm::Value* const_flt;
 
  public:
   /**
@@ -75,6 +78,12 @@ class CodegenContext {
 
   llvm::Value* CreateFltBinop(cinder::Token::Type ty, llvm::Value* left,
                               llvm::Value* right);
+
+  llvm::Value* CreateLoad(llvm::Type* ty, llvm::Value* val,
+                          const llvm::Twine& name = "");
+
+  llvm::Value* CreatePreOp(cinder::types::Type* ty, cinder::Token::Type op,
+                           llvm::Value* val, llvm::AllocaInst* alloca);
 };
 
 #endif

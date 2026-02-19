@@ -107,9 +107,9 @@ struct Expr {
   /** @brief Returns whether this node is `Conditional`. */
   bool IsConditional();
   /** @brief Returns whether this node's id contains a value. */
-  bool HasValue();
+  bool HasID();
   /** @brief Returns the underlying symbol id. */
-  SymbolId GetValue();
+  SymbolId GetID();
 
   template <typename T>
   llvm::ErrorOr<T*> CastTo() {
