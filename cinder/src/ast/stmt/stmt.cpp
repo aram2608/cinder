@@ -174,6 +174,12 @@ bool Stmt::IsFor() {
 bool Stmt::IsWhile() {
   return stmt_type == StmtType::While;
 }
+bool Stmt::HasValue() {
+  return id.has_value();
+}
+SymbolId Stmt::GetValue() {
+  return id.value();
+}
 
 ModuleStmt::ModuleStmt(Token name, std::vector<std::unique_ptr<Stmt>> stmts)
     : Stmt(StmtType::Module), name(name), stmts(std::move(stmts)) {}

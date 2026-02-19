@@ -100,15 +100,15 @@ void Lexer::Scan() {
       break;
     // BINOPS
     case '+':
-      AddToken(Match('+') ? Token::Type::PLUS_PLUS : Token::Type::PLUS);
+      AddToken(Match('+') ? Token::Type::PlusPlus : Token::Type::Plus);
       break;
     case '-':
       if (Match('>')) {
         AddToken(Token::Type::ARROW);
       } else if (Match('-')) {
-        AddToken(Token::Type::MINUS_MINUS);
+        AddToken(Token::Type::MinusMinus);
       } else {
-        AddToken(Token::Type::MINUS);
+        AddToken(Token::Type::Minus);
       }
       break;
     case '/':
@@ -335,13 +335,13 @@ std::string Lexer::TokenToString(Token tok) {
   switch (tok.kind) {
     case Token::Type::QUOTE:
       return "\"";
-    case Token::Type::PLUS:
+    case Token::Type::Plus:
       return "+";
-    case Token::Type::PLUS_PLUS:
+    case Token::Type::PlusPlus:
       return "++";
-    case Token::Type::MINUS:
+    case Token::Type::Minus:
       return "-";
-    case Token::Type::MINUS_MINUS:
+    case Token::Type::MinusMinus:
       return "--";
     case Token::Type::MODULO:
       return "%";

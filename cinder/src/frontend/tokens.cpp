@@ -49,7 +49,7 @@ bool Token::IsFactor() {
 }
 
 bool Token::IsTerm() {
-  return kind == Type::PLUS || kind == Type::MINUS;
+  return kind == Type::Plus || kind == Type::Minus;
 }
 
 bool Token::IsThisType(Type type) {

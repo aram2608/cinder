@@ -7,3 +7,11 @@ bool Binding::IsFunction() const {
 bool Binding::IsVariable() const {
   return type_ == BindType::Var;
 }
+
+llvm::AllocaInst* VarBinding::GetAlloca() {
+  return alloca_ptr;
+}
+
+void VarBinding::SetAlloca(llvm::AllocaInst* alloca) {
+  alloca_ptr = alloca;
+}

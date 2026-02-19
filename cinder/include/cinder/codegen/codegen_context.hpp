@@ -4,6 +4,8 @@
 #include <memory>
 
 #include "cinder/codegen/codegen_bindings.hpp"
+#include "cinder/frontend/tokens.hpp"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/BasicBlock.h"
@@ -11,6 +13,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -55,6 +58,23 @@ class CodegenContext {
   llvm::Module& GetModule();
   /** @brief Returns the mutable IR builder. */
   llvm::IRBuilder<>& GetBuilder();
+
+  llvm::AllocaInst* CreateAlloca(llvm::Type* ty, llvm::Value* array_size,
+                                 const llvm::Twine& name = "");
+  llvm::StoreInst* CreateStore(llvm::Value* value, llvm::Value* ptr,
+                               bool is_volatile = false);
+
+  llvm::Value* CreateIntCmp(cinder::Token::Type ty, llvm::Value* left,
+                            llvm::Value* right);
+
+  llvm::Value* CreateFltCmp(cinder::Token::Type ty, llvm::Value* left,
+                            llvm::Value* right);
+
+  llvm::Value* CreateIntBinop(cinder::Token::Type ty, llvm::Value* left,
+                              llvm::Value* right);
+
+  llvm::Value* CreateFltBinop(cinder::Token::Type ty, llvm::Value* left,
+                              llvm::Value* right);
 };
 
 #endif

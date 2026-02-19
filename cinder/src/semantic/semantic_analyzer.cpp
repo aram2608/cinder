@@ -171,8 +171,8 @@ void SemanticAnalyzer::Visit(Binary& expr) {
   }
 
   switch (expr.op.kind) {
-    case Token::Type::PLUS:
-    case Token::Type::MINUS:
+    case Token::Type::Plus:
+    case Token::Type::Minus:
     case Token::Type::STAR:
     case Token::Type::SLASH:
       expr.type = expr.left->type;

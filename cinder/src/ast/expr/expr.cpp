@@ -4,6 +4,8 @@
 #include <system_error>
 #include <variant>
 
+#include "cinder/semantic/symbol.hpp"
+
 using namespace cinder;
 
 using namespace llvm;
@@ -173,6 +175,12 @@ bool Expr::IsAssign() {
 }
 bool Expr::IsConditional() {
   return expr_type == ExprType::Conditional;
+}
+bool Expr::HasValue() {
+  return id.has_value();
+}
+SymbolId Expr::GetValue() {
+  return id.value();
 }
 
 Literal::Literal(TokenValue value) : Expr(ExprType::Literal), value(value) {}

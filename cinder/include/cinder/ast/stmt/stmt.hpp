@@ -109,6 +109,10 @@ struct Stmt {
   bool IsFor();
   /** @brief Returns whether this node is `WhileStmt`. */
   bool IsWhile();
+  /** @brief Returns whether this node's id contains a value. */
+  bool HasValue();
+  /** @brief Returns the underlying symbol id. */
+  SymbolId GetValue();
 
   template <typename T>
   llvm::ErrorOr<T*> CastTo() {

@@ -1,10 +1,18 @@
 #include "cinder/codegen/codegen_context.hpp"
 
+#include <cstddef>
+#include <functional>
+#include <unordered_map>
+
+#include "cinder/frontend/tokens.hpp"
+#include "cinder/support/utils.hpp"
+#include "llvm/ADT/Twine.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -22,11 +30,12 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
 using namespace llvm;
+using namespace cinder;
 
 CodegenContext::CodegenContext(const std::string& module_name)
-    : llvm_ctx_(std::make_unique<llvm::LLVMContext>()),
-      module_(std::make_unique<llvm::Module>(module_name, *llvm_ctx_)),
-      builder_(std::make_unique<llvm::IRBuilder<>>(*llvm_ctx_)) {
+    : llvm_ctx_(std::make_unique<LLVMContext>()),
+      module_(std::make_unique<Module>(module_name, *llvm_ctx_)),
+      builder_(std::make_unique<IRBuilder<>>(*llvm_ctx_)) {
   TheFPM_ = std::make_unique<FunctionPassManager>();
   TheLAM_ = std::make_unique<LoopAnalysisManager>();
   TheFAM_ = std::make_unique<FunctionAnalysisManager>();
@@ -48,14 +57,138 @@ CodegenContext::CodegenContext(const std::string& module_name)
   PB.crossRegisterProxies(*TheLAM_, *TheFAM_, *TheCGAM_, *TheMAM_);
 }
 
-llvm::LLVMContext& CodegenContext::GetContext() {
+LLVMContext& CodegenContext::GetContext() {
   return *llvm_ctx_;
 }
 
-llvm::Module& CodegenContext::GetModule() {
+Module& CodegenContext::GetModule() {
   return *module_;
 }
 
-llvm::IRBuilder<>& CodegenContext::GetBuilder() {
+IRBuilder<>& CodegenContext::GetBuilder() {
   return *builder_;
+}
+
+AllocaInst* CodegenContext::CreateAlloca(Type* ty, Value* array_size,
+                                         const Twine& name) {
+  return builder_->CreateAlloca(ty, array_size, name);
+}
+
+StoreInst* CodegenContext::CreateStore(Value* value, Value* ptr,
+                                       bool is_volatile) {
+  return builder_->CreateStore(value, ptr, is_volatile);
+}
+
+Value* CodegenContext::CreateIntCmp(cinder::Token::Type ty, Value* left,
+                                    Value* right) {
+  CmpInst::Predicate p;
+  switch (ty) {
+    case Token::Type::BANGEQ:
+      p = CmpInst::ICMP_NE;
+      break;
+    case Token::Type::EQEQ:
+      p = CmpInst::ICMP_EQ;
+      break;
+    case Token::Type::LESSER:
+      p = CmpInst::ICMP_SLT;
+      break;
+    case Token::Type::LESSER_EQ:
+      p = CmpInst::ICMP_SLE;
+      break;
+    case Token::Type::GREATER:
+      p = CmpInst::ICMP_SGT;
+      break;
+    case Token::Type::GREATER_EQ:
+      p = CmpInst::ICMP_SGE;
+      break;
+    default:
+      UNREACHABLE(CodegenContext, CreateIntCmp);
+  }
+  return builder_->CreateCmp(p, left, right, "cmptmp");
+}
+
+Value* CodegenContext::CreateFltCmp(cinder::Token::Type ty, Value* left,
+                                    Value* right) {
+  CmpInst::Predicate p;
+  switch (ty) {
+    case Token::Type::BANGEQ:
+      p = CmpInst::FCMP_ONE;
+      break;
+    case Token::Type::EQEQ:
+      p = CmpInst::FCMP_OEQ;
+      break;
+    case Token::Type::LESSER:
+      p = CmpInst::FCMP_OLT;
+      break;
+    case Token::Type::LESSER_EQ:
+      p = CmpInst::FCMP_OLE;
+      break;
+    case Token::Type::GREATER:
+      p = CmpInst::FCMP_OGT;
+      break;
+    case Token::Type::GREATER_EQ:
+      p = CmpInst::FCMP_OGE;
+      break;
+    default:
+      UNREACHABLE(CodegenContext, CreateFltCmp);
+  }
+  return builder_->CreateCmp(p, left, right, "cmptmp");
+}
+
+Value* CodegenContext::CreateIntBinop(Token::Type ty, Value* left,
+                                      Value* right) {
+  using Builder = IRBuilder<>;
+  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
+
+  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> table = {
+      {Token::Type::Plus, [](Builder& b, Value* l,
+                             Value* r) { return b.CreateAdd(l, r, "addtmp"); }},
+      {Token::Type::Minus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateSub(l, r, "subtmp");
+       }},
+      {Token::Type::STAR, [](Builder& b, Value* l,
+                             Value* r) { return b.CreateMul(l, r, "multmp"); }},
+      {Token::Type::SLASH,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateSDiv(l, r, "divtmp");
+       }},
+  };
+
+  auto fn = table.find(ty);
+  if (fn == table.end()) {
+    return nullptr;
+  }
+  return fn->second(*builder_, left, right);
+}
+
+Value* CodegenContext::CreateFltBinop(cinder::Token::Type ty, Value* left,
+                                      Value* right) {
+  using Builder = IRBuilder<>;
+  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
+
+  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> table = {
+      {Token::Type::Plus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFAdd(l, r, "addtmp");
+       }},
+      {Token::Type::Minus,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFSub(l, r, "subtmp");
+       }},
+      {Token::Type::STAR,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFMul(l, r, "multmp");
+       }},
+      {Token::Type::SLASH,
+       [](Builder& b, Value* l, Value* r) {
+         return b.CreateFDiv(l, r, "divtmp");
+       }},
+  };
+
+  auto fn = table.find(ty);
+  if (fn == table.end()) {
+    return nullptr;
+  }
+  return fn->second(*builder_, left, right);
 }

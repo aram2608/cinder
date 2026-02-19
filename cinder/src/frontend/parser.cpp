@@ -211,7 +211,7 @@ std::unique_ptr<Expr> Parser::Factor() {
 }
 
 std::unique_ptr<Expr> Parser::PreIncrement() {
-  if (MatchType({Token::Type::PLUS_PLUS, Token::Type::MINUS_MINUS})) {
+  if (MatchType({Token::Type::PlusPlus, Token::Type::MinusMinus})) {
     Token op = Previous();
     Token name = Advance();
     return std::make_unique<PreFixOp>(op, name);

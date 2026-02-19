@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cinder/support/error_category.hpp"
+#include "llvm/Support/ErrorOr.h"
 
 namespace cinder {
 
@@ -55,6 +56,15 @@ struct Type {
   bool IsThisType(Type& type);
   /** @brief Returns whether this has exactly `type` kind. */
   bool IsThisType(TypeKind type);
+
+  template <typename T>
+  llvm::ErrorOr<T*> CastTo() {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      return make_error_code(Errors::BadCast);
+    }
+    return p;
+  }
 
   /**
    * @brief Dynamically casts this type to `T` with error-code reporting.

@@ -28,10 +28,10 @@ using TokenValue = std::variant<std::string, int, float, bool>;
 struct Token {
   enum class Type {
     // Binops
-    PLUS, /** "+" */
-    PLUS_PLUS,
-    MINUS, /** "-" */
-    MINUS_MINUS,
+    Plus, /** "+" */
+    PlusPlus,
+    Minus, /** "-" */
+    MinusMinus,
     MODULO, /** "%" */
     STAR,   /** "*" */
     SLASH,  /** "/" */
@@ -139,6 +139,13 @@ struct Token {
   bool IsThisType(Type type);
   /** @brief Returns whether this token is the end-of-file sentinel. */
   bool IsEOF();
+};
+
+struct TokenTypeHash {
+  std::size_t operator()(Token::Type t) const noexcept {
+    return std::hash<std::underlying_type_t<Token::Type>>{}(
+        static_cast<std::underlying_type_t<Token::Type>>(t));
+  }
 };
 
 /** @brief Parsed function argument metadata from a function prototype. */

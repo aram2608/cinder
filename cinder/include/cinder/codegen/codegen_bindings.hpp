@@ -11,6 +11,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Support/ErrorOr.h"
 
 /** @brief Polymorphic base for AST-symbol to LLVM-entity bindings. */
 struct Binding {
@@ -24,6 +25,15 @@ struct Binding {
   bool IsFunction() const;
   /** @brief Returns whether this binding stores a variable allocation. */
   bool IsVariable() const;
+
+  template <typename T>
+  llvm::ErrorOr<T*> CastTo() {
+    T* p = dynamic_cast<T*>(this);
+    if (!p) {
+      return make_error_code(Errors::BadCast);
+    }
+    return p;
+  }
 
   /**
    * @brief Dynamically casts this binding to `T` with error-code reporting.
@@ -45,6 +55,9 @@ struct Binding {
 struct VarBinding : Binding {
   llvm::AllocaInst* alloca_ptr = nullptr; /**< Backing alloca instruction. */
   VarBinding() : Binding(BindType::Var) {}
+
+  llvm::AllocaInst* GetAlloca();
+  void SetAlloca(llvm::AllocaInst* alloca);
 };
 
 /** @brief Binding for function symbols represented by an LLVM function. */

@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <system_error>
 
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/support/utils.hpp"
@@ -9,10 +10,13 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -352,21 +356,19 @@ Value* Codegen::Visit(ReturnStmt& stmt) {
 Value* Codegen::Visit(VarDeclarationStmt& stmt) {
   Value* init = stmt.value->Accept(*this);
   Type* ty = ResolveType(stmt.value->type);
-  AllocaInst* slot =
-      ctx_->GetBuilder().CreateAlloca(ty, nullptr, stmt.name.lexeme);
-  ctx_->GetBuilder().CreateStore(init, slot);
+  AllocaInst* slot = ctx_->CreateAlloca(ty, nullptr, stmt.name.lexeme);
+  ctx_->CreateStore(init, slot);
 
-  if (stmt.id.has_value()) {
-    std::unique_ptr<Binding>& b = ir_bindings_[stmt.id.value()];
+  if (stmt.HasValue()) {
+    std::unique_ptr<Binding>& b = ir_bindings_[stmt.GetValue()];
     if (!b || !b->IsVariable()) {
       b = std::make_unique<VarBinding>();
     }
-    std::error_code ec;
-    VarBinding* var = b->CastTo<VarBinding>(ec);
-    if (ec) {
+    llvm::ErrorOr<VarBinding*> var = b->CastTo<VarBinding>();
+    if (var.getError()) {
       return nullptr;
     }
-    var->alloca_ptr = slot;
+    var.get()->SetAlloca(slot);
   }
   return init;
 }
@@ -381,53 +383,11 @@ Value* Codegen::Visit(Conditional& expr) {
 
   switch (expr.left->type->kind) {
     case types::TypeKind::Int:
-      switch (expr.op.kind) {
-        case Token::Type::BANGEQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_NE, left, right,
-                                              "cmptmp");
-        case Token::Type::EQEQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_EQ, left, right,
-                                              "cmptmp");
-        case Token::Type::LESSER:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLT, left, right,
-                                              "cmptmp");
-        case Token::Type::LESSER_EQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SLE, left, right,
-                                              "cmptmp");
-        case Token::Type::GREATER:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGT, left, right,
-                                              "cmptmp");
-        case Token::Type::GREATER_EQ:
-          return ctx_->GetBuilder().CreateCmp(CmpInst::ICMP_SGE, left, right,
-                                              "cmptmp");
-        default:
-          break;
-      }
+      return ctx_->CreateIntCmp(expr.op.kind, left, right);
     case types::TypeKind::Float:
-      switch (expr.op.kind) {
-        case Token::Type::BANGEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_ONE, left, right,
-                                               "cmptmp");
-        case Token::Type::EQEQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OEQ, left, right,
-                                               "cmptmp");
-        case Token::Type::LESSER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLT, left, right,
-                                               "cmptmp");
-        case Token::Type::LESSER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OLE, left, right,
-                                               "cmptmp");
-        case Token::Type::GREATER:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGT, left, right,
-                                               "cmptmp");
-        case Token::Type::GREATER_EQ:
-          return ctx_->GetBuilder().CreateFCmp(CmpInst::FCMP_OGE, left, right,
-                                               "cmptmp");
-        default:
-          break;
-      }
+      return ctx_->CreateFltCmp(expr.op.kind, left, right);
     default:
-      break;
+      UNREACHABLE(Codegen, VisitConditional);
   }
   return nullptr;
 }
@@ -438,61 +398,47 @@ Value* Codegen::Visit(Binary& expr) {
 
   switch (expr.type->kind) {
     case types::TypeKind::Int:
-      switch (expr.op.kind) {
-        case Token::Type::PLUS:
-          return ctx_->GetBuilder().CreateAdd(left, right, "addtmp");
-        case Token::Type::MINUS:
-          return ctx_->GetBuilder().CreateSub(left, right, "subtmp");
-        case Token::Type::SLASH:
-          return ctx_->GetBuilder().CreateSDiv(left, right, "divtmp");
-        case Token::Type::STAR:
-          return ctx_->GetBuilder().CreateMul(left, right, "multmp");
-        default:
-          break;
-      }
+      return ctx_->CreateIntBinop(expr.op.kind, left, right);
     case types::TypeKind::Float:
-      switch (expr.op.kind) {
-        case Token::Type::PLUS:
-          return ctx_->GetBuilder().CreateFAdd(left, right, "addtmp");
-        case Token::Type::MINUS:
-          return ctx_->GetBuilder().CreateFSub(left, right, "subtmp");
-        case Token::Type::STAR:
-          return ctx_->GetBuilder().CreateFMul(left, right, "multmp");
-        case Token::Type::SLASH:
-          return ctx_->GetBuilder().CreateFDiv(left, right, "divtmp");
-        default:
-          break;
-      }
+      return ctx_->CreateFltBinop(expr.op.kind, left, right);
     default:
-      break;
+      UNREACHABLE(Codegen, VisitBinary);
   }
   return nullptr;
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
-  if (!expr.id.has_value()) {
+  if (!expr.HasValue()) {
     return nullptr;
   }
+
   auto symbol = ir_bindings_.find(expr.id.value());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
     return nullptr;
   }
-  VarBinding* bind = dynamic_cast<VarBinding*>(symbol->second.get());
-  if (!bind || !bind->alloca_ptr) {
+
+  llvm::ErrorOr<VarBinding*> bind = symbol->second->CastTo<VarBinding>();
+  if (std::error_code ec = bind.getError()) {
     return nullptr;
   }
-  Type* type = bind->alloca_ptr->getAllocatedType();
+
+  if (!bind.get()->GetAlloca()) {
+    return nullptr;
+  }
+
+  AllocaInst* a = bind.get()->GetAlloca();
+  Type* type = a->getAllocatedType();
   std::string name = expr.name.lexeme;
 
-  Value* var = ctx_->GetBuilder().CreateLoad(type, bind->alloca_ptr, name);
+  Value* var = ctx_->GetBuilder().CreateLoad(type, a, name);
 
   Value* inc = nullptr;
   Value* value = nullptr;
 
   /// TODO: maybe refactor this or find a better way to match this
   switch (expr.op.kind) {
-    case Token::Type::PLUS_PLUS:
+    case Token::Type::PlusPlus:
       switch (expr.type->kind) {
         case types::TypeKind::Int:
           inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
@@ -506,7 +452,7 @@ Value* Codegen::Visit(PreFixOp& expr) {
           break;
       }
       break;
-    case Token::Type::MINUS_MINUS:
+    case Token::Type::MinusMinus:
       switch (expr.type->kind) {
         case types::TypeKind::Int:
           inc = ConstantInt::get(ctx_->GetContext(), APInt(32, 1));
@@ -524,7 +470,7 @@ Value* Codegen::Visit(PreFixOp& expr) {
       break;
   }
 
-  ctx_->GetBuilder().CreateStore(value, bind->alloca_ptr);
+  ctx_->GetBuilder().CreateStore(value, a);
   return value;
 }
 
@@ -534,13 +480,18 @@ Value* Codegen::Visit(Assign& expr) {
       !symbol->second->IsVariable()) {
     return nullptr;
   }
-  VarBinding* var = dynamic_cast<VarBinding*>(symbol->second.get());
-  if (!var || !var->alloca_ptr) {
+  // VarBinding* var = dynamic_cast<VarBinding*>(symbol->second.get());
+  llvm::ErrorOr<VarBinding*> var = symbol->second->CastTo<VarBinding>();
+  if (std::error_code ec = var.getError()) {
+    return nullptr;
+  }
+
+  if (!var.get()->GetAlloca()) {
     return nullptr;
   }
 
   Value* value = expr.value->Accept(*this);
-  ctx_->GetBuilder().CreateStore(value, var->alloca_ptr);
+  ctx_->GetBuilder().CreateStore(value, var.get()->GetAlloca());
   return value;
 }
 
@@ -572,16 +523,17 @@ Value* Codegen::Visit(Variable& expr) {
         return nullptr;
       }
       if (b->IsFunction()) {
-        FuncBinding* f = dynamic_cast<FuncBinding*>(b);
-        return f->function;
+        llvm::ErrorOr<FuncBinding*> f = b->CastTo<FuncBinding>();
+        return f.get()->function;
       }
       if (b->IsVariable()) {
-        VarBinding* v = dynamic_cast<VarBinding*>(b);
-        if (!v->alloca_ptr) {
+        llvm::ErrorOr<VarBinding*> v = b->CastTo<VarBinding>();
+        if (!v.get()->GetAlloca()) {
           return nullptr;
         }
-        return ctx_->GetBuilder().CreateLoad(v->alloca_ptr->getAllocatedType(),
-                                             v->alloca_ptr, expr.name.lexeme);
+        AllocaInst* a = v.get()->GetAlloca();
+        return ctx_->GetBuilder().CreateLoad(a->getAllocatedType(), a,
+                                             expr.name.lexeme);
       }
     }
   }
