@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "common",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CINDER_ENABLE_CLANG_TIDY": "OFF"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug build with default options",
+      "inherits": "common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release build with optimizations",
+      "inherits": "common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "debug-clang-tidy",
+      "displayName": "Debug + clang-tidy",
+      "description": "Debug build with clang-tidy enabled",
+      "inherits": "debug",
+      "cacheVariables": {
+        "CINDER_ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "release-clang-tidy",
+      "displayName": "Release + clang-tidy",
+      "description": "Release build with clang-tidy enabled",
+      "inherits": "release",
+      "cacheVariables": {
+        "CINDER_ENABLE_CLANG_TIDY": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-debug",
+      "displayName": "Build Debug",
+      "description": "Build using the debug configure preset",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "build-release",
+      "displayName": "Build Release",
+      "description": "Build using the release configure preset",
+      "configurePreset": "release"
+    },
+    {
+      "name": "build-debug-clang-tidy",
+      "displayName": "Build Debug + clang-tidy",
+      "description": "Build debug with clang-tidy checks enabled",
+      "configurePreset": "debug-clang-tidy"
+    },
+    {
+      "name": "build-release-clang-tidy",
+      "displayName": "Build Release + clang-tidy",
+      "description": "Build release with clang-tidy checks enabled",
+      "configurePreset": "release-clang-tidy"
+    }
+  ]
+}
