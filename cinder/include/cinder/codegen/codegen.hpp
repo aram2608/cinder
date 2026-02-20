@@ -107,6 +107,7 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   /** @brief Emits an integer constant literal value. */
   llvm::Value* EmitInteger(Literal& expr);
 
+  llvm::Type* ResolveType(cinder::types::Type* type, bool allow_void);
   /** @brief Maps semantic function-argument types to LLVM types. */
   llvm::Type* ResolveArgType(cinder::types::Type* type);
   /** @brief Maps semantic types to LLVM storage/value types. */

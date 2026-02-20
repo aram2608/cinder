@@ -84,57 +84,43 @@ StoreInst* CodegenContext::CreateStore(Value* value, Value* ptr,
 }
 
 Value* CodegenContext::CreateIntCmp(Token::Type ty, Value* left, Value* right) {
-  CmpInst::Predicate p;
   switch (ty) {
     case Token::Type::BANGEQ:
-      p = CmpInst::ICMP_NE;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_NE, left, right, "cmptmp");
     case Token::Type::EQEQ:
-      p = CmpInst::ICMP_EQ;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_EQ, left, right, "cmptmp");
     case Token::Type::LESSER:
-      p = CmpInst::ICMP_SLT;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_SLT, left, right, "cmptmp");
     case Token::Type::LESSER_EQ:
-      p = CmpInst::ICMP_SLE;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_SLE, left, right, "cmptmp");
     case Token::Type::GREATER:
-      p = CmpInst::ICMP_SGT;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_SGT, left, right, "cmptmp");
     case Token::Type::GREATER_EQ:
-      p = CmpInst::ICMP_SGE;
-      break;
+      return builder_->CreateCmp(CmpInst::ICMP_SGE, left, right, "cmptmp");
     default:
       UNREACHABLE(CodegenContext, CreateIntCmp);
+      return nullptr;
   }
-  return builder_->CreateCmp(p, left, right, "cmptmp");
 }
 
 Value* CodegenContext::CreateFltCmp(Token::Type ty, Value* left, Value* right) {
-  CmpInst::Predicate p;
   switch (ty) {
     case Token::Type::BANGEQ:
-      p = CmpInst::FCMP_ONE;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_ONE, left, right, "cmptmp");
     case Token::Type::EQEQ:
-      p = CmpInst::FCMP_OEQ;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_OEQ, left, right, "cmptmp");
     case Token::Type::LESSER:
-      p = CmpInst::FCMP_OLT;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_OLT, left, right, "cmptmp");
     case Token::Type::LESSER_EQ:
-      p = CmpInst::FCMP_OLE;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_OLE, left, right, "cmptmp");
     case Token::Type::GREATER:
-      p = CmpInst::FCMP_OGT;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_OGT, left, right, "cmptmp");
     case Token::Type::GREATER_EQ:
-      p = CmpInst::FCMP_OGE;
-      break;
+      return builder_->CreateCmp(CmpInst::FCMP_OGE, left, right, "cmptmp");
     default:
       UNREACHABLE(CodegenContext, CreateFltCmp);
+      return nullptr;
   }
-  return builder_->CreateCmp(p, left, right, "cmptmp");
 }
 
 Value* CodegenContext::CreateIntBinop(Token::Type op, Value* l, Value* r) {

@@ -1,7 +1,6 @@
 #include "cinder/codegen/codegen.hpp"
 
 #include <cstdlib>
-#include <functional>
 #include <memory>
 #include <system_error>
 #include <unordered_map>
@@ -546,60 +545,39 @@ llvm::Value* Codegen::EmitInteger(Literal& expr) {
   return ConstantInt::get(ctx_->GetContext(), APInt(int_type->bits, value));
 }
 
-llvm::Type* Codegen::ResolveArgType(types::Type* type) {
-  using TypeFunc = std::function<llvm::Type*(llvm::LLVMContext&)>;
-  static const std::unordered_map<types::TypeKind, TypeFunc> BUILTINS = {
-      {types::TypeKind::Bool,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt1Ty(ctx); }},
-      {types::TypeKind::Int,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt32Ty(ctx); }},
-      {types::TypeKind::String,
-       [](llvm::LLVMContext& ctx) { return PointerType::getInt8Ty(ctx); }},
-      {types::TypeKind::Float,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getFloatTy(ctx); }},
-  };
-
-  auto fn = BUILTINS.find(type->kind);
-  if (fn == BUILTINS.end()) {
-    return nullptr;
-  }
-
-  return fn->second(ctx_->GetContext());
-}
-
 static Type* ResolveStructType() {
   StructType* ty = nullptr;
   return ty;
 }
 
+llvm::Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
+  auto& ctx = ctx_->GetContext();
+
+  switch (type->kind) {
+    case types::TypeKind::Bool:
+      return llvm::Type::getInt1Ty(ctx);
+    case types::TypeKind::Int:
+      return llvm::Type::getInt32Ty(ctx);
+    case types::TypeKind::Float:
+      return llvm::Type::getFloatTy(ctx);
+    case types::TypeKind::String:
+      return PointerType::getInt8Ty(ctx);
+    case types::TypeKind::Void:
+      return allow_void ? llvm::Type::getVoidTy(ctx) : nullptr;
+    case types::TypeKind::Struct:
+      return ResolveStructType();
+    default:
+      UNREACHABLE(CodeGen, ResolveType);
+      return nullptr;
+  }
+}
+
+llvm::Type* Codegen::ResolveArgType(types::Type* type) {
+  return ResolveType(type, false);
+}
+
 llvm::Type* Codegen::ResolveType(types::Type* type) {
-  using TypeFunc = std::function<llvm::Type*(llvm::LLVMContext&)>;
-  static const std::unordered_map<types::TypeKind, TypeFunc> BUILTINS = {
-      {types::TypeKind::Bool,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt1Ty(ctx); }},
-      {types::TypeKind::Int,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getInt32Ty(ctx); }},
-      {types::TypeKind::String,
-       [](llvm::LLVMContext& ctx) { return PointerType::getInt8Ty(ctx); }},
-      {types::TypeKind::Float,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getFloatTy(ctx); }},
-      {types::TypeKind::Void,
-       [](llvm::LLVMContext& ctx) { return llvm::Type::getVoidTy(ctx); }},
-  };
-
-  auto fn = BUILTINS.find(type->kind);
-  if (fn != BUILTINS.end()) {
-    return fn->second(ctx_->GetContext());
-  }
-
-  if (type->IsThisType(types::TypeKind::Struct)) {
-    IMPLEMENT(ResolveStructType);
-    ResolveStructType();
-    return nullptr;
-  }
-
-  UNREACHABLE(CodeGen, ResolveType);
-  return nullptr;
+  return ResolveType(type, true);
 }
 
 // auto* s = dynamic_cast<types::StructType*>(type);
