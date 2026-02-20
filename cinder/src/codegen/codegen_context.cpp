@@ -137,62 +137,34 @@ Value* CodegenContext::CreateFltCmp(Token::Type ty, Value* left, Value* right) {
   return builder_->CreateCmp(p, left, right, "cmptmp");
 }
 
-Value* CodegenContext::CreateIntBinop(Token::Type ty, Value* left,
-                                      Value* right) {
-  using Builder = IRBuilder<>;
-  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
-
-  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> table = {
-      {Token::Type::Plus, [](Builder& b, Value* l,
-                             Value* r) { return b.CreateAdd(l, r, "addtmp"); }},
-      {Token::Type::Minus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateSub(l, r, "subtmp");
-       }},
-      {Token::Type::STAR, [](Builder& b, Value* l,
-                             Value* r) { return b.CreateMul(l, r, "multmp"); }},
-      {Token::Type::SLASH,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateSDiv(l, r, "divtmp");
-       }},
-  };
-
-  auto fn = table.find(ty);
-  if (fn == table.end()) {
-    return nullptr;
+Value* CodegenContext::CreateIntBinop(Token::Type op, Value* l, Value* r) {
+  switch (op) {
+    case Token::Type::Plus:
+      return builder_->CreateAdd(l, r, "addtmp");
+    case Token::Type::Minus:
+      return builder_->CreateSub(l, r, "subtmp");
+    case Token::Type::STAR:
+      return builder_->CreateMul(l, r, "multmp");
+    case Token::Type::SLASH:
+      return builder_->CreateSDiv(l, r, "divtmp");
+    default:
+      return nullptr;
   }
-  return fn->second(*builder_, left, right);
 }
 
-Value* CodegenContext::CreateFltBinop(Token::Type ty, Value* left,
-                                      Value* right) {
-  using Builder = IRBuilder<>;
-  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
-
-  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> table = {
-      {Token::Type::Plus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFAdd(l, r, "addtmp");
-       }},
-      {Token::Type::Minus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFSub(l, r, "subtmp");
-       }},
-      {Token::Type::STAR,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFMul(l, r, "multmp");
-       }},
-      {Token::Type::SLASH,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFDiv(l, r, "divtmp");
-       }},
-  };
-
-  auto fn = table.find(ty);
-  if (fn == table.end()) {
-    return nullptr;
+Value* CodegenContext::CreateFltBinop(Token::Type op, Value* l, Value* r) {
+  switch (op) {
+    case Token::Type::Plus:
+      return builder_->CreateFAdd(l, r, "addtmp");
+    case Token::Type::Minus:
+      return builder_->CreateFSub(l, r, "subtmp");
+    case Token::Type::STAR:
+      return builder_->CreateFMul(l, r, "multmp");
+    case Token::Type::SLASH:
+      return builder_->CreateFDiv(l, r, "divtmp");
+    default:
+      return nullptr;
   }
-  return fn->second(*builder_, left, right);
 }
 
 Value* CodegenContext::CreateLoad(Type* ty, Value* val, const Twine& name) {
@@ -201,42 +173,31 @@ Value* CodegenContext::CreateLoad(Type* ty, Value* val, const Twine& name) {
 
 Value* CodegenContext::CreatePreOp(types::Type* ty, Token::Type op, Value* val,
                                    AllocaInst* alloca) {
-  using Builder = IRBuilder<>;
-  using OpFn = std::function<Value*(Builder&, Value*, Value*)>;
+  const bool isFloat = (ty->kind == types::TypeKind::Float);
+  const bool isInt = (ty->kind == types::TypeKind::Int);
+  if (!isFloat && !isInt) UNREACHABLE(CodegenContext, CreatePreOp);
 
-  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> flt = {
-      {Token::Type::PlusPlus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFAdd(l, r, "addtmp");
-       }},
-      {Token::Type::MinusMinus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateFAdd(l, r, "addtmp");
-       }},
+  Value* one = isFloat ? const_flt : const_int;
+
+  auto add = [&](Value* a, Value* b) {
+    return isFloat ? builder_->CreateFAdd(a, b, "inc")
+                   : builder_->CreateAdd(a, b, "inc");
+  };
+  auto sub = [&](Value* a, Value* b) {
+    return isFloat ? builder_->CreateFSub(a, b, "dec")
+                   : builder_->CreateSub(a, b, "dec");
   };
 
-  static const std::unordered_map<Token::Type, OpFn, TokenTypeHash> integer = {
-      {Token::Type::PlusPlus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateAdd(l, r, "addtmp");
-       }},
-      {Token::Type::MinusMinus,
-       [](Builder& b, Value* l, Value* r) {
-         return b.CreateAdd(l, r, "addtmp");
-       }},
-  };
-
-  Value* var;
-
-  switch (ty->kind) {
-    case types::TypeKind::Int:
-      var = integer.find(op)->second(*builder_, val, const_int);
+  Value* var = nullptr;
+  switch (op) {
+    case Token::Type::PlusPlus:
+      var = add(val, one);
       break;
-    case types::TypeKind::Float:
-      var = flt.find(op)->second(*builder_, val, const_flt);
+    case Token::Type::MinusMinus:
+      var = sub(val, one);
       break;
     default:
-      UNREACHABLE(CodegenConxt, CreatePreOp);
+      UNREACHABLE(CodegenContext, CreatePreOp);
   }
 
   builder_->CreateStore(var, alloca);

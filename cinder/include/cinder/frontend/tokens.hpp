@@ -141,13 +141,6 @@ struct Token {
   bool IsEOF();
 };
 
-struct TokenTypeHash {
-  std::size_t operator()(Token::Type t) const noexcept {
-    return std::hash<std::underlying_type_t<Token::Type>>{}(
-        static_cast<std::underlying_type_t<Token::Type>>(t));
-  }
-};
-
 /** @brief Parsed function argument metadata from a function prototype. */
 struct FuncArg {
   Token type_token; /**< Declared argument type token. */
