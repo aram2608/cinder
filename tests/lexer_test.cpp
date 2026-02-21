@@ -11,7 +11,7 @@ namespace {
 std::vector<cinder::Token> TokenizeFromSource(const std::string& source) {
   Lexer lexer(source);
   lexer.ScanTokens();
-  EXPECT_GT(lexer.GetTokens().size(), 0);
+  EXPECT_GT(lexer.GetTokens().size(), 0u);
   return lexer.GetTokens();
 }
 

@@ -10,7 +10,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -44,7 +43,8 @@ CodegenContext::CodegenContext(const std::string& module_name)
       module_(std::make_unique<Module>(module_name, *llvm_ctx_)),
       builder_(std::make_unique<IRBuilder<>>(*llvm_ctx_)),
       const_int(ConstantInt::get(*llvm_ctx_, APInt(32, 1))),
-      const_flt(ConstantFP::get(*llvm_ctx_, APFloat(1.0f))) {
+      const_flt(ConstantFP::get(*llvm_ctx_, APFloat(1.0f))),
+      debug_info_(*llvm_ctx_, *builder_) {
   TheFPM_ = std::make_unique<FunctionPassManager>();
   TheLAM_ = std::make_unique<LoopAnalysisManager>();
   TheFAM_ = std::make_unique<FunctionAnalysisManager>();
@@ -64,6 +64,10 @@ CodegenContext::CodegenContext(const std::string& module_name)
   PB.registerModuleAnalyses(*TheMAM_);
   PB.registerFunctionAnalyses(*TheFAM_);
   PB.crossRegisterProxies(*TheLAM_, *TheFAM_, *TheCGAM_, *TheMAM_);
+}
+
+DebugInfoContext& CodegenContext::DebugInfo() {
+  return debug_info_;
 }
 
 LLVMContext& CodegenContext::GetContext() {

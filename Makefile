@@ -7,7 +7,7 @@ semantic:
 	./build/bin/cinder --test-semantic -o test ./tests/test.ci
 
 test:
-	./build/bin/cinder --compile -g -o test ./tests/test.ci
+	./build/bin/cinder --compile  -o test ./tests/test.ci
 
 fib:
 	./build/bin/cinder --compile -o fib ./tests/fib.ci
@@ -26,4 +26,6 @@ linker:
 
 # Ironic to use cmake inside of a makefile but it is what is it
 cinder:
-	cmake --preset debug && cmake --build --preset build-debug
+	cmake --preset debug-tests\
+	&& cmake --build --preset build-debug-tests\
+	&& ctest --preset test-debug

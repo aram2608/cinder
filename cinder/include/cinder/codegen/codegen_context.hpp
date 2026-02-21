@@ -3,15 +3,16 @@
 
 #include <memory>
 
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
+#include "cinder/codegen/debug_info_context.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -51,6 +52,7 @@ class CodegenContext {
   BindingMap bindings; /**< Reserved binding storage for context-local use. */
   llvm::Value* const_int;
   llvm::Value* const_flt;
+  DebugInfoContext debug_info_;
 
  public:
   /**
@@ -59,8 +61,11 @@ class CodegenContext {
    */
   explicit CodegenContext(const std::string& module_name);
 
+  DebugInfoContext& DebugInfo();
+
   /** @brief Returns the mutable LLVM context. */
   llvm::LLVMContext& GetContext();
+
   /** @brief Returns the mutable LLVM module. */
   llvm::Module& GetModule();
   /** @brief Returns the mutable IR builder. */

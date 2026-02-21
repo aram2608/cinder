@@ -52,10 +52,10 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   BindingMap ir_bindings_; /**< Symbol-to-IR binding table. */
   std::unordered_map<std::string, llvm::StructType*> struct_types_;
   std::unordered_map<SymbolId, llvm::DILocalVariable*> di_locals_;
-  std::unique_ptr<llvm::DIBuilder> di_builder_;
-  llvm::DICompileUnit* di_compile_unit_ = nullptr;
-  llvm::DIFile* di_file_ = nullptr;
-  llvm::DIScope* di_scope_ = nullptr;
+  // std::unique_ptr<llvm::DIBuilder> di_builder_;
+  // llvm::DICompileUnit* di_compile_unit_ = nullptr;
+  // llvm::DIFile* di_file_ = nullptr;
+  // llvm::DIScope* di_scope_ = nullptr;
   DiagnosticEngine diagnose_; /**< Internal diagnostic reporter. */
   TypeContext types_;         /**< Canonical semantic types. */
   SemanticAnalyzer pass_;     /**< Semantic analysis pass. */
@@ -127,13 +127,6 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   llvm::Type* ResolveType(cinder::types::Type* type);
 
   void InitAllTargets();
-
-  void InitDebugInfo();
-  void FinalizeDebugInfo();
-  void SetDebugLocation(const cinder::SourceLocation& loc);
-  llvm::DIType* ResolveDebugType(cinder::types::Type* type);
-  void EmitDbgValue(llvm::Value* value, llvm::DILocalVariable* variable,
-                    const cinder::SourceLocation& loc);
 };
 
 #endif

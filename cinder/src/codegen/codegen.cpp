@@ -114,9 +114,9 @@ bool Codegen::Generate() {
     return false;
   }
 
-  InitDebugInfo();
+  ctx_->DebugInfo().Init(opts.debug_info, ctx_->GetModule(), modules_);
   GenerateIR();
-  FinalizeDebugInfo();
+  ctx_->DebugInfo().Finalize();
 
   std::string target_trip = sys::getDefaultTargetTriple();
   ctx_->SetTargetTriple(Triple(target_trip));
@@ -155,105 +155,6 @@ void Codegen::InitAllTargets() {
   InitializeAllTargetMCs();
   InitializeAllAsmParsers();
   InitializeAllAsmPrinters();
-}
-
-void Codegen::InitDebugInfo() {
-  if (!opts.debug_info) {
-    return;
-  }
-
-  auto& module = ctx_->GetModule();
-  module.addModuleFlag(Module::Warning, "Debug Info Version",
-                       DEBUG_METADATA_VERSION);
-#ifdef __APPLE__
-  module.addModuleFlag(Module::Warning, "Dwarf Version", 2);
-#else
-  module.addModuleFlag(Module::Warning, "Dwarf Version", 4);
-#endif
-
-  di_builder_ = std::make_unique<DIBuilder>(module);
-
-  std::string file_name = "input.ci";
-  if (!modules_.empty() && modules_[0] && !modules_[0]->name.lexeme.empty()) {
-    file_name = modules_[0]->name.lexeme + ".ci";
-  }
-
-  di_file_ = di_builder_->createFile(file_name, ".");
-  di_compile_unit_ = di_builder_->createCompileUnit(dwarf::DW_LANG_C, di_file_,
-                                                    "cinder", false, "", 0);
-  di_scope_ = di_compile_unit_;
-}
-
-void Codegen::FinalizeDebugInfo() {
-  if (!di_builder_) {
-    return;
-  }
-  di_builder_->finalize();
-}
-
-void Codegen::SetDebugLocation(const cinder::SourceLocation& loc) {
-  if (!opts.debug_info || !di_scope_) {
-    return;
-  }
-
-  unsigned line = static_cast<unsigned>(loc.line == 0 ? 1 : loc.line);
-  unsigned col = static_cast<unsigned>(loc.column == 0 ? 1 : loc.column);
-  auto* debug_loc = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
-  ctx_->GetBuilder().SetCurrentDebugLocation(debug_loc);
-}
-
-void Codegen::EmitDbgValue(llvm::Value* value, llvm::DILocalVariable* variable,
-                           const cinder::SourceLocation& loc) {
-  if (!opts.debug_info || !di_builder_ || !di_scope_ || !value || !variable) {
-    return;
-  }
-
-  unsigned line = static_cast<unsigned>(loc.line == 0 ? 1 : loc.line);
-  unsigned col = static_cast<unsigned>(loc.column == 0 ? 1 : loc.column);
-  auto* dl = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
-  di_builder_->insertDbgValueIntrinsic(value, variable,
-                                       di_builder_->createExpression(), dl,
-                                       ctx_->GetBuilder().GetInsertPoint());
-}
-
-DIType* Codegen::ResolveDebugType(cinder::types::Type* type) {
-  if (!di_builder_) {
-    return nullptr;
-  }
-
-  if (!type) {
-    return di_builder_->createUnspecifiedType("auto");
-  }
-
-  switch (type->kind) {
-    case types::TypeKind::Bool:
-      return di_builder_->createBasicType("bool", 1, dwarf::DW_ATE_boolean);
-    case types::TypeKind::Int: {
-      auto* i = dynamic_cast<types::IntType*>(type);
-      uint64_t bits = i ? i->bits : 32;
-      unsigned encoding =
-          (i && !i->is_signed) ? dwarf::DW_ATE_unsigned : dwarf::DW_ATE_signed;
-      return di_builder_->createBasicType("int", bits, encoding);
-    }
-    case types::TypeKind::Float: {
-      auto* f = dynamic_cast<types::FloatType*>(type);
-      uint64_t bits = f ? f->bits : 32;
-      return di_builder_->createBasicType("float", bits, dwarf::DW_ATE_float);
-    }
-    case types::TypeKind::String: {
-      DIType* char_ty =
-          di_builder_->createBasicType("char", 8, dwarf::DW_ATE_signed_char);
-      return di_builder_->createPointerType(char_ty, 64);
-    }
-    case types::TypeKind::Struct: {
-      auto* s = dynamic_cast<types::StructType*>(type);
-      return di_builder_->createUnspecifiedType(s ? s->name : "struct");
-    }
-    case types::TypeKind::Void:
-    case types::TypeKind::Function:
-    default:
-      return di_builder_->createUnspecifiedType("void");
-  }
 }
 
 void Codegen::GenerateIR() {
@@ -349,15 +250,17 @@ Value* Codegen::Visit(StructStmt& stmt) {
 
 Value* Codegen::Visit(ExpressionStmt& stmt) {
   if (auto loc = ExprLocation(stmt.expr.get())) {
-    SetDebugLocation(*loc);
+    ctx_->DebugInfo().SetLocation(*loc);
   }
   stmt.expr->Accept(*this);
   return nullptr;
 }
 
 Value* Codegen::Visit(WhileStmt& stmt) {
-  if (auto loc = ExprLocation(stmt.condition.get())) {
-    SetDebugLocation(*loc);
+  if (opts.debug_info) {
+    if (auto loc = ExprLocation(stmt.condition.get())) {
+      ctx_->DebugInfo().SetLocation(*loc);
+    }
   }
   Function* func = ctx_->GetInsertBlockParent();
 
@@ -372,20 +275,15 @@ Value* Codegen::Visit(WhileStmt& stmt) {
 
   ctx_->CreateBasicCondBr(condition, loop_block, after_block);
   ctx_->SetInsertPoint(loop_block);
-  DIScope* previous_scope = di_scope_;
-  if (opts.debug_info && di_builder_ && di_scope_) {
-    unsigned line = 1;
-    unsigned col = 1;
-    if (auto loc = ExprLocation(stmt.condition.get())) {
-      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
-      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
-    }
-    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
+
+  DIScope* previous_scope = ctx_->DebugInfo().GetScope();
+  if (opts.debug_info) {
+    ctx_->DebugInfo().CreateLexicalBlock(ExprLocation(stmt.condition.get()));
   }
   for (auto& body_stmt : stmt.body) {
     body_stmt->Accept(*this);
   }
-  di_scope_ = previous_scope;
+  ctx_->DebugInfo().SetScope(previous_scope);
 
   ctx_->CreateBr(cond_block);
   ctx_->SetInsertPoint(after_block);
@@ -397,9 +295,9 @@ Value* Codegen::Visit(ForStmt& stmt) {
     stmt.initializer->Accept(*this);
   }
 
-  if (stmt.condition) {
+  if (stmt.condition && opts.debug_info) {
     if (auto loc = ExprLocation(stmt.condition.get())) {
-      SetDebugLocation(*loc);
+      ctx_->DebugInfo().SetLocation(*loc);
     }
   }
 
@@ -417,27 +315,21 @@ Value* Codegen::Visit(ForStmt& stmt) {
   ctx_->CreateBasicCondBr(condition, loop_block, after_block);
   ctx_->SetInsertPoint(loop_block);
 
-  DIScope* previous_scope = di_scope_;
-  if (opts.debug_info && di_builder_ && di_scope_) {
-    unsigned line = 1;
-    unsigned col = 1;
-    if (auto loc = ExprLocation(stmt.condition.get())) {
-      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
-      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
-    }
-    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
+  DIScope* previous_scope = ctx_->DebugInfo().GetScope();
+  if (opts.debug_info) {
+    ctx_->DebugInfo().CreateLexicalBlock(ExprLocation(stmt.condition.get()));
   }
   for (auto& body_stmt : stmt.body) {
     body_stmt->Accept(*this);
   }
-  di_scope_ = previous_scope;
+  ctx_->DebugInfo().SetScope(previous_scope);
 
   ctx_->CreateBr(step_block);
   ctx_->SetInsertPoint(step_block);
 
   if (stmt.step) {
-    if (auto loc = ExprLocation(stmt.step.get())) {
-      SetDebugLocation(*loc);
+    if (opts.debug_info) {
+      ctx_->DebugInfo().SetLocation(*ExprLocation(stmt.step.get()));
     }
     stmt.step->Accept(*this);
   }
@@ -448,8 +340,10 @@ Value* Codegen::Visit(ForStmt& stmt) {
 }
 
 Value* Codegen::Visit(IfStmt& stmt) {
-  if (auto loc = ExprLocation(stmt.cond.get())) {
-    SetDebugLocation(*loc);
+  if (opts.debug_info) {
+    if (auto loc = ExprLocation(stmt.cond.get())) {
+      ctx_->DebugInfo().SetLocation(*loc);
+    }
   }
   Value* condition = stmt.cond->Accept(*this);
 
@@ -466,15 +360,9 @@ Value* Codegen::Visit(IfStmt& stmt) {
   ctx_->CreateBasicCondBr(condition, then_block, else_block);
   ctx_->SetInsertPoint(then_block);
 
-  DIScope* previous_scope = di_scope_;
-  if (opts.debug_info && di_builder_ && di_scope_) {
-    unsigned line = 1;
-    unsigned col = 1;
-    if (auto loc = ExprLocation(stmt.cond.get())) {
-      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
-      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
-    }
-    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
+  DIScope* previous_scope = ctx_->DebugInfo().GetScope();
+  if (opts.debug_info) {
+    ctx_->DebugInfo().CreateLexicalBlock(ExprLocation(stmt.cond.get()));
   }
 
   /// TODO: Add multiple statements in the body of the then and else branches
@@ -487,21 +375,14 @@ Value* Codegen::Visit(IfStmt& stmt) {
   }
 
   then_block = ctx_->GetInsertBlock();
-  di_scope_ = previous_scope;
+  ctx_->DebugInfo().SetScope(previous_scope);
 
   if (stmt.otherwise) {
     Func->insert(Func->end(), else_block);
     ctx_->SetInsertPoint(else_block);
 
-    if (opts.debug_info && di_builder_ && previous_scope) {
-      unsigned line = 1;
-      unsigned col = 1;
-      if (auto loc = ExprLocation(stmt.cond.get())) {
-        line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
-        col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
-      }
-      di_scope_ =
-          di_builder_->createLexicalBlock(previous_scope, di_file_, line, col);
+    if (opts.debug_info) {
+      ctx_->DebugInfo().CreateLexicalBlock(ExprLocation(stmt.cond.get()));
     }
 
     stmt.otherwise->Accept(*this);
@@ -510,7 +391,7 @@ Value* Codegen::Visit(IfStmt& stmt) {
       ctx_->CreateBr(merge);
     }
     else_block = ctx_->GetInsertBlock();
-    di_scope_ = previous_scope;
+    ctx_->DebugInfo().SetScope(previous_scope);
   }
 
   Func->insert(Func->end(), merge);
@@ -525,29 +406,30 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
   ctx_->SetInsertPoint(entry);
   di_locals_.clear();
 
-  DIScope* previous_scope = di_scope_;
-  if (opts.debug_info && di_builder_ && di_file_) {
+  DIScope* previous_scope = ctx_->DebugInfo().GetScope();
+  auto* di_builder = ctx_->DebugInfo().GetBuilder();
+  auto* di_file = ctx_->DebugInfo().GetFile();
+  if (opts.debug_info && di_builder && di_file) {
     auto debug_type_from_token = [&](const Token& tok) -> DIType* {
       switch (tok.kind) {
         case Token::Type::BOOL_SPECIFIER:
-          return di_builder_->createBasicType("bool", 1, dwarf::DW_ATE_boolean);
+          return di_builder->createBasicType("bool", 1, dwarf::DW_ATE_boolean);
         case Token::Type::INT32_SPECIFIER:
-          return di_builder_->createBasicType("int", 32, dwarf::DW_ATE_signed);
+          return di_builder->createBasicType("int", 32, dwarf::DW_ATE_signed);
         case Token::Type::INT64_SPECIFIER:
-          return di_builder_->createBasicType("int", 64, dwarf::DW_ATE_signed);
+          return di_builder->createBasicType("int", 64, dwarf::DW_ATE_signed);
         case Token::Type::FLT32_SPECIFIER:
-          return di_builder_->createBasicType("float", 32, dwarf::DW_ATE_float);
+          return di_builder->createBasicType("float", 32, dwarf::DW_ATE_float);
         case Token::Type::FLT64_SPECIFIER:
-          return di_builder_->createBasicType("double", 64,
-                                              dwarf::DW_ATE_float);
+          return di_builder->createBasicType("double", 64, dwarf::DW_ATE_float);
         case Token::Type::STR_SPECIFIER: {
-          auto* char_ty = di_builder_->createBasicType(
-              "char", 8, dwarf::DW_ATE_signed_char);
-          return di_builder_->createPointerType(char_ty, 64);
+          auto* char_ty =
+              di_builder->createBasicType("char", 8, dwarf::DW_ATE_signed_char);
+          return di_builder->createPointerType(char_ty, 64);
         }
         case Token::Type::VOID_SPECIFIER:
         default:
-          return di_builder_->createUnspecifiedType("void");
+          return di_builder->createUnspecifiedType("void");
       }
     };
 
@@ -555,14 +437,14 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
     if (proto_stmt) {
       param_types.push_back(debug_type_from_token(proto_stmt->return_type));
       for (const auto& arg : proto_stmt->args) {
-        param_types.push_back(ResolveDebugType(arg.resolved_type));
+        param_types.push_back(ctx_->DebugInfo().ResolveType(arg.resolved_type));
       }
     } else {
-      param_types.push_back(di_builder_->createUnspecifiedType("void"));
+      param_types.push_back(di_builder->createUnspecifiedType("void"));
     }
 
-    auto* subroutine = di_builder_->createSubroutineType(
-        di_builder_->getOrCreateTypeArray(ArrayRef<Metadata*>(param_types)));
+    auto* subroutine = di_builder->createSubroutineType(
+        di_builder->getOrCreateTypeArray(ArrayRef<Metadata*>(param_types)));
     unsigned line = 1;
     if (proto_stmt) {
       line = static_cast<unsigned>(proto_stmt->name.location.line == 0
@@ -570,13 +452,13 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
                                        : proto_stmt->name.location.line);
     }
 
-    auto* subprogram = di_builder_->createFunction(
-        di_file_, func->getName(), func->getName(), di_file_, line, subroutine,
+    auto* subprogram = di_builder->createFunction(
+        di_file, func->getName(), func->getName(), di_file, line, subroutine,
         line, DINode::FlagPrototyped, DISubprogram::SPFlagDefinition);
     func->setSubprogram(subprogram);
-    di_scope_ = subprogram;
+    ctx_->DebugInfo().SetScope(subprogram);
     if (proto_stmt) {
-      SetDebugLocation(proto_stmt->name.location);
+      ctx_->DebugInfo().SetLocation(proto_stmt->name.location);
 
       size_t arg_index = 0;
       for (auto& arg : func->args()) {
@@ -594,13 +476,14 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
                                       ? 1
                                       : arg_meta.identifier.location.column);
 
-        auto* dbg_param = di_builder_->createParameterVariable(
-            di_scope_, arg_meta.identifier.lexeme,
-            static_cast<unsigned>(arg_index + 1), di_file_, line,
-            ResolveDebugType(arg_meta.resolved_type), true);
-        auto* dl = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
-        di_builder_->insertDbgValueIntrinsic(
-            &arg, dbg_param, di_builder_->createExpression(), dl, entry);
+        auto* dbg_param = di_builder->createParameterVariable(
+            ctx_->DebugInfo().GetScope(), arg_meta.identifier.lexeme,
+            static_cast<unsigned>(arg_index + 1), di_file, line,
+            ctx_->DebugInfo().ResolveType(arg_meta.resolved_type), true);
+        auto* dl = DILocation::get(ctx_->GetContext(), line, col,
+                                   ctx_->DebugInfo().GetScope());
+        di_builder->insertDbgValueIntrinsic(
+            &arg, dbg_param, di_builder->createExpression(), dl, entry);
         ++arg_index;
       }
     }
@@ -619,13 +502,13 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
   }
 
   verifyFunction(*func);
-  di_scope_ = previous_scope;
+  ctx_->DebugInfo().SetScope(previous_scope);
   di_locals_.clear();
   return func;
 }
 
 Value* Codegen::Visit(FunctionProto& stmt) {
-  SetDebugLocation(stmt.name.location);
+  ctx_->DebugInfo().SetLocation(stmt.name.location);
   Type* ret_type = ctx_->CreateTypeFromToken(stmt.return_type);
 
   std::vector<Type*> arg_types;
@@ -660,7 +543,7 @@ Value* Codegen::Visit(FunctionProto& stmt) {
 }
 
 Value* Codegen::Visit(ReturnStmt& stmt) {
-  SetDebugLocation(stmt.ret_token.location);
+  ctx_->DebugInfo().SetLocation(stmt.ret_token.location);
   if (stmt.value->type->Void()) {
     return ctx_->CreateVoidReturn();
   }
@@ -670,29 +553,31 @@ Value* Codegen::Visit(ReturnStmt& stmt) {
 }
 
 Value* Codegen::Visit(VarDeclarationStmt& stmt) {
-  SetDebugLocation(stmt.name.location);
+  ctx_->DebugInfo().SetLocation(stmt.name.location);
   Value* init = stmt.value->Accept(*this);
   Type* ty = ResolveType(stmt.value->type);
   AllocaInst* slot = ctx_->CreateAlloca(ty, nullptr, stmt.name.lexeme);
   ctx_->CreateStore(init, slot);
 
-  if (opts.debug_info && di_builder_ && di_scope_) {
+  auto* di_builder = ctx_->DebugInfo().GetBuilder();
+  auto* di_file = ctx_->DebugInfo().GetFile();
+  if (opts.debug_info && di_builder && ctx_->DebugInfo().GetScope()) {
     unsigned line = static_cast<unsigned>(
         stmt.name.location.line == 0 ? 1 : stmt.name.location.line);
     unsigned col = static_cast<unsigned>(
         stmt.name.location.column == 0 ? 1 : stmt.name.location.column);
-    auto* variable = di_builder_->createAutoVariable(
-        di_scope_, stmt.name.lexeme, di_file_, line,
-        ResolveDebugType(stmt.value->type));
-    di_builder_->insertDeclare(
-        slot, variable, di_builder_->createExpression(),
-        DILocation::get(ctx_->GetContext(), line, col, di_scope_),
-        ctx_->GetBuilder().GetInsertBlock());
+    auto* variable = di_builder->createAutoVariable(
+        ctx_->DebugInfo().GetScope(), stmt.name.lexeme, di_file, line,
+        ctx_->DebugInfo().ResolveType(stmt.value->type));
+    di_builder->insertDeclare(slot, variable, di_builder->createExpression(),
+                              DILocation::get(ctx_->GetContext(), line, col,
+                                              ctx_->DebugInfo().GetScope()),
+                              ctx_->GetBuilder().GetInsertBlock());
 
     if (stmt.HasID()) {
       di_locals_[stmt.GetID()] = variable;
     }
-    EmitDbgValue(init, variable, stmt.name.location);
+    ctx_->DebugInfo().EmitValue(init, variable, stmt.name.location);
   }
 
   if (stmt.HasID()) {
@@ -710,7 +595,7 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
 }
 
 Value* Codegen::Visit(Conditional& expr) {
-  SetDebugLocation(expr.op.location);
+  ctx_->DebugInfo().SetLocation(expr.op.location);
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -726,7 +611,7 @@ Value* Codegen::Visit(Conditional& expr) {
 }
 
 Value* Codegen::Visit(Binary& expr) {
-  SetDebugLocation(expr.op.location);
+  ctx_->DebugInfo().SetLocation(expr.op.location);
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -742,7 +627,7 @@ Value* Codegen::Visit(Binary& expr) {
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
-  SetDebugLocation(expr.op.location);
+  ctx_->DebugInfo().SetLocation(expr.op.location);
   auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
@@ -767,7 +652,7 @@ Value* Codegen::Visit(PreFixOp& expr) {
   if (expr.HasID()) {
     auto it = di_locals_.find(expr.GetID());
     if (it != di_locals_.end()) {
-      EmitDbgValue(result, it->second, expr.name.location);
+      ctx_->DebugInfo().EmitValue(result, it->second, expr.name.location);
     }
   }
 
@@ -775,7 +660,7 @@ Value* Codegen::Visit(PreFixOp& expr) {
 }
 
 Value* Codegen::Visit(Assign& expr) {
-  SetDebugLocation(expr.name.location);
+  ctx_->DebugInfo().SetLocation(expr.name.location);
   auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second->IsVariable()) {
     return nullptr;
@@ -795,14 +680,14 @@ Value* Codegen::Visit(Assign& expr) {
   if (expr.HasID()) {
     auto it = di_locals_.find(expr.GetID());
     if (it != di_locals_.end()) {
-      EmitDbgValue(value, it->second, expr.name.location);
+      ctx_->DebugInfo().EmitValue(value, it->second, expr.name.location);
     }
   }
   return value;
 }
 
 Value* Codegen::Visit(MemberAssign& expr) {
-  SetDebugLocation(expr.target->member.location);
+  ctx_->DebugInfo().SetLocation(expr.target->member.location);
   if (!expr.base_id.has_value() || !expr.target->field_index.has_value()) {
     return nullptr;
   }
@@ -839,7 +724,7 @@ Value* Codegen::Visit(MemberAssign& expr) {
 
 Value* Codegen::Visit(CallExpr& expr) {
   if (auto loc = ExprLocation(expr.callee.get())) {
-    SetDebugLocation(*loc);
+    ctx_->DebugInfo().SetLocation(*loc);
   }
   if (expr.type->kind == types::TypeKind::Struct) {
     std::error_code ec;
@@ -880,7 +765,7 @@ Value* Codegen::Visit(CallExpr& expr) {
 }
 
 Value* Codegen::Visit(MemberAccess& expr) {
-  SetDebugLocation(expr.member.location);
+  ctx_->DebugInfo().SetLocation(expr.member.location);
   if (expr.field_index.has_value()) {
     Value* object = expr.object->Accept(*this);
     if (!object) {
@@ -922,13 +807,13 @@ Value* Codegen::Visit(MemberAccess& expr) {
 
 Value* Codegen::Visit(Grouping& expr) {
   if (auto loc = ExprLocation(expr.expr.get())) {
-    SetDebugLocation(*loc);
+    ctx_->DebugInfo().SetLocation(*loc);
   }
   return expr.expr->Accept(*this);
 }
 
 Value* Codegen::Visit(Variable& expr) {
-  SetDebugLocation(expr.name.location);
+  ctx_->DebugInfo().SetLocation(expr.name.location);
   if (expr.HasID()) {
     auto it = ir_bindings_.find(expr.id.value());
     if (it != ir_bindings_.end()) {
