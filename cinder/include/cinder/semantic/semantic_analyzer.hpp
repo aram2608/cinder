@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "cinder/ast/expr/expr.hpp"
@@ -25,6 +26,9 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   Environment env_;                    /**< Lexical scope stack. */
   cinder::types::Type* current_return; /**< Active function return type. */
   DiagnosticEngine diagnose_;          /**< Collected diagnostics. */
+  std::string current_mod_;
+  using ImportedMods = std::vector<std::string>;
+  std::unordered_map<std::string, ImportedMods> imported_mods_;
 
   /// We need to declare we are using these so the compiler knows which methods
   /// are available
@@ -43,13 +47,16 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   void Visit(FunctionProto& stmt) override;
   void Visit(ReturnStmt& stmt) override;
   void Visit(VarDeclarationStmt& stmt) override;
+  void Visit(StructStmt& stmt) override;
   ///@}
 
   /** @name Expression visitor overrides */
   ///@{
   void Visit(Variable& expr) override;
+  void Visit(MemberAccess& expr) override;
   void Visit(Binary& expr) override;
   void Visit(Assign& expr) override;
+  void Visit(MemberAssign& expr) override;
   void Visit(Grouping& expr) override;
   void Visit(Conditional& expr) override;
   void Visit(PreFixOp& expr) override;
@@ -68,6 +75,11 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   void Resolve(Expr& expr);
   /** @brief Looks up symbol info by source name in the current environment. */
   SymbolInfo* LookupSymbol(const std::string& name);
+  /** @brief Looks up symbol with current-module fallback. */
+  SymbolInfo* LookupInCurrentModule(const std::string& name);
+  /** @brief Joins a qualifier/member name as `qualifier.member`. */
+  std::string QualifiedName(const std::string& qualifier,
+                            const std::string& name) const;
   /** @brief Pushes a new lexical scope. */
   void BeginScope();
   /** @brief Pops the current lexical scope. */

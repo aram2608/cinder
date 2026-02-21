@@ -32,7 +32,7 @@ struct Parser {
   std::unique_ptr<Stmt> ParseModule();
 
   /** @brief Parses a function prototype signature. */
-  std::unique_ptr<Stmt> FunctionPrototype();
+  std::unique_ptr<Stmt> FunctionPrototype(bool is_extern = false);
 
   /** @brief Parses either an extern prototype or a full function definition. */
   std::unique_ptr<Stmt> ExternFunction();
@@ -59,7 +59,16 @@ struct Parser {
   std::unique_ptr<Stmt> ReturnStatement();
 
   /** @brief Parses a variable declaration statement. */
-  std::unique_ptr<Stmt> VarDeclaration();
+  std::unique_ptr<Stmt> VarDeclaration(cinder::Token type_token);
+
+  /** @brief Parses a primitive or qualified type token. */
+  cinder::Token ParseTypeToken(const std::string& context);
+
+  /** @brief Checks if current position starts a type declaration. */
+  bool IsTypeDeclarationStart();
+
+  /** @brief Parses a struct declaration statement. */
+  std::unique_ptr<Stmt> StructDeclaration();
 
   /** @brief Parses an expression statement terminated by `;`. */
   std::unique_ptr<Stmt> ExpressionStatement();
@@ -121,6 +130,9 @@ struct Parser {
    * @return `true` when the current token matches `type`.
    */
   bool CheckType(cinder::Token::Type type);
+
+  /** @brief Checks whether the next token has kind `type`. */
+  bool CheckNextType(cinder::Token::Type type);
 
   /** @brief Returns the current token without consuming it. */
   cinder::Token Peek();

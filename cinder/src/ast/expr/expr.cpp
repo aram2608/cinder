@@ -5,6 +5,7 @@
 #include <system_error>
 #include <variant>
 
+#include "cinder/frontend/tokens.hpp"
 #include "cinder/semantic/symbol.hpp"
 
 using namespace cinder;
@@ -16,6 +17,9 @@ bool Expr::IsLiteral() {
 }
 bool Expr::IsVariable() {
   return expr_type == ExprType::Variable;
+}
+bool Expr::IsMemberAccess() {
+  return expr_type == ExprType::MemberAccess;
 }
 bool Expr::IsGrouping() {
   return expr_type == ExprType::Grouping;
@@ -31,6 +35,9 @@ bool Expr::IsCallExpr() {
 }
 bool Expr::IsAssign() {
   return expr_type == ExprType::Assign;
+}
+bool Expr::IsMemberAssign() {
+  return expr_type == ExprType::MemberAssign;
 }
 bool Expr::IsConditional() {
   return expr_type == ExprType::Conditional;
@@ -67,6 +74,21 @@ void Variable::Accept(SemanticExprVisitor& visitor) {
 }
 
 std::string Variable::Accept(ExprDumperVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+MemberAccess::MemberAccess(std::unique_ptr<Expr> object, Token member)
+    : Expr(ExprType::MemberAccess), object(std::move(object)), member(member) {}
+
+Value* MemberAccess::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void MemberAccess::Accept(SemanticExprVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
+std::string MemberAccess::Accept(ExprDumperVisitor& visitor) {
   return visitor.Visit(*this);
 }
 
@@ -131,6 +153,24 @@ void Assign::Accept(SemanticExprVisitor& visitor) {
 }
 
 std::string Assign::Accept(ExprDumperVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+MemberAssign::MemberAssign(std::unique_ptr<MemberAccess> target,
+                           std::unique_ptr<Expr> value)
+    : Expr(ExprType::MemberAssign),
+      target(std::move(target)),
+      value(std::move(value)) {}
+
+Value* MemberAssign::Accept(CodegenExprVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void MemberAssign::Accept(SemanticExprVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
+std::string MemberAssign::Accept(ExprDumperVisitor& visitor) {
   return visitor.Visit(*this);
 }
 

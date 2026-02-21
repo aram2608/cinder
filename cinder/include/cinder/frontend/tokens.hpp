@@ -99,6 +99,7 @@ struct Token {
   std::string lexeme;                /**< Source spelling for the token. */
   std::optional<TokenValue> literal; /**< Parsed literal value, if present. */
 
+  Token() = default;
   /**
    * @brief Constructs a token.
    * @param kind Token category.

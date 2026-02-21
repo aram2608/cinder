@@ -97,10 +97,10 @@ target_compile_options(cinder_core
     PRIVATE
       ${LLVM_EXTRA_CXXFLAGS}
       -g
-      -Wall
-      -Wextra
-      -pedantic
-      -Wno-unused-parameter
+      $<$<CONFIG:Debug>:-Wall>
+      $<$<CONFIG:Debug>:-Wextra>
+      $<$<CONFIG:Debug>:-pedantic>
+      $<$<CONFIG:Debug>:-Wno-unused-parameter>
       -fno-exceptions
 )
 
@@ -125,10 +125,10 @@ target_link_libraries(cinder_core
 target_compile_options(cinder
     PRIVATE
       -g
-      -Wall
-      -Wextra
-      -pedantic
-      -Wno-unused-parameter
+      $<$<CONFIG:Debug>:-Wall>
+      $<$<CONFIG:Debug>:-Wextra>
+      $<$<CONFIG:Debug>:-pedantic>
+      $<$<CONFIG:Debug>:-Wno-unused-parameter>
       -fno-exceptions
 )
 

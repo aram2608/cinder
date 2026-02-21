@@ -41,6 +41,9 @@ bool Stmt::IsWhile() {
 bool Stmt::IsImport() {
   return stmt_type == StmtType::Import;
 }
+bool Stmt::IsStruct() {
+  return stmt_type == StmtType::Struct;
+}
 
 bool Stmt::HasID() {
   return id.has_value();
@@ -80,12 +83,14 @@ void ExpressionStmt::Accept(SemanticStmtVisitor& visitor) {
 }
 
 FunctionProto::FunctionProto(Token name, Token return_type,
-                             std::vector<FuncArg> args, bool is_variadic)
+                             std::vector<FuncArg> args, bool is_variadic,
+                             bool is_extern)
     : Stmt(StmtType::FunctionProto),
       name(name),
       return_type(return_type),
       args(args),
-      is_variadic(is_variadic) {}
+      is_variadic(is_variadic),
+      is_extern(is_extern) {}
 
 Value* FunctionProto::Accept(StmtVisitor& visitor) {
   return visitor.Visit(*this);
@@ -221,5 +226,20 @@ void ImportStmt::Accept(SemanticStmtVisitor& visitor) {
 }
 
 std::string ImportStmt::Accept(StmtDumperVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+StructStmt::StructStmt(cinder::Token name, std::vector<cinder::FuncArg> fields)
+    : Stmt(StmtType::Struct), name(name), fields(std::move(fields)) {}
+
+llvm::Value* StructStmt::Accept(StmtVisitor& visitor) {
+  return visitor.Visit(*this);
+}
+
+void StructStmt::Accept(SemanticStmtVisitor& visitor) {
+  visitor.Visit(*this);
+}
+
+std::string StructStmt::Accept(StmtDumperVisitor& visitor) {
   return visitor.Visit(*this);
 }

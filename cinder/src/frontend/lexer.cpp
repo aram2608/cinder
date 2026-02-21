@@ -15,6 +15,7 @@ static const std::unordered_map<std::string, Token::Type> key_words = {
     {"int32", Token::Type::INT32_SPECIFIER},
     {"int64", Token::Type::INT64_SPECIFIER},
     {"flt32", Token::Type::FLT32_SPECIFIER},
+    {"flt64", Token::Type::FLT64_SPECIFIER},
     {"str", Token::Type::STR_SPECIFIER},
     {"bool", Token::Type::BOOL_SPECIFIER},
     {"struct", Token::Type::STRUCT_SPECIFIER},

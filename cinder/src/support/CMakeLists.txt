@@ -4,4 +4,5 @@ target_sources(cinder_core
       raw_outstream.cpp
       diagnostic.cpp
       error_category.cpp
+      ast_dumper.cpp
 )

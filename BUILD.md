@@ -46,6 +46,29 @@ cmake --build build
 
 If `clang-tidy` is not installed, CMake prints a warning.
 
+## Build and Run Unit Tests (Direct Command)
+
+Unit tests use GoogleTest and are enabled by default (`CINDER_BUILD_TESTS=ON`).
+
+Configure + build with tests:
+
+```bash
+cmake -S . -B build -DCINDER_BUILD_TESTS=ON
+cmake --build build
+```
+
+Run all tests:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+You can disable test targets when needed:
+
+```bash
+cmake -S . -B build -DCINDER_BUILD_TESTS=OFF
+```
+
 ## Build With CMake Presets
 
 Available configure presets:
@@ -53,6 +76,7 @@ Available configure presets:
 - `debug`
 - `release`
 - `debug-clang-tidy`
+- `debug-tests`
 - `release-clang-tidy`
 
 Available build presets:
@@ -60,7 +84,12 @@ Available build presets:
 - `build-debug`
 - `build-release`
 - `build-debug-clang-tidy`
+- `build-debug-tests`
 - `build-release-clang-tidy`
+
+Available test presets:
+
+- `test-debug`
 
 Debug build:
 
@@ -88,6 +117,14 @@ Release with clang-tidy:
 ```bash
 cmake --preset release-clang-tidy
 cmake --build --preset build-release-clang-tidy
+```
+
+Debug build with tests + run tests:
+
+```bash
+cmake --preset debug-tests
+cmake --build --preset build-debug-tests
+ctest --preset test-debug
 ```
 
 ## Output Locations

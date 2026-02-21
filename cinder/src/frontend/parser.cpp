@@ -2,8 +2,10 @@
 
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <optional>
 
+#include "cinder/ast/expr/expr.hpp"
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/support/raw_outstream.hpp"
 
@@ -34,7 +36,7 @@ std::unique_ptr<Stmt> Parser::ParseModule() {
   return std::make_unique<ModuleStmt>(name, std::move(statements));
 }
 
-std::unique_ptr<Stmt> Parser::FunctionPrototype() {
+std::unique_ptr<Stmt> Parser::FunctionPrototype(bool is_extern) {
   Token name =
       Consume(Token::Type::IDENTIFER, "expected identifier after 'def'");
   Consume(Token::Type::LPAREN, "expected '(' after function name");
@@ -51,7 +53,7 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
         is_variadic = true;
         break;
       }
-      Token type = Advance();
+      Token type = ParseTypeToken("expected arg type");
       Token identifier = Consume(Token::Type::IDENTIFER, "expected arg name");
       args.emplace_back(type, identifier);
     } while (MatchType({Token::Type::COMMA}));
@@ -59,13 +61,14 @@ std::unique_ptr<Stmt> Parser::FunctionPrototype() {
   Consume(Token::Type::RPAREN,
           "expected ')' after end of function declaration");
   Consume(Token::Type::ARROW, "expected '->' prior to the return type");
-  Token return_type = Advance();
-  return std::make_unique<FunctionProto>(name, return_type, args, is_variadic);
+  Token return_type = ParseTypeToken("expected return type");
+  return std::make_unique<FunctionProto>(name, return_type, args, is_variadic,
+                                         is_extern);
 }
 
 std::unique_ptr<Stmt> Parser::ExternFunction() {
   if (MatchType({Token::Type::EXTERN})) {
-    return FunctionPrototype();
+    return FunctionPrototype(true);
   }
   return Function();
 }
@@ -84,8 +87,14 @@ std::unique_ptr<Stmt> Parser::Function() {
 }
 
 std::unique_ptr<Stmt> Parser::Statement() {
-  if (MatchType(&Token::IsPrimitive)) {
-    return VarDeclaration();
+  if (Peek().IsPrimitive()) {
+    return VarDeclaration(ParseTypeToken("expected type specifier"));
+  }
+  if (IsTypeDeclarationStart()) {
+    return VarDeclaration(ParseTypeToken("expected type specifier"));
+  }
+  if (MatchType({Token::Type::STRUCT_SPECIFIER})) {
+    return StructDeclaration();
   }
   if (MatchType({Token::Type::RETURN})) {
     return ReturnStatement();
@@ -154,10 +163,10 @@ std::unique_ptr<Stmt> Parser::ReturnStatement() {
   return std::make_unique<ReturnStmt>(tok, std::move(expr));
 }
 
-std::unique_ptr<Stmt> Parser::VarDeclaration() {
-  Token specifier = Previous();
+std::unique_ptr<Stmt> Parser::VarDeclaration(Token specifier) {
   Consume(Token::Type::COLON, "expected ':' after type specifier");
-  Token var = Advance();
+  Token var =
+      Consume(Token::Type::IDENTIFER, "expected variable name after ':'");
   std::unique_ptr<Expr> initializer;
   if (MatchType({Token::Type::EQ})) {
     initializer = Expression();
@@ -168,6 +177,24 @@ std::unique_ptr<Stmt> Parser::VarDeclaration() {
   Consume(Token::Type::SEMICOLON, "expected ';' after variable declaration");
   return std::make_unique<VarDeclarationStmt>(specifier, var,
                                               std::move(initializer));
+}
+
+std::unique_ptr<Stmt> Parser::StructDeclaration() {
+  Token name =
+      Consume(Token::Type::IDENTIFER, "expected struct name after 'struct'");
+
+  std::vector<FuncArg> fields;
+  while (!CheckType(Token::Type::END) && !IsEnd()) {
+    Token field_type = ParseTypeToken("expected field type in struct");
+    Consume(Token::Type::COLON, "expected ':' after field type");
+    Token field_name =
+        Consume(Token::Type::IDENTIFER, "expected field name in struct");
+    Consume(Token::Type::SEMICOLON, "expected ';' after struct field");
+    fields.emplace_back(field_type, field_name);
+  }
+
+  Consume(Token::Type::END, "expected 'end' after struct declaration");
+  return std::make_unique<StructStmt>(name, std::move(fields));
 }
 
 std::unique_ptr<Stmt> Parser::ExpressionStatement() {
@@ -183,10 +210,15 @@ std::unique_ptr<Expr> Parser::Expression() {
 std::unique_ptr<Expr> Parser::Assignment() {
   std::unique_ptr<Expr> expr = Comparison();
   if (MatchType({Token::Type::EQ})) {
-    Token eq = Previous();
     std::unique_ptr<Expr> value = Assignment();
     if (auto* var = dynamic_cast<Variable*>(expr.get())) {
       return std::make_unique<Assign>(var->name, std::move(value));
+    }
+    if (dynamic_cast<MemberAccess*>(expr.get())) {
+      std::unique_ptr<MemberAccess> target(
+          static_cast<MemberAccess*>(expr.release()));
+      return std::make_unique<MemberAssign>(std::move(target),
+                                            std::move(value));
     }
   }
   return expr;
@@ -234,21 +266,33 @@ std::unique_ptr<Expr> Parser::PreIncrement() {
 std::unique_ptr<Expr> Parser::Call() {
   std::unique_ptr<Expr> expr = Atom();
 
-  if (MatchType({Token::Type::LPAREN})) {
-    const size_t MAX_ARGS = 255;
-    std::vector<std::unique_ptr<Expr>> args;
-    if (!CheckType(Token::Type::RPAREN)) {
-      do {
-        if (args.size() >= MAX_ARGS) {
-          std::cout << "max number of allowed arguments reached\n";
-          exit(1);
-        }
-        args.push_back(Expression());
-      } while (MatchType({Token::Type::COMMA}));
+  while (true) {
+    if (MatchType({Token::Type::DOT})) {
+      Token member =
+          Consume(Token::Type::IDENTIFER, "expected member name after '.'");
+      expr = std::make_unique<MemberAccess>(std::move(expr), member);
+      continue;
     }
 
-    Consume(Token::Type::RPAREN, "expected ')' after call");
-    expr = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+    if (MatchType({Token::Type::LPAREN})) {
+      const size_t MAX_ARGS = 255;
+      std::vector<std::unique_ptr<Expr>> args;
+      if (!CheckType(Token::Type::RPAREN)) {
+        do {
+          if (args.size() >= MAX_ARGS) {
+            std::cout << "max number of allowed arguments reached\n";
+            exit(1);
+          }
+          args.push_back(Expression());
+        } while (MatchType({Token::Type::COMMA}));
+      }
+
+      Consume(Token::Type::RPAREN, "expected ')' after call");
+      expr = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+      continue;
+    }
+
+    break;
   }
 
   return expr;
@@ -285,6 +329,43 @@ std::unique_ptr<Expr> Parser::Atom() {
   return nullptr;
 }
 
+Token Parser::ParseTypeToken(const std::string& context) {
+  if (MatchType(&Token::IsPrimitive)) {
+    return Previous();
+  }
+
+  Token type = Consume(Token::Type::IDENTIFER, context);
+  if (!CheckType(Token::Type::DOT)) {
+    return type;
+  }
+
+  std::string qualified = type.lexeme;
+  while (MatchType({Token::Type::DOT})) {
+    Token part = Consume(Token::Type::IDENTIFER,
+                         "expected identifier after '.' in type name");
+    qualified += "." + part.lexeme;
+  }
+
+  return Token(Token::Type::IDENTIFER, type.location, qualified);
+}
+
+bool Parser::IsTypeDeclarationStart() {
+  if (!CheckType(Token::Type::IDENTIFER)) {
+    return false;
+  }
+
+  size_t idx = current_tok_ + 1;
+  while (idx + 1 < tokens_.size() && tokens_[idx].kind == Token::Type::DOT &&
+         tokens_[idx + 1].kind == Token::Type::IDENTIFER) {
+    idx += 2;
+  }
+
+  if (idx >= tokens_.size()) {
+    return false;
+  }
+  return tokens_[idx].kind == Token::Type::COLON;
+}
+
 bool Parser::MatchType(std::initializer_list<Token::Type> types) {
   for (Token::Type type : types) {
     if (Peek().kind == type) {
@@ -312,6 +393,13 @@ bool Parser::CheckType(Token::Type type) {
     return false;
   }
   return Peek().kind == type;
+}
+
+bool Parser::CheckNextType(Token::Type type) {
+  if (current_tok_ + 1 >= tokens_.size()) {
+    return false;
+  }
+  return tokens_[current_tok_ + 1].kind == type;
 }
 
 Token Parser::Previous() {

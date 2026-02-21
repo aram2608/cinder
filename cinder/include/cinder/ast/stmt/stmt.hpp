@@ -24,6 +24,7 @@ struct IfStmt;
 struct ForStmt;
 struct WhileStmt;
 struct ImportStmt;
+struct StructStmt;
 
 /** @brief Code generation visitor interface for statement nodes. */
 struct StmtVisitor {
@@ -38,6 +39,7 @@ struct StmtVisitor {
   virtual llvm::Value* Visit(ForStmt& stmt) = 0;
   virtual llvm::Value* Visit(WhileStmt& stmt) = 0;
   virtual llvm::Value* Visit(ImportStmt& stmt) = 0;
+  virtual llvm::Value* Visit(StructStmt& stmt) = 0;
 };
 
 /** @brief Semantic analysis visitor interface for statement nodes. */
@@ -53,6 +55,7 @@ struct SemanticStmtVisitor {
   virtual void Visit(ForStmt& stmt) = 0;
   virtual void Visit(WhileStmt& stmt) = 0;
   virtual void Visit(ImportStmt& stmt) = 0;
+  virtual void Visit(StructStmt& stmt) = 0;
 };
 
 struct StmtDumperVisitor {
@@ -67,6 +70,7 @@ struct StmtDumperVisitor {
   virtual std::string Visit(ForStmt& stmt) = 0;
   virtual std::string Visit(WhileStmt& stmt) = 0;
   virtual std::string Visit(ImportStmt& stmt) = 0;
+  virtual std::string Visit(StructStmt& stmt) = 0;
 };
 
 /** @brief Abstract base class for all statement AST nodes. */
@@ -82,6 +86,7 @@ struct Stmt {
     For,
     While,
     Import,
+    Struct,
   };
 
   StmtType stmt_type;
@@ -125,6 +130,8 @@ struct Stmt {
   bool IsWhile();
   /** @brief Returns whether this node is `ImportStmt`. */
   bool IsImport();
+  /** @brief Returns whether this node is `StructStmt`. */
+  bool IsStruct();
 
   /** @brief Returns whether this node's id contains a value. */
   bool HasID();
@@ -198,9 +205,11 @@ struct FunctionProto : Stmt {
   cinder::Token return_type;         /**< Return type token. */
   std::vector<cinder::FuncArg> args; /**< Function parameter list. */
   bool is_variadic; /**< True when prototype accepts varargs. */
+  bool is_extern;   /**< True when declared with `extern`. */
 
   FunctionProto(cinder::Token name, cinder::Token return_type,
-                std::vector<cinder::FuncArg> args, bool is_variadic);
+                std::vector<cinder::FuncArg> args, bool is_variadic,
+                bool is_extern = false);
 
   /**
    * @brief Accepts a code generation visitor.
@@ -342,6 +351,18 @@ struct ImportStmt : Stmt {
    */
   llvm::Value* Accept(StmtVisitor& visitor) override;
   /** @brief Accepts a semantic analysis visitor. */
+  void Accept(SemanticStmtVisitor& visitor) override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
+};
+
+/** @brief Struct declaration statement node. */
+struct StructStmt : Stmt {
+  cinder::Token name;
+  std::vector<cinder::FuncArg> fields;
+
+  StructStmt(cinder::Token name, std::vector<cinder::FuncArg> fields);
+
+  llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
   std::string Accept(StmtDumperVisitor& visitor) override;
 };

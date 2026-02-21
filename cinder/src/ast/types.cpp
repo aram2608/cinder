@@ -31,11 +31,24 @@ bool types::Type::Struct() {
 }
 
 bool types::Type::IsThisType(types::Type* type) {
-  return kind == type->kind;
+  if (!type || kind != type->kind) {
+    return false;
+  }
+
+  if (kind == types::TypeKind::Struct) {
+    auto lhs = CastTo<types::StructType>();
+    auto rhs = type->CastTo<types::StructType>();
+    if (lhs.getError() || rhs.getError()) {
+      return false;
+    }
+    return lhs.get()->name == rhs.get()->name;
+  }
+
+  return true;
 }
 
 bool types::Type::IsThisType(types::Type& type) {
-  return kind == type.kind;
+  return IsThisType(&type);
 }
 
 bool types::Type::IsThisType(types::TypeKind type) {
@@ -44,4 +57,13 @@ bool types::Type::IsThisType(types::TypeKind type) {
 
 bool types::FunctionType::IsVariadic() {
   return is_variadic;
+}
+
+int types::StructType::FieldIndex(const std::string& field) const {
+  for (size_t i = 0; i < field_names.size(); ++i) {
+    if (field_names[i] == field) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }

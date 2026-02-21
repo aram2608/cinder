@@ -10,6 +10,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 option(CINDER_ENABLE_CLANG_TIDY "Enable clang-tidy during build" OFF)
+option(CINDER_BUILD_TESTS "Build Cinder unit tests" ON)
 if(CINDER_ENABLE_CLANG_TIDY)
   find_program(CLANG_TIDY_EXE NAMES clang-tidy)
   if(CLANG_TIDY_EXE)
@@ -67,3 +68,8 @@ message(STATUS "=== end diagnostics ===")
 message(STATUS "")
 
 add_subdirectory(cinder)
+
+if(CINDER_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

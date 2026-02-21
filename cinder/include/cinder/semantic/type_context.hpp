@@ -1,6 +1,9 @@
 #ifndef TYPE_CONTEXT_H_
 #define TYPE_CONTEXT_H_
 
+#include <string>
+#include <unordered_map>
+
 #include "cinder/ast/types.hpp"
 
 /**
@@ -38,6 +41,14 @@ class TypeContext {
       cinder::types::Type* ret, std::vector<cinder::types::Type*> params,
       bool variadic);
 
+  /** @brief Creates or replaces a struct type by name. */
+  cinder::types::StructType* Struct(std::string name,
+                                    std::vector<std::string> field_names,
+                                    std::vector<cinder::types::Type*> fields);
+
+  /** @brief Looks up a struct type by name. */
+  cinder::types::StructType* LookupStruct(const std::string& name);
+
  private:
   cinder::types::IntType int32_{32, true};
   cinder::types::IntType int64_{64, true};
@@ -50,6 +61,8 @@ class TypeContext {
   std::vector<std::unique_ptr<cinder::types::FunctionType>>
       function_pool_; /**< Owning pool for dynamically created function types.
                        */
+  std::unordered_map<std::string, std::unique_ptr<cinder::types::StructType>>
+      struct_types_;
 };
 
 #endif

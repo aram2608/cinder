@@ -16,11 +16,13 @@ struct AstDumper : ExprDumperVisitor, StmtDumperVisitor {
   using StmtDumperVisitor::Visit;
   std::string Visit(Literal& expr) override;
   std::string Visit(Variable& expr) override;
+  std::string Visit(MemberAccess& expr) override;
   std::string Visit(Grouping& expr) override;
   std::string Visit(PreFixOp& expr) override;
   std::string Visit(Binary& expr) override;
   std::string Visit(CallExpr& expr) override;
   std::string Visit(Assign& expr) override;
+  std::string Visit(MemberAssign& expr) override;
   std::string Visit(Conditional& expr) override;
 
   std::string Visit(ExpressionStmt& stmt) override;
@@ -33,6 +35,7 @@ struct AstDumper : ExprDumperVisitor, StmtDumperVisitor {
   std::string Visit(ForStmt& stmt) override;
   std::string Visit(WhileStmt& stmt) override;
   std::string Visit(ImportStmt& stmt) override;
+  std::string Visit(StructStmt& stmt) override;
 };
 
 }  // namespace cinder

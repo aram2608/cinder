@@ -1,4 +1,4 @@
-#include "cinder/ast/ast_dumper.hpp"
+#include "cinder/support/ast_dumper.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -87,6 +87,11 @@ std::string AstDumper::Visit(Variable& expr) {
   return "Variable " + expr.name.lexeme;
 }
 
+std::string AstDumper::Visit(MemberAccess& expr) {
+  return "MemberAccess " + expr.object->Accept(*this) + "." +
+         expr.member.lexeme;
+}
+
 std::string AstDumper::Visit(Grouping& expr) {
   std::string out = "Grouping\n";
   AppendTreeBlock(&out, "", true, "expr", expr.expr->Accept(*this));
@@ -121,6 +126,14 @@ std::string AstDumper::Visit(CallExpr& expr) {
 
 std::string AstDumper::Visit(Assign& expr) {
   std::string out = "Assign " + expr.name.lexeme + "\n";
+  AppendTreeBlock(&out, "", true, "value", expr.value->Accept(*this));
+  TrimTrailingNewline(&out);
+  return out;
+}
+
+std::string AstDumper::Visit(MemberAssign& expr) {
+  std::string out = "MemberAssign\n";
+  AppendTreeBlock(&out, "", false, "target", expr.target->Accept(*this));
   AppendTreeBlock(&out, "", true, "value", expr.value->Accept(*this));
   TrimTrailingNewline(&out);
   return out;
@@ -257,4 +270,16 @@ std::string AstDumper::Visit(WhileStmt& stmt) {
 }
 std::string AstDumper::Visit(ImportStmt& stmt) {
   return "ImportStmt " + stmt.mod_name.lexeme;
+}
+
+std::string AstDumper::Visit(StructStmt& stmt) {
+  std::string out = "StructStmt " + stmt.name.lexeme + "\n";
+  for (size_t i = 0; i < stmt.fields.size(); ++i) {
+    const bool is_last = (i + 1) == stmt.fields.size();
+    const auto& field = stmt.fields[i];
+    AppendTreeBlock(&out, "", is_last, "field[" + std::to_string(i) + "]",
+                    field.type_token.lexeme + " " + field.identifier.lexeme);
+  }
+  TrimTrailingNewline(&out);
+  return out;
 }

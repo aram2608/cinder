@@ -39,3 +39,21 @@ types::FunctionType* TypeContext::Function(types::Type* ret,
       std::make_unique<types::FunctionType>(ret, std::move(params), variadic));
   return function_pool_.back().get();
 }
+
+types::StructType* TypeContext::Struct(std::string name,
+                                       std::vector<std::string> field_names,
+                                       std::vector<types::Type*> fields) {
+  auto ty = std::make_unique<types::StructType>(
+      std::move(name), std::move(field_names), std::move(fields));
+  types::StructType* raw = ty.get();
+  struct_types_[raw->name] = std::move(ty);
+  return raw;
+}
+
+types::StructType* TypeContext::LookupStruct(const std::string& name) {
+  auto it = struct_types_.find(name);
+  if (it == struct_types_.end()) {
+    return nullptr;
+  }
+  return it->second.get();
+}

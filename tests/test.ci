@@ -29,7 +29,12 @@ def main() -> int32
         ++val;
     end
 
-    int32: x = add(2, 3);
-    printf("X from imported math %d\n", x);
+    math.Vector2: p = math.Vector2(10, 20);
+    p.x = 7;
+    p.y = p.y + 3;
+    int32: result = math.sum(p);
+    printf("%d\n", result);
+
+    printf("X from imported math %d\n", 0);
     return 0;
 end

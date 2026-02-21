@@ -5,13 +5,13 @@
 #include <vector>
 
 #include "../vendor/cxxopts.hpp"
-#include "cinder/ast/ast_dumper.hpp"
 #include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/codegen/codegen.hpp"
 #include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/frontend/lexer.hpp"
 #include "cinder/frontend/module_loader.hpp"
 #include "cinder/frontend/parser.hpp"
+#include "cinder/support/ast_dumper.hpp"
 
 static std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};

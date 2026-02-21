@@ -13,15 +13,18 @@
 #include "cinder/support/error_category.hpp"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Value.h"
 #include "llvm/Support/ErrorOr.h"
 
 struct Literal;
 struct Variable;
+struct MemberAccess;
 struct Grouping;
 struct PreFixOp;
 struct Binary;
 struct CallExpr;
 struct Assign;
+struct MemberAssign;
 struct Conditional;
 
 /** @brief Code generation visitor interface for expression nodes. */
@@ -29,11 +32,13 @@ struct CodegenExprVisitor {
   virtual ~CodegenExprVisitor() = default;
   virtual llvm::Value* Visit(Literal& expr) = 0;
   virtual llvm::Value* Visit(Variable& expr) = 0;
+  virtual llvm::Value* Visit(MemberAccess& expr) = 0;
   virtual llvm::Value* Visit(Grouping& expr) = 0;
   virtual llvm::Value* Visit(PreFixOp& expr) = 0;
   virtual llvm::Value* Visit(Binary& expr) = 0;
   virtual llvm::Value* Visit(CallExpr& expr) = 0;
   virtual llvm::Value* Visit(Assign& expr) = 0;
+  virtual llvm::Value* Visit(MemberAssign& expr) = 0;
   virtual llvm::Value* Visit(Conditional& expr) = 0;
 };
 
@@ -42,11 +47,13 @@ struct SemanticExprVisitor {
   virtual ~SemanticExprVisitor() = default;
   virtual void Visit(Literal& expr) = 0;
   virtual void Visit(Variable& expr) = 0;
+  virtual void Visit(MemberAccess& expr) = 0;
   virtual void Visit(Grouping& expr) = 0;
   virtual void Visit(PreFixOp& expr) = 0;
   virtual void Visit(Binary& expr) = 0;
   virtual void Visit(CallExpr& expr) = 0;
   virtual void Visit(Assign& expr) = 0;
+  virtual void Visit(MemberAssign& expr) = 0;
   virtual void Visit(Conditional& expr) = 0;
 };
 
@@ -54,11 +61,13 @@ struct ExprDumperVisitor {
   virtual ~ExprDumperVisitor() = default;
   virtual std::string Visit(Literal& expr) = 0;
   virtual std::string Visit(Variable& expr) = 0;
+  virtual std::string Visit(MemberAccess& expr) = 0;
   virtual std::string Visit(Grouping& expr) = 0;
   virtual std::string Visit(PreFixOp& expr) = 0;
   virtual std::string Visit(Binary& expr) = 0;
   virtual std::string Visit(CallExpr& expr) = 0;
   virtual std::string Visit(Assign& expr) = 0;
+  virtual std::string Visit(MemberAssign& expr) = 0;
   virtual std::string Visit(Conditional& expr) = 0;
 };
 
@@ -67,11 +76,13 @@ struct Expr {
   enum class ExprType {
     Literal,
     Variable,
+    MemberAccess,
     Grouping,
     PreFix,
     Binary,
     Call,
     Assign,
+    MemberAssign,
     Conditional,
     Unknown
   };
@@ -103,6 +114,8 @@ struct Expr {
   bool IsLiteral();
   /** @brief Returns whether this node is `Variable`. */
   bool IsVariable();
+  /** @brief Returns whether this node is `MemberAccess`. */
+  bool IsMemberAccess();
   /** @brief Returns whether this node is `Grouping`. */
   bool IsGrouping();
   /** @brief Returns whether this node is `PreFix`. */
@@ -113,6 +126,8 @@ struct Expr {
   bool IsCallExpr();
   /** @brief Returns whether this node is `Assign`. */
   bool IsAssign();
+  /** @brief Returns whether this node is `MemberAssign`. */
+  bool IsMemberAssign();
   /** @brief Returns whether this node is `Conditional`. */
   bool IsConditional();
   /** @brief Returns whether this node's id contains a value. */
@@ -179,6 +194,23 @@ struct Variable : Expr {
    * @param visitor Codegen visitor.
    * @return Value produced by code generation.
    */
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+
+  /** @brief Accepts a semantic visitor. */
+  void Accept(SemanticExprVisitor& visitor) override;
+
+  std::string Accept(ExprDumperVisitor& visitor) override;
+};
+
+/** @brief Member access expression node (`object.member`). */
+struct MemberAccess : Expr {
+  std::unique_ptr<Expr> object; /**< Object/base expression. */
+  cinder::Token member;         /**< Accessed member identifier token. */
+  std::optional<size_t> field_index = std::nullopt;
+
+  MemberAccess(std::unique_ptr<Expr> object, cinder::Token member);
+
+  /** @brief Accepts a codegen visitor. */
   llvm::Value* Accept(CodegenExprVisitor& visitor) override;
 
   /** @brief Accepts a semantic visitor. */
@@ -287,6 +319,21 @@ struct Assign : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
+  std::string Accept(ExprDumperVisitor& visitor) override;
+};
+
+/** @brief Struct member assignment expression node (`object.member = value`).
+ */
+struct MemberAssign : Expr {
+  std::unique_ptr<MemberAccess> target;
+  std::unique_ptr<Expr> value;
+  std::optional<SymbolId> base_id = std::nullopt;
+
+  MemberAssign(std::unique_ptr<MemberAccess> target,
+               std::unique_ptr<Expr> value);
+
+  llvm::Value* Accept(CodegenExprVisitor& visitor) override;
+  void Accept(SemanticExprVisitor& visitor) override;
   std::string Accept(ExprDumperVisitor& visitor) override;
 };
 

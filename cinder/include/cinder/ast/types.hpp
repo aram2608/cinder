@@ -2,6 +2,7 @@
 #define TYPES_H_
 
 #include <memory>
+#include <string>
 #include <system_error>
 #include <vector>
 
@@ -129,13 +130,18 @@ struct FunctionType : Type {
 
 /** @brief Struct type descriptor (currently minimal metadata only). */
 struct StructType : Type {
-  std::string name;          /**< Struct name. */
+  std::string name;                     /**< Struct name. */
+  std::vector<std::string> field_names; /**< Field names in order. */
   std::vector<Type*> fields; /**< Field types in declaration order. */
 
-  StructType(std::string name, std::vector<Type*> fields)
+  StructType(std::string name, std::vector<std::string> field_names,
+             std::vector<Type*> fields)
       : Type(TypeKind::Struct),
         name(std::move(name)),
+        field_names(std::move(field_names)),
         fields(std::move(fields)) {}
+
+  int FieldIndex(const std::string& field) const;
 };
 
 }  // namespace types

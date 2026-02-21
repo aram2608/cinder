@@ -1,5 +1,10 @@
 mod math;
 
-def add(int32 a, int32 b) -> int32
-  return a + b;
+struct Vector2
+  int32: x;
+  int32: y;
+end
+
+def sum(Vector2 p) -> int32
+  return p.x + p.y;
 end

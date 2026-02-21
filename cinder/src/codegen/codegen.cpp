@@ -162,6 +162,10 @@ Value* Codegen::Visit(ImportStmt& stmt) {
   return nullptr;
 }
 
+Value* Codegen::Visit(StructStmt& stmt) {
+  return nullptr;
+}
+
 Value* Codegen::Visit(ExpressionStmt& stmt) {
   stmt.expr->Accept(*this);
   return nullptr;
@@ -428,8 +432,67 @@ Value* Codegen::Visit(Assign& expr) {
   return value;
 }
 
+Value* Codegen::Visit(MemberAssign& expr) {
+  if (!expr.base_id.has_value() || !expr.target->field_index.has_value()) {
+    return nullptr;
+  }
+
+  auto symbol = ir_bindings_.find(expr.base_id.value());
+  if (symbol == ir_bindings_.end() || !symbol->second ||
+      !symbol->second->IsVariable()) {
+    return nullptr;
+  }
+
+  ErrorOr<VarBinding*> var = symbol->second->CastTo<VarBinding>();
+  if (std::error_code ec = var.getError()) {
+    return nullptr;
+  }
+
+  AllocaInst* slot = var.get()->GetAlloca();
+  if (!slot) {
+    return nullptr;
+  }
+
+  Value* rhs = expr.value->Accept(*this);
+  if (!rhs) {
+    return nullptr;
+  }
+
+  Value* current =
+      ctx_->CreateLoad(slot->getAllocatedType(), slot, "struct.assign.current");
+  Value* updated = ctx_->GetBuilder().CreateInsertValue(
+      current, rhs, {static_cast<unsigned>(expr.target->field_index.value())},
+      "struct.assign.updated");
+  ctx_->CreateStore(updated, slot);
+  return rhs;
+}
+
 Value* Codegen::Visit(CallExpr& expr) {
+  if (expr.type->kind == types::TypeKind::Struct) {
+    std::error_code ec;
+    expr.type->CastTo<types::StructType>(ec);
+    if (ec) {
+      return nullptr;
+    }
+
+    Type* llvm_struct_ty = ResolveType(expr.type);
+    if (!llvm_struct_ty || !llvm::isa<llvm::StructType>(llvm_struct_ty)) {
+      return nullptr;
+    }
+
+    Value* aggregate = UndefValue::get(llvm_struct_ty);
+    for (size_t i = 0; i < expr.args.size(); ++i) {
+      Value* arg_value = expr.args[i]->Accept(*this);
+      aggregate = ctx_->GetBuilder().CreateInsertValue(
+          aggregate, arg_value, {static_cast<unsigned>(i)});
+    }
+    return aggregate;
+  }
+
   Function* callee = dyn_cast<Function>(expr.callee->Accept(*this));
+  if (!callee) {
+    return nullptr;
+  }
 
   std::vector<Value*> call_args;
   for (auto& arg : expr.args) {
@@ -441,6 +504,46 @@ Value* Codegen::Visit(CallExpr& expr) {
   }
 
   return ctx_->CreateCall(callee, call_args, callee->getName());
+}
+
+Value* Codegen::Visit(MemberAccess& expr) {
+  if (expr.field_index.has_value()) {
+    Value* object = expr.object->Accept(*this);
+    if (!object) {
+      return nullptr;
+    }
+
+    std::error_code ec;
+    auto* struct_ty = expr.object->type->CastTo<types::StructType>(ec);
+    if (ec) {
+      return nullptr;
+    }
+
+    Type* llvm_struct_ty = ResolveType(struct_ty);
+    if (!llvm_struct_ty || !llvm::isa<llvm::StructType>(llvm_struct_ty)) {
+      return nullptr;
+    }
+
+    return ctx_->GetBuilder().CreateExtractValue(
+        object, {static_cast<unsigned>(expr.field_index.value())},
+        struct_ty->field_names[expr.field_index.value()]);
+  }
+
+  if (!expr.HasID()) {
+    return nullptr;
+  }
+
+  auto it = ir_bindings_.find(expr.GetID());
+  if (it == ir_bindings_.end() || !it->second || !it->second->IsFunction()) {
+    return nullptr;
+  }
+
+  ErrorOr<FuncBinding*> f = it->second->CastTo<FuncBinding>();
+  if (std::error_code ec = f.getError()) {
+    return nullptr;
+  }
+
+  return f.get()->function;
 }
 
 Value* Codegen::Visit(Grouping& expr) {
@@ -514,8 +617,7 @@ Value* Codegen::EmitInteger(Literal& expr) {
 }
 
 static Type* ResolveStructType() {
-  StructType* ty = nullptr;
-  return ty;
+  return nullptr;
 }
 
 Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
@@ -533,11 +635,41 @@ Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
     case types::TypeKind::Void:
       return allow_void ? Type::getVoidTy(ctx) : nullptr;
     case types::TypeKind::Struct:
-      return ResolveStructType();
+      break;
     default:
       UNREACHABLE(CodeGen, ResolveType);
       return nullptr;
   }
+
+  auto* s = dynamic_cast<types::StructType*>(type);
+  if (!s) {
+    return ResolveStructType();
+  }
+
+  auto it = struct_types_.find(s->name);
+  llvm::StructType* llvm_struct = nullptr;
+  if (it != struct_types_.end()) {
+    llvm_struct = it->second;
+  } else {
+    llvm_struct = llvm::StructType::create(ctx_->GetContext(), s->name);
+    struct_types_[s->name] = llvm_struct;
+  }
+
+  if (!llvm_struct->isOpaque()) {
+    return llvm_struct;
+  }
+
+  std::vector<llvm::Type*> field_types;
+  field_types.reserve(s->fields.size());
+  for (auto* f : s->fields) {
+    llvm::Type* ft = ResolveType(f, false);
+    if (!ft) {
+      return nullptr;
+    }
+    field_types.push_back(ft);
+  }
+  llvm_struct->setBody(field_types, false);
+  return llvm_struct;
 }
 
 Type* Codegen::ResolveArgType(types::Type* type) {

@@ -1,5 +1,7 @@
 #include "cinder/semantic/semantic_analyzer.hpp"
 
+#include <unordered_set>
+
 #include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/support/utils.hpp"
 
@@ -23,6 +25,50 @@ void SemanticAnalyzer::Visit(ImportStmt& stmt) {
   return;
 }
 
+void SemanticAnalyzer::Visit(StructStmt& stmt) {
+  std::vector<std::string> field_names;
+  std::vector<types::Type*> field_types;
+  std::unordered_set<std::string> seen;
+
+  field_names.reserve(stmt.fields.size());
+  field_types.reserve(stmt.fields.size());
+
+  for (auto& field : stmt.fields) {
+    if (seen.contains(field.identifier.lexeme)) {
+      diagnose_.Error({field.identifier.location.line},
+                      "Duplicate struct field: " + field.identifier.lexeme);
+      return;
+    }
+    seen.insert(field.identifier.lexeme);
+
+    types::Type* ty = ResolveType(field.type_token);
+    if (!ty || ty->Void() || ty->Function()) {
+      diagnose_.Error({field.identifier.location.line},
+                      "Invalid struct field type: " + field.type_token.lexeme);
+      return;
+    }
+
+    field.resolved_type = ty;
+    field_names.push_back(field.identifier.lexeme);
+    field_types.push_back(ty);
+  }
+
+  std::string qualified_name =
+      current_mod_.empty() ? stmt.name.lexeme
+                           : QualifiedName(current_mod_, stmt.name.lexeme);
+  types::StructType* struct_ty =
+      types_.Struct(qualified_name, field_names, field_types);
+
+  std::optional<SymbolId> id =
+      Declare(qualified_name, struct_ty, false, {stmt.name.location.line});
+  if (!id.has_value()) {
+    diagnose_.Error({stmt.name.location.line},
+                    "Struct could not be declared: " + stmt.name.lexeme);
+    return;
+  }
+  stmt.id = id.value();
+}
+
 void SemanticAnalyzer::Visit(FunctionProto& stmt) {
   types::Type* ret = ResolveType(stmt.return_type);
 
@@ -33,8 +79,13 @@ void SemanticAnalyzer::Visit(FunctionProto& stmt) {
     params.push_back(arg_type);
   }
 
+  std::string declared_name = stmt.name.lexeme;
+  if (!stmt.is_extern && !current_mod_.empty()) {
+    declared_name = QualifiedName(current_mod_, stmt.name.lexeme);
+  }
+
   std::optional<SymbolId> id =
-      Declare(stmt.name.lexeme, types_.Function(ret, params, stmt.is_variadic),
+      Declare(declared_name, types_.Function(ret, params, stmt.is_variadic),
               true, {stmt.name.location.line});
   if (id.has_value()) {
     stmt.id = id.value();
@@ -121,6 +172,9 @@ void SemanticAnalyzer::Visit(ReturnStmt& stmt) {
   }
 
   Resolve(*stmt.value);
+  if (!stmt.value->type) {
+    return;
+  }
   if (!stmt.value->type->IsThisType(current_return)) {
     diagnose_.Error({stmt.ret_token.location.line},
                     "Return value does not match current return type");
@@ -137,6 +191,10 @@ void SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
 
   types::Type* declared_type = ResolveType(stmt.type);
   Resolve(*stmt.value);
+
+  if (!declared_type || !stmt.value->type) {
+    return;
+  }
 
   if (!stmt.value->type->IsThisType(declared_type)) {
     std::string error =
@@ -156,6 +214,9 @@ void SemanticAnalyzer::Visit(VarDeclarationStmt& stmt) {
 void SemanticAnalyzer::Visit(Variable& expr) {
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
+    sym = LookupInCurrentModule(expr.name.lexeme);
+  }
+  if (!sym) {
     std::string err = "Undeclared variable: " + expr.name.lexeme;
     diagnose_.Error({expr.name.location.line}, err);
     return;
@@ -164,9 +225,61 @@ void SemanticAnalyzer::Visit(Variable& expr) {
   expr.id = sym->id;
 }
 
+void SemanticAnalyzer::Visit(MemberAccess& expr) {
+  auto* base = dynamic_cast<Variable*>(expr.object.get());
+  if (!base) {
+    diagnose_.Error({expr.member.location.line},
+                    "Unsupported member access base expression");
+    return;
+  }
+
+  SymbolInfo* base_sym = LookupSymbol(base->name.lexeme);
+  if (!base_sym) {
+    base_sym = LookupInCurrentModule(base->name.lexeme);
+  }
+
+  if (base_sym && base_sym->type && base_sym->type->Struct()) {
+    base->id = base_sym->id;
+    base->type = base_sym->type;
+    auto struct_type = base_sym->type->CastTo<types::StructType>();
+    if (std::error_code ec = struct_type.getError()) {
+      diagnose_.Error({expr.member.location.line},
+                      "Invalid struct member access base");
+      return;
+    }
+
+    int idx = struct_type.get()->FieldIndex(expr.member.lexeme);
+    if (idx < 0) {
+      diagnose_.Error({expr.member.location.line},
+                      "Unknown field: " + expr.member.lexeme);
+      return;
+    }
+
+    expr.field_index = static_cast<size_t>(idx);
+    expr.type = struct_type.get()->fields[idx];
+    return;
+  }
+
+  SymbolInfo* symbol =
+      LookupSymbol(QualifiedName(base->name.lexeme, expr.member.lexeme));
+  if (!symbol) {
+    diagnose_.Error(
+        {expr.member.location.line},
+        "Undefined member: " + base->name.lexeme + "." + expr.member.lexeme);
+    return;
+  }
+
+  expr.id = symbol->id;
+  expr.type = symbol->type;
+}
+
 void SemanticAnalyzer::Visit(Binary& expr) {
   Resolve(*expr.left);
   Resolve(*expr.right);
+
+  if (!expr.left->type || !expr.right->type) {
+    return;
+  }
 
   if (!expr.left->type->IsThisType(expr.right->type)) {
     std::string err = "Type mismatch: " + expr.op.lexeme;
@@ -192,6 +305,9 @@ void SemanticAnalyzer::Visit(Binary& expr) {
 
 void SemanticAnalyzer::Visit(Assign& expr) {
   Resolve(*expr.value);
+  if (!expr.value->type) {
+    return;
+  }
   auto* sym = LookupSymbol(expr.name.lexeme);
   if (!sym) {
     std::string err = "Assignment to undelcared variable: " + expr.name.lexeme;
@@ -199,7 +315,7 @@ void SemanticAnalyzer::Visit(Assign& expr) {
     return;
   }
 
-  if (!sym->type->IsThisType(expr.value->type)) {
+  if (!sym->type || !sym->type->IsThisType(expr.value->type)) {
     std::string err = "Type mismatch in assignment: " + expr.name.lexeme;
     diagnose_.Error({expr.name.location.line}, err);
     return;
@@ -207,6 +323,40 @@ void SemanticAnalyzer::Visit(Assign& expr) {
 
   expr.type = sym->type;
   expr.id = sym->id;
+}
+
+void SemanticAnalyzer::Visit(MemberAssign& expr) {
+  Resolve(*expr.target);
+  Resolve(*expr.value);
+
+  if (!expr.target->type) {
+    diagnose_.Error({expr.target->member.location.line},
+                    "Invalid member assignment target");
+    return;
+  }
+
+  if (!expr.target->type->IsThisType(expr.value->type)) {
+    diagnose_.Error({expr.target->member.location.line},
+                    "Type mismatch in member assignment");
+    return;
+  }
+
+  auto* base = dynamic_cast<Variable*>(expr.target->object.get());
+  if (!base || !base->HasID()) {
+    diagnose_.Error({expr.target->member.location.line},
+                    "Member assignment requires variable base");
+    return;
+  }
+
+  if (!expr.target->field_index.has_value()) {
+    diagnose_.Error({expr.target->member.location.line},
+                    "Member assignment target is not a struct field");
+    return;
+  }
+
+  expr.base_id = base->GetID();
+  expr.id = base->id;
+  expr.type = expr.target->type;
 }
 
 void SemanticAnalyzer::Visit(PreFixOp& expr) {
@@ -244,36 +394,95 @@ void SemanticAnalyzer::Visit(Grouping& expr) {
 }
 
 void SemanticAnalyzer::Visit(CallExpr& expr) {
+  SymbolInfo* symbol = nullptr;
+  SourceLoc call_loc{0};
+  std::string call_name;
   std::error_code ec;
-  Variable* callee = expr.callee->CastTo<Variable>(ec);
 
-  if (ec) {
-    std::string err = callee->name.lexeme + " is not callable";
-    diagnose_.Error({callee->name.location.line}, err);
+  if (auto* callee = dynamic_cast<Variable*>(expr.callee.get())) {
+    call_loc = {callee->name.location.line};
+    call_name = callee->name.lexeme;
+    symbol = LookupInCurrentModule(callee->name.lexeme);
+    if (!symbol) {
+      symbol = LookupSymbol(callee->name.lexeme);
+    }
+    if (symbol) {
+      callee->id = symbol->id;
+      callee->type = symbol->type;
+    }
+  } else if (auto* member = dynamic_cast<MemberAccess*>(expr.callee.get())) {
+    auto* base = dynamic_cast<Variable*>(member->object.get());
+    if (!base) {
+      diagnose_.Error({member->member.location.line},
+                      "Unsupported callee expression");
+      return;
+    }
+
+    call_loc = {member->member.location.line};
+    call_name = base->name.lexeme + "." + member->member.lexeme;
+    symbol =
+        LookupSymbol(QualifiedName(base->name.lexeme, member->member.lexeme));
+    if (symbol) {
+      member->id = symbol->id;
+      member->type = symbol->type;
+    }
+  } else {
+    diagnose_.Error({0}, "Unsupported callee expression");
     return;
   }
-
-  SymbolInfo* symbol = LookupSymbol(callee->name.lexeme);
 
   if (!symbol) {
-    std::string err = "Undefined function: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.location.line}, err);
+    diagnose_.Error(call_loc, "Undefined function: " + call_name);
     return;
   }
 
-  callee->id = symbol->id;
-  callee->type = symbol->type;
+  if (!symbol->type) {
+    diagnose_.Error(call_loc,
+                    "Callable symbol has unresolved type: " + call_name);
+    return;
+  }
+
+  if (!symbol->is_function && symbol->type->Struct()) {
+    auto* struct_type = symbol->type->CastTo<types::StructType>(ec);
+    if (ec) {
+      diagnose_.Error(call_loc, "Invalid struct constructor: " + call_name);
+      return;
+    }
+
+    if (expr.args.size() != struct_type->fields.size()) {
+      diagnose_.Error(
+          call_loc,
+          "Argument count mismatch for struct constructor: " + call_name);
+      return;
+    }
+
+    for (size_t i = 0; i < expr.args.size(); ++i) {
+      Resolve(*expr.args[i]);
+      if (!expr.args[i]->type) {
+        return;
+      }
+      if (!expr.args[i]->type->IsThisType(struct_type->fields[i])) {
+        diagnose_.Error(call_loc,
+                        "Type mismatch in struct constructor argument");
+        return;
+      }
+    }
+
+    expr.id = symbol->id;
+    expr.type = struct_type;
+    return;
+  }
 
   if (!symbol->is_function) {
-    std::string err = "Symbol is not callable: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.location.line}, err);
+    std::string err = "Symbol is not callable: " + call_name;
+    diagnose_.Error(call_loc, err);
     return;
   }
 
   auto* func_type = symbol->type->CastTo<types::FunctionType>(ec);
   if (ec) {
-    std::string err = "Symbol is not callable: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.location.line}, err);
+    std::string err = "Symbol is not callable: " + call_name;
+    diagnose_.Error(call_loc, err);
     return;
   }
 
@@ -282,23 +491,24 @@ void SemanticAnalyzer::Visit(CallExpr& expr) {
 
   if (func_type->IsVariadic()) {
     if (num_args < num_params) {
-      std::string err =
-          "Too few arguments for variadic function: " + callee->name.lexeme;
-      diagnose_.Error({callee->name.location.line}, err);
+      std::string err = "Too few arguments for variadic function: " + call_name;
+      diagnose_.Error(call_loc, err);
       return;
     }
   } else if (num_args != num_params) {
-    std::string err = "Argument count mismatch for: " + callee->name.lexeme;
-    diagnose_.Error({callee->name.location.line}, err);
+    std::string err = "Argument count mismatch for: " + call_name;
+    diagnose_.Error(call_loc, err);
     return;
   }
 
   for (size_t i = 0; i < num_args; i++) {
     Resolve(*expr.args[i]);
+    if (!expr.args[i]->type) {
+      return;
+    }
     if (i < num_params) {
       if (expr.args[i]->type->kind != func_type->params[i]->kind) {
-        diagnose_.Error({callee->name.location.line},
-                        "Type mismatch in fixed argument");
+        diagnose_.Error(call_loc, "Type mismatch in fixed argument");
         return;
       }
     } else {
@@ -326,6 +536,18 @@ void SemanticAnalyzer::Visit(Literal& expr) {
 }
 
 types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
+  if (type.kind == Token::Type::IDENTIFER) {
+    types::StructType* struct_type = types_.LookupStruct(
+        current_mod_.empty() ? type.lexeme
+                             : QualifiedName(current_mod_, type.lexeme));
+    if (!struct_type) {
+      struct_type = types_.LookupStruct(type.lexeme);
+    }
+    if (struct_type) {
+      return struct_type;
+    }
+  }
+
   switch (type.kind) {
     case Token::Type::INT32_SPECIFIER:
       return types_.Int32();
@@ -347,6 +569,18 @@ types::Type* SemanticAnalyzer::ResolveArgType(Token type) {
 }
 
 types::Type* SemanticAnalyzer::ResolveType(Token type) {
+  if (type.kind == Token::Type::IDENTIFER) {
+    types::StructType* struct_type = types_.LookupStruct(
+        current_mod_.empty() ? type.lexeme
+                             : QualifiedName(current_mod_, type.lexeme));
+    if (!struct_type) {
+      struct_type = types_.LookupStruct(type.lexeme);
+    }
+    if (struct_type) {
+      return struct_type;
+    }
+  }
+
   switch (type.kind) {
     case Token::Type::INT32_SPECIFIER:
       return types_.Int32();
@@ -384,6 +618,18 @@ SymbolInfo* SemanticAnalyzer::LookupSymbol(const std::string& name) {
   return symbols_.GetSymbolInfo(*id);
 }
 
+SymbolInfo* SemanticAnalyzer::LookupInCurrentModule(const std::string& name) {
+  if (current_mod_.empty()) {
+    return nullptr;
+  }
+  return LookupSymbol(QualifiedName(current_mod_, name));
+}
+
+std::string SemanticAnalyzer::QualifiedName(const std::string& qualifier,
+                                            const std::string& name) const {
+  return qualifier + "." + name;
+}
+
 void SemanticAnalyzer::BeginScope() {
   env_.PushScope();
 }
@@ -414,6 +660,16 @@ void SemanticAnalyzer::AnalyzeProgram(const std::vector<ModuleStmt*>& modules) {
   BeginScope();
 
   for (ModuleStmt* mod : modules) {
+    current_mod_ = mod->name.lexeme;
+    for (auto& stmt : mod->stmts) {
+      if (auto* strct = dynamic_cast<StructStmt*>(stmt.get())) {
+        Resolve(*strct);
+      }
+    }
+  }
+
+  for (ModuleStmt* mod : modules) {
+    current_mod_ = mod->name.lexeme;
     for (auto& stmt : mod->stmts) {
       if (auto* fn = dynamic_cast<FunctionStmt*>(stmt.get())) {
         Resolve(*fn->proto);
@@ -424,8 +680,9 @@ void SemanticAnalyzer::AnalyzeProgram(const std::vector<ModuleStmt*>& modules) {
   }
 
   for (ModuleStmt* mod : modules) {
+    current_mod_ = mod->name.lexeme;
     for (auto& stmt : mod->stmts) {
-      if (stmt->IsImport() || stmt->IsFunctionP()) {
+      if (stmt->IsImport() || stmt->IsFunctionP() || stmt->IsStruct()) {
         continue;
       }
       Resolve(*stmt);

@@ -2,6 +2,7 @@
 #define COMPILER_H_
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "cinder/ast/expr/expr.hpp"
@@ -45,8 +46,9 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
 
   CodegenOpts opts; /**< Backend options. */
   std::unique_ptr<CodegenContext>
-      ctx_;                   /**< Owned LLVM context and module state. */
-  BindingMap ir_bindings_;    /**< Symbol-to-IR binding table. */
+      ctx_;                /**< Owned LLVM context and module state. */
+  BindingMap ir_bindings_; /**< Symbol-to-IR binding table. */
+  std::unordered_map<std::string, llvm::StructType*> struct_types_;
   DiagnosticEngine diagnose_; /**< Internal diagnostic reporter. */
   TypeContext types_;         /**< Canonical semantic types. */
   SemanticAnalyzer pass_;     /**< Semantic analysis pass. */
@@ -84,15 +86,18 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   llvm::Value* Visit(FunctionProto& stmt) override;
   llvm::Value* Visit(ReturnStmt& stmt) override;
   llvm::Value* Visit(VarDeclarationStmt& stmt) override;
+  llvm::Value* Visit(StructStmt& stmt) override;
   ///@}
 
   /** @name Expression visitor overrides */
   ///@{
   llvm::Value* Visit(Assign& expr) override;
+  llvm::Value* Visit(MemberAssign& expr) override;
   llvm::Value* Visit(Conditional& expr) override;
   llvm::Value* Visit(Binary& expr) override;
   llvm::Value* Visit(PreFixOp& expr) override;
   llvm::Value* Visit(CallExpr& expr) override;
+  llvm::Value* Visit(MemberAccess& expr) override;
   llvm::Value* Visit(Grouping& expr) override;
   llvm::Value* Visit(Variable& expr) override;
   llvm::Value* Visit(Literal& expr) override;

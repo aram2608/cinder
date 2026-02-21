@@ -43,6 +43,15 @@
       }
     },
     {
+      "name": "debug-tests",
+      "displayName": "Debug + tests",
+      "description": "Debug build with unit tests enabled",
+      "inherits": "debug",
+      "cacheVariables": {
+        "CINDER_BUILD_TESTS": "ON"
+      }
+    },
+    {
       "name": "release-clang-tidy",
       "displayName": "Release + clang-tidy",
       "description": "Release build with clang-tidy enabled",
@@ -72,10 +81,27 @@
       "configurePreset": "debug-clang-tidy"
     },
     {
+      "name": "build-debug-tests",
+      "displayName": "Build Debug + tests",
+      "description": "Build debug with unit tests enabled",
+      "configurePreset": "debug-tests"
+    },
+    {
       "name": "build-release-clang-tidy",
       "displayName": "Build Release + clang-tidy",
       "description": "Build release with clang-tidy checks enabled",
       "configurePreset": "release-clang-tidy"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-debug",
+      "displayName": "Test Debug",
+      "description": "Run all tests from debug-tests build directory",
+      "configurePreset": "debug-tests",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }
