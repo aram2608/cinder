@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <system_error>
 #include <vector>
 
@@ -49,6 +50,18 @@ struct SemanticExprVisitor {
   virtual void Visit(Conditional& expr) = 0;
 };
 
+struct ExprDumperVisitor {
+  virtual ~ExprDumperVisitor() = default;
+  virtual std::string Visit(Literal& expr) = 0;
+  virtual std::string Visit(Variable& expr) = 0;
+  virtual std::string Visit(Grouping& expr) = 0;
+  virtual std::string Visit(PreFixOp& expr) = 0;
+  virtual std::string Visit(Binary& expr) = 0;
+  virtual std::string Visit(CallExpr& expr) = 0;
+  virtual std::string Visit(Assign& expr) = 0;
+  virtual std::string Visit(Conditional& expr) = 0;
+};
+
 /** @brief Abstract base class for all expression AST nodes. */
 struct Expr {
   enum class ExprType {
@@ -84,11 +97,7 @@ struct Expr {
    */
   virtual void Accept(SemanticExprVisitor& visitor) = 0;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of the expression subtree.
-   */
-  virtual std::string ToString() = 0;
+  virtual std::string Accept(ExprDumperVisitor& visitor) = 0;
 
   /** @brief Returns whether this node is `Literal`. */
   bool IsLiteral();
@@ -156,8 +165,7 @@ struct Literal : Expr {
    */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Variable reference expression node. */
@@ -176,8 +184,7 @@ struct Variable : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Parenthesized expression node. */
@@ -196,8 +203,7 @@ struct Grouping : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Prefix increment/decrement expression node. */
@@ -217,8 +223,7 @@ struct PreFixOp : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Binary arithmetic expression node. */
@@ -240,8 +245,7 @@ struct Binary : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Binary comparison expression node. */
@@ -263,8 +267,7 @@ struct Conditional : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Assignment expression node. */
@@ -284,8 +287,7 @@ struct Assign : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 /** @brief Function call expression node. */
@@ -306,8 +308,7 @@ struct CallExpr : Expr {
   /** @brief Accepts a semantic visitor. */
   void Accept(SemanticExprVisitor& visitor) override;
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+  std::string Accept(ExprDumperVisitor& visitor) override;
 };
 
 #endif

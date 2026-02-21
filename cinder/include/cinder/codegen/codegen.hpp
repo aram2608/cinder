@@ -2,6 +2,7 @@
 #define COMPILER_H_
 
 #include <memory>
+#include <vector>
 
 #include "cinder/ast/expr/expr.hpp"
 #include "cinder/ast/stmt/stmt.hpp"
@@ -40,8 +41,7 @@
  * visitor dispatch, and emits/links output according to `CodegenOpts`.
  */
 struct Codegen : CodegenExprVisitor, StmtVisitor {
-  /// TODO:  make this a vector or a map of mods to handle imports
-  std::unique_ptr<Stmt> mod; /**< Root module statement. */
+  std::vector<ModuleStmt*> modules_; /**< Dependency-ordered modules. */
 
   CodegenOpts opts; /**< Backend options. */
   std::unique_ptr<CodegenContext>
@@ -52,11 +52,11 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   SemanticAnalyzer pass_;     /**< Semantic analysis pass. */
 
   /**
-   * @brief Creates a codegen driver for a parsed module.
-   * @param mod Module AST to lower.
+   * @brief Creates a codegen driver for parsed modules.
+   * @param modules Module AST nodes to lower.
    * @param opts Backend options.
    */
-  Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts);
+  Codegen(std::vector<ModuleStmt*> modules, CodegenOpts opts);
 
   /** @brief Runs full backend flow according to configured mode. */
   bool Generate();
@@ -75,6 +75,7 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
   /** @name Statement visitor overrides */
   ///@{
   llvm::Value* Visit(ModuleStmt& stmt) override;
+  llvm::Value* Visit(ImportStmt& stmt) override;
   llvm::Value* Visit(ForStmt& stmt) override;
   llvm::Value* Visit(WhileStmt& stmt) override;
   llvm::Value* Visit(IfStmt& stmt) override;
@@ -99,10 +100,10 @@ struct Codegen : CodegenExprVisitor, StmtVisitor {
 
   /**
    * @brief Runs semantic analysis and reports diagnostics on failure.
-   * @param mod Module AST node.
+   * @param modules Module AST nodes.
    * @return `true` on success, `false` when semantic errors are present.
    */
-  bool SemanticPass(ModuleStmt& mod);
+  bool SemanticPass(const std::vector<ModuleStmt*>& modules);
 
   /** @brief Emits an integer constant literal value. */
   llvm::Value* EmitInteger(Literal& expr);

@@ -23,6 +23,11 @@ std::unique_ptr<Stmt> Parser::ParseModule() {
       Consume(Token::Type::IDENTIFER, "expected identifier after module");
   Consume(Token::Type::SEMICOLON, "';' expected after statement");
   std::vector<std::unique_ptr<Stmt>> statements;
+
+  while (MatchType({Token::Type::IMPORT})) {
+    statements.push_back(ImportStatement());
+  }
+
   while (!IsEnd()) {
     statements.push_back(ExternFunction());
   }
@@ -95,6 +100,13 @@ std::unique_ptr<Stmt> Parser::Statement() {
     return WhileStatement();
   }
   return ExpressionStatement();
+}
+
+std::unique_ptr<Stmt> Parser::ImportStatement() {
+  Token mod_name =
+      Consume(Token::Type::IDENTIFER, "expected module name after import");
+  Consume(Token::Type::SEMICOLON, "expected ';' after import declaration");
+  return std::make_unique<ImportStmt>(mod_name);
 }
 
 std::unique_ptr<Stmt> Parser::WhileStatement() {
@@ -325,14 +337,4 @@ Token Parser::Consume(Token::Type type, std::string message) {
   // Not used, simply to suppress compiler warning
   Token tok{type, {0, 0, 0}, "", std::nullopt};
   return tok;
-}
-
-void Parser::EmitAST(std::vector<std::unique_ptr<Stmt>> statements) {
-  for (std::unique_ptr<Stmt>& stmt : statements) {
-    std::cout << stmt->ToString() << "\n";
-  }
-}
-
-void Parser::EmitAST(std::unique_ptr<Stmt> statement) {
-  std::cout << statement->ToString() << "\n";
 }

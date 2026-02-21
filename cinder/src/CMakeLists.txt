@@ -104,7 +104,11 @@ target_compile_options(cinder_core
       -fno-exceptions
 )
 
-target_compile_definitions(cinder_core PUBLIC CXXOPTS_NO_EXCEPTIONS)
+target_compile_definitions(cinder_core
+    PUBLIC
+      CXXOPTS_NO_EXCEPTIONS
+      $<$<CONFIG:Debug>:DEBUG_BUILD>
+)
 
 if(APPLE AND EXISTS "/opt/homebrew/opt/llvm/lib/c++")
   target_link_directories(cinder_core PRIVATE "/opt/homebrew/opt/llvm/lib/c++")
@@ -128,7 +132,12 @@ target_compile_options(cinder
       -fno-exceptions
 )
 
-target_compile_definitions(cinder PRIVATE CXXOPTS_NO_EXCEPTIONS)
+target_compile_definitions(cinder
+    PRIVATE
+      CXXOPTS_NO_EXCEPTIONS
+      $<$<CONFIG:Debug>:DEBUG_BUILD>
+)
+
 target_link_libraries(cinder PRIVATE cinder_core)
 
 add_subdirectory(ast)

@@ -1,14 +1,18 @@
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "../vendor/cxxopts.hpp"
+#include "cinder/ast/ast_dumper.hpp"
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/codegen/codegen.hpp"
 #include "cinder/codegen/codegen_opts.hpp"
 #include "cinder/frontend/lexer.hpp"
+#include "cinder/frontend/module_loader.hpp"
 #include "cinder/frontend/parser.hpp"
-
-#define DEBUG_BUILD
 
 static std::string ReadEntireFile(std::string file_path) {
   std::fstream file{file_path};
@@ -42,17 +46,21 @@ static bool GenerateProgram(cxxopts::ParseResult& result,
     debug_info = true;
     linker_flags.push_back("-g");
   }
-  for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
-    std::string source = ReadEntireFile(*it);
-    Lexer lexer{source};
-    lexer.ScanTokens();
-    Parser parser{lexer.GetTokens()};
-    std::unique_ptr<Stmt> mod = parser.Parse();
-    CodegenOpts opts{out_path, opt, debug_info, linker_flags};
-    Codegen cg{std::move(mod), opts};
-    return cg.Generate();
+  ModuleLoader loader({"."});
+  if (!loader.LoadEntrypoints(file_paths)) {
+    std::cout << loader.LastError() << "\n";
+    return false;
   }
-  return true;
+
+  std::vector<ModuleStmt*> modules;
+  modules.reserve(loader.OrderedModules().size());
+  for (const auto& loaded : loader.OrderedModules()) {
+    modules.push_back(loaded.ast.get());
+  }
+
+  CodegenOpts opts{out_path, opt, debug_info, linker_flags};
+  Codegen cg{std::move(modules), opts};
+  return cg.Generate();
 }
 
 static void DumpUnknownArgs(cxxopts::ParseResult& result,
@@ -117,14 +125,18 @@ static bool ParseCLI(int argc, char** argv) {
   if (result.contains("emit-ast")) {
     std::vector<std::string> file_paths =
         result["src"].as<std::vector<std::string>>();
+
+    std::vector<std::unique_ptr<Stmt>> program;
     for (auto it = file_paths.begin(); it != file_paths.end(); ++it) {
       std::string source = ReadEntireFile(*it);
       Lexer lexer{source};
       lexer.ScanTokens();
       Parser parser{lexer.GetTokens()};
       std::unique_ptr<Stmt> mod = parser.Parse();
-      parser.EmitAST(std::move(mod));
+      program.push_back(std::move(mod));
     }
+    cinder::AstDumper dumper;
+    dumper.RenderProgram(std::move(program));
     return true;
   }
 #endif

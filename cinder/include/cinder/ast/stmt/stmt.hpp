@@ -23,6 +23,7 @@ struct VarDeclarationStmt;
 struct IfStmt;
 struct ForStmt;
 struct WhileStmt;
+struct ImportStmt;
 
 /** @brief Code generation visitor interface for statement nodes. */
 struct StmtVisitor {
@@ -36,6 +37,7 @@ struct StmtVisitor {
   virtual llvm::Value* Visit(IfStmt& stmt) = 0;
   virtual llvm::Value* Visit(ForStmt& stmt) = 0;
   virtual llvm::Value* Visit(WhileStmt& stmt) = 0;
+  virtual llvm::Value* Visit(ImportStmt& stmt) = 0;
 };
 
 /** @brief Semantic analysis visitor interface for statement nodes. */
@@ -50,6 +52,21 @@ struct SemanticStmtVisitor {
   virtual void Visit(IfStmt& stmt) = 0;
   virtual void Visit(ForStmt& stmt) = 0;
   virtual void Visit(WhileStmt& stmt) = 0;
+  virtual void Visit(ImportStmt& stmt) = 0;
+};
+
+struct StmtDumperVisitor {
+  virtual ~StmtDumperVisitor() = default;
+  virtual std::string Visit(ExpressionStmt& stmt) = 0;
+  virtual std::string Visit(ReturnStmt& stmt) = 0;
+  virtual std::string Visit(FunctionStmt& stmt) = 0;
+  virtual std::string Visit(VarDeclarationStmt& stmt) = 0;
+  virtual std::string Visit(FunctionProto& stmt) = 0;
+  virtual std::string Visit(ModuleStmt& stmt) = 0;
+  virtual std::string Visit(IfStmt& stmt) = 0;
+  virtual std::string Visit(ForStmt& stmt) = 0;
+  virtual std::string Visit(WhileStmt& stmt) = 0;
+  virtual std::string Visit(ImportStmt& stmt) = 0;
 };
 
 /** @brief Abstract base class for all statement AST nodes. */
@@ -64,6 +81,7 @@ struct Stmt {
     If,
     For,
     While,
+    Import,
   };
 
   StmtType stmt_type;
@@ -85,11 +103,7 @@ struct Stmt {
    */
   virtual void Accept(SemanticStmtVisitor& visitor) = 0;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of the statement subtree.
-   */
-  virtual std::string ToString() = 0;
+  virtual std::string Accept(StmtDumperVisitor& visitor) = 0;
 
   /** @brief Returns whether this node is `ModuleStmt`. */
   bool IsModule();
@@ -109,6 +123,9 @@ struct Stmt {
   bool IsFor();
   /** @brief Returns whether this node is `WhileStmt`. */
   bool IsWhile();
+  /** @brief Returns whether this node is `ImportStmt`. */
+  bool IsImport();
+
   /** @brief Returns whether this node's id contains a value. */
   bool HasID();
   /** @brief Returns the underlying symbol id. */
@@ -155,11 +172,7 @@ struct ModuleStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief Statement wrapper around an expression. */
@@ -176,11 +189,7 @@ struct ExpressionStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief Function signature statement node. */
@@ -201,11 +210,7 @@ struct FunctionProto : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief Function definition statement node. */
@@ -224,11 +229,7 @@ struct FunctionStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief Return statement node. */
@@ -246,11 +247,7 @@ struct ReturnStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief Variable declaration statement node. */
@@ -270,11 +267,7 @@ struct VarDeclarationStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief If/else statement node. */
@@ -294,11 +287,7 @@ struct IfStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief For-loop statement node. */
@@ -319,11 +308,7 @@ struct ForStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   void Accept(SemanticStmtVisitor& visitor) override;
 
-  /**
-   * @brief Renders this node as a debug string.
-   * @return String representation of this subtree.
-   */
-  std::string ToString() override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 /** @brief While-loop statement node. */
@@ -342,9 +327,23 @@ struct WhileStmt : Stmt {
   llvm::Value* Accept(StmtVisitor& visitor) override;
   /** @brief Accepts a semantic analysis visitor. */
   void Accept(SemanticStmtVisitor& visitor) override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
+};
 
-  /** @brief Renders this node as a debug string. */
-  std::string ToString() override;
+struct ImportStmt : Stmt {
+  cinder::Token mod_name;
+
+  ImportStmt(cinder::Token mod_name);
+
+  /**
+   * @brief Accepts a code generation visitor.
+   * @param visitor Codegen visitor.
+   * @return Value produced by code generation.
+   */
+  llvm::Value* Accept(StmtVisitor& visitor) override;
+  /** @brief Accepts a semantic analysis visitor. */
+  void Accept(SemanticStmtVisitor& visitor) override;
+  std::string Accept(StmtDumperVisitor& visitor) override;
 };
 
 #endif

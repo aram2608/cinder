@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "cinder/ast/expr/expr.hpp"
 #include "cinder/ast/stmt/stmt.hpp"
@@ -33,6 +34,7 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
   /** @name Statement visitor overrides */
   ///@{
   void Visit(ModuleStmt& stmt) override;
+  void Visit(ImportStmt& stmt) override;
   void Visit(ForStmt& stmt) override;
   void Visit(WhileStmt& stmt) override;
   void Visit(IfStmt& stmt) override;
@@ -100,6 +102,12 @@ class SemanticAnalyzer : SemanticExprVisitor, SemanticStmtVisitor {
    * @param mod Module node to analyze.
    */
   void Analyze(ModuleStmt& mod);
+
+  /**
+   * @brief Runs semantic analysis over a dependency-ordered module set.
+   * @param modules Module nodes to analyze.
+   */
+  void AnalyzeProgram(const std::vector<ModuleStmt*>& modules);
 
   /** @brief Returns whether any error diagnostics were emitted. */
   bool HadError();

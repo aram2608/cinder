@@ -43,6 +43,9 @@ struct Parser {
   /** @brief Parses a single statement. */
   std::unique_ptr<Stmt> Statement();
 
+  /** @brief Parses an import declaration. */
+  std::unique_ptr<Stmt> ImportStatement();
+
   /** @brief Parses a `while` statement. */
   std::unique_ptr<Stmt> WhileStatement();
 
@@ -147,12 +150,6 @@ struct Parser {
    * @return The consumed token when matched.
    */
   cinder::Token Consume(cinder::Token::Type type, std::string message);
-
-  /** @brief Prints statements as formatted AST debug output. */
-  void EmitAST(std::vector<std::unique_ptr<Stmt>> statements);
-
-  /** @brief Prints a statement as formatted AST debug output. */
-  void EmitAST(std::unique_ptr<Stmt> statement);
 };
 
 #endif

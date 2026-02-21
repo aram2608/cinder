@@ -38,8 +38,8 @@ static ExitOnError ExitOnErr;
 
 static ostream::RawOutStream errors{2};
 
-Codegen::Codegen(std::unique_ptr<Stmt> mod, CodegenOpts opts)
-    : mod(std::move(mod)),
+Codegen::Codegen(std::vector<ModuleStmt*> modules, CodegenOpts opts)
+    : modules_(std::move(modules)),
       opts(opts),
       ctx_(std::make_unique<CodegenContext>(this->opts.out_path)),
       pass_(types_) {}
@@ -50,6 +50,10 @@ bool Codegen::Generate() {
   InitializeAllTargetMCs();
   InitializeAllAsmParsers();
   InitializeAllAsmPrinters();
+
+  if (!SemanticPass(modules_)) {
+    return false;
+  }
 
   GenerateIR();
 
@@ -85,7 +89,12 @@ bool Codegen::Generate() {
 }
 
 void Codegen::GenerateIR() {
-  mod->Accept(*this);
+  for (ModuleStmt* mod : modules_) {
+    if (!mod) {
+      continue;
+    }
+    mod->Accept(*this);
+  }
 }
 
 void Codegen::EmitLLVM() {
@@ -129,8 +138,8 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   }
 }
 
-bool Codegen::SemanticPass(ModuleStmt& mod) {
-  pass_.Analyze(mod);
+bool Codegen::SemanticPass(const std::vector<ModuleStmt*>& modules) {
+  pass_.AnalyzeProgram(modules);
   if (pass_.HadError()) {
     pass_.DumpErrors();
     return false;
@@ -139,14 +148,17 @@ bool Codegen::SemanticPass(ModuleStmt& mod) {
 }
 
 Value* Codegen::Visit(ModuleStmt& stmt) {
-  if (!SemanticPass(stmt)) {
-    return nullptr;
+  for (auto& module_stmt : stmt.stmts) {
+    if (module_stmt->IsImport()) {
+      continue;
+    }
+    module_stmt->Accept(*this);
   }
 
-  for (auto& stmt : stmt.stmts) {
-    stmt->Accept(*this);
-  }
+  return nullptr;
+}
 
+Value* Codegen::Visit(ImportStmt& stmt) {
   return nullptr;
 }
 

@@ -1,5 +1,6 @@
 #include "cinder/semantic/semantic_analyzer.hpp"
 
+#include "cinder/ast/stmt/stmt.hpp"
 #include "cinder/support/utils.hpp"
 
 using namespace cinder;
@@ -16,6 +17,10 @@ void SemanticAnalyzer::Visit(ModuleStmt& stmt) {
     Resolve(*s);
   }
   EndScope();
+}
+
+void SemanticAnalyzer::Visit(ImportStmt& stmt) {
+  return;
 }
 
 void SemanticAnalyzer::Visit(FunctionProto& stmt) {
@@ -40,7 +45,6 @@ void SemanticAnalyzer::Visit(FunctionProto& stmt) {
 }
 
 void SemanticAnalyzer::Visit(FunctionStmt& stmt) {
-  Resolve(*stmt.proto);
   std::error_code ec;
   FunctionProto* proto = stmt.proto->CastTo<FunctionProto>(ec);
 
@@ -403,7 +407,32 @@ std::optional<SymbolId> SemanticAnalyzer::Declare(std::string name,
 }
 
 void SemanticAnalyzer::Analyze(ModuleStmt& mod) {
-  Resolve(mod);
+  AnalyzeProgram({&mod});
+}
+
+void SemanticAnalyzer::AnalyzeProgram(const std::vector<ModuleStmt*>& modules) {
+  BeginScope();
+
+  for (ModuleStmt* mod : modules) {
+    for (auto& stmt : mod->stmts) {
+      if (auto* fn = dynamic_cast<FunctionStmt*>(stmt.get())) {
+        Resolve(*fn->proto);
+      } else if (auto* proto = dynamic_cast<FunctionProto*>(stmt.get())) {
+        Resolve(*proto);
+      }
+    }
+  }
+
+  for (ModuleStmt* mod : modules) {
+    for (auto& stmt : mod->stmts) {
+      if (stmt->IsImport() || stmt->IsFunctionP()) {
+        continue;
+      }
+      Resolve(*stmt);
+    }
+  }
+
+  EndScope();
 }
 
 void SemanticAnalyzer::VariadicPromotion(Expr* expr) {
