@@ -6,11 +6,16 @@
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
+#include "clang/Driver/Compilation.h"
+#include "clang/Driver/Driver.h"
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Host.h"
 
 /**
@@ -19,6 +24,7 @@
  * hard coded paths.
  * @return Returns a string if the match is made, otherwise a nullopt
  */
+#ifdef __APPLE__
 static std::optional<std::string> ResolveDarwinSysroot() {
   if (const char* sdkroot = std::getenv("SDKROOT"); sdkroot && *sdkroot) {
     return std::string(sdkroot);
@@ -37,6 +43,7 @@ static std::optional<std::string> ResolveDarwinSysroot() {
   }
   return std::nullopt;
 }
+#endif
 
 bool ClangDriver::LinkObject(const std::string& object_path,
                              const std::string& output_path,

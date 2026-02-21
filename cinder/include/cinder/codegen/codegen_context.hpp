@@ -6,6 +6,7 @@
 #include "cinder/ast/types.hpp"
 #include "cinder/codegen/codegen_bindings.hpp"
 #include "cinder/frontend/tokens.hpp"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -14,6 +15,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -23,8 +25,10 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Triple.h"
 
 /**
  * @brief Owns LLVM IR construction state for a single compilation unit.
@@ -62,6 +66,8 @@ class CodegenContext {
   /** @brief Returns the mutable IR builder. */
   llvm::IRBuilder<>& GetBuilder();
 
+  llvm::Type* CreateTypeFromToken(cinder::Token& tok);
+
   llvm::AllocaInst* CreateAlloca(llvm::Type* ty, llvm::Value* array_size,
                                  const llvm::Twine& name = "");
   llvm::StoreInst* CreateStore(llvm::Value* value, llvm::Value* ptr,
@@ -84,6 +90,49 @@ class CodegenContext {
 
   llvm::Value* CreatePreOp(cinder::types::Type* ty, cinder::Token::Type op,
                            llvm::Value* val, llvm::AllocaInst* alloca);
+
+  llvm::BasicBlock* GetInsertBlock();
+  llvm::Instruction* GetInsertBlockTerminator();
+  llvm::Function* GetInsertBlockParent();
+
+  llvm::BasicBlock* CreateBasicBlock(const llvm::Twine name,
+                                     llvm::Function* parent = nullptr,
+                                     llvm::BasicBlock* before = nullptr);
+
+  llvm::BranchInst* CreateBr(llvm::BasicBlock* destination);
+
+  llvm::BranchInst* CreateBasicCondBr(llvm::Value* val,
+                                      llvm::BasicBlock* true_block,
+                                      llvm::BasicBlock* false_block);
+
+  llvm::FunctionType* GetFuncType(llvm::Type* res,
+                                  llvm::ArrayRef<llvm::Type*> params,
+                                  bool is_variadic);
+
+  llvm::Function* CreatePublicFunc(llvm::FunctionType* type,
+                                   const llvm::Twine& name);
+
+  void SetInsertPoint(llvm::BasicBlock* block);
+
+  llvm::ReturnInst* CreateVoidReturn();
+
+  llvm::ReturnInst* CreateReturn(llvm::Value* val);
+
+  llvm::CallInst* CreateVoidCall(llvm::FunctionCallee callee,
+                                 llvm::ArrayRef<llvm::Value*> args = {});
+
+  llvm::CallInst* CreateCall(llvm::FunctionCallee callee,
+                             llvm::ArrayRef<llvm::Value*> args = {},
+                             const llvm::Twine name = "");
+
+  void SetTargetTriple(llvm::Triple trip);
+
+  const llvm::Target* LookupTarget();
+
+  llvm::TargetMachine* CreateTargetMachine(const llvm::Target* target,
+                                           const std::string& trip);
+
+  void SetModDataLayout(llvm::TargetMachine* tm);
 };
 
 #endif

@@ -11,6 +11,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/Scalar.h"
 
 /// TODO: Refactor some of the functions in this file, a bit redundant and
@@ -51,31 +53,27 @@ bool Codegen::Generate() {
 
   GenerateIR();
 
-  auto TargetTriple = sys::getDefaultTargetTriple();
-  ctx_->GetModule().setTargetTriple(Triple(TargetTriple));
+  std::string target_trip = sys::getDefaultTargetTriple();
+  ctx_->SetTargetTriple(Triple(target_trip));
 
   std::string Error;
-  auto Target =
-      TargetRegistry::lookupTarget(ctx_->GetModule().getTargetTriple(), Error);
+  auto target = ctx_->LookupTarget();
 
-  if (!Target) {
+  if (!target) {
     std::cout << "Failed to create target";
-    return true;
+    return false;
   }
 
-  auto CPU = "generic";
-  auto Features = "";
   TargetOptions gen_opt;
-  auto TheTargetMachine = Target->createTargetMachine(
-      Triple(TargetTriple), CPU, Features, gen_opt, Reloc::PIC_);
+  auto target_machine = ctx_->CreateTargetMachine(target, target_trip);
+
+  ctx_->SetModDataLayout(target_machine);
 
   switch (opts.mode) {
     case CodegenOpts::Opt::COMPILE:
-      ctx_->GetModule().setDataLayout(TheTargetMachine->createDataLayout());
-      CompileBinary(TheTargetMachine);
+      CompileBinary(target_machine);
       return true;
     case CodegenOpts::Opt::EMIT_LLVM:
-      ctx_->GetModule().setDataLayout(TheTargetMachine->createDataLayout());
       EmitLLVM();
       return true;
     case CodegenOpts::Opt::RUN:
@@ -125,7 +123,7 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
     ostream::ErrorOutln(errors, "clang driver link step failed");
   }
 
-  auto err = llvm::sys::fs::remove(temp);
+  auto err = sys::fs::remove(temp);
   if (err) {
     diagnose_.Error({0}, err.message());
   }
@@ -158,27 +156,25 @@ Value* Codegen::Visit(ExpressionStmt& stmt) {
 }
 
 Value* Codegen::Visit(WhileStmt& stmt) {
-  Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
-  BasicBlock* cond_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.cond", func);
-  BasicBlock* loop_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
-  BasicBlock* after_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
+  Function* func = ctx_->GetInsertBlockParent();
 
-  ctx_->GetBuilder().CreateBr(cond_block);
-  ctx_->GetBuilder().SetInsertPoint(cond_block);
+  BasicBlock* cond_block = ctx_->CreateBasicBlock("loop.cond", func);
+  BasicBlock* loop_block = ctx_->CreateBasicBlock("loop.body", func);
+  BasicBlock* after_block = ctx_->CreateBasicBlock("loop.body", func);
+
+  ctx_->CreateBr(cond_block);
+  ctx_->SetInsertPoint(cond_block);
+
   Value* condition = stmt.condition->Accept(*this);
 
-  ctx_->GetBuilder().CreateCondBr(condition, loop_block, after_block);
-
-  ctx_->GetBuilder().SetInsertPoint(loop_block);
+  ctx_->CreateBasicCondBr(condition, loop_block, after_block);
+  ctx_->SetInsertPoint(loop_block);
   for (auto& stmt : stmt.body) {
     stmt->Accept(*this);
   }
 
-  ctx_->GetBuilder().CreateBr(cond_block);
-  ctx_->GetBuilder().SetInsertPoint(after_block);
+  ctx_->CreateBr(cond_block);
+  ctx_->SetInsertPoint(after_block);
   return nullptr;
 }
 
@@ -188,36 +184,32 @@ Value* Codegen::Visit(ForStmt& stmt) {
   }
 
   Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
-  BasicBlock* cond_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.cond", func);
-  BasicBlock* loop_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.body", func);
-  BasicBlock* step_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.step", func);
-  BasicBlock* after_block =
-      BasicBlock::Create(ctx_->GetContext(), "loop.end", func);
+  BasicBlock* cond_block = ctx_->CreateBasicBlock("loop.cond", func);
+  BasicBlock* loop_block = ctx_->CreateBasicBlock("loop.body", func);
+  BasicBlock* step_block = ctx_->CreateBasicBlock("loop.step", func);
+  BasicBlock* after_block = ctx_->CreateBasicBlock("loop.end", func);
 
-  ctx_->GetBuilder().CreateBr(cond_block);
+  ctx_->CreateBr(cond_block);
+  ctx_->SetInsertPoint(cond_block);
 
-  ctx_->GetBuilder().SetInsertPoint(cond_block);
   Value* condition = stmt.condition->Accept(*this);
 
-  ctx_->GetBuilder().CreateCondBr(condition, loop_block, after_block);
+  ctx_->CreateBasicCondBr(condition, loop_block, after_block);
+  ctx_->SetInsertPoint(loop_block);
 
-  ctx_->GetBuilder().SetInsertPoint(loop_block);
   for (auto& stmt : stmt.body) {
     stmt->Accept(*this);
   }
 
-  ctx_->GetBuilder().CreateBr(step_block);
+  ctx_->CreateBr(step_block);
+  ctx_->SetInsertPoint(step_block);
 
-  ctx_->GetBuilder().SetInsertPoint(step_block);
   if (stmt.step) {
     stmt.step->Accept(*this);
   }
-  ctx_->GetBuilder().CreateBr(cond_block);
 
-  ctx_->GetBuilder().SetInsertPoint(after_block);
+  ctx_->CreateBr(cond_block);
+  ctx_->SetInsertPoint(after_block);
   return nullptr;
 }
 
@@ -226,48 +218,49 @@ Value* Codegen::Visit(IfStmt& stmt) {
 
   Function* Func = ctx_->GetBuilder().GetInsertBlock()->getParent();
 
-  BasicBlock* then_block =
-      BasicBlock::Create(ctx_->GetContext(), "if.then", Func);
-  BasicBlock* merge = BasicBlock::Create(ctx_->GetContext(), "if.cont");
+  BasicBlock* then_block = ctx_->CreateBasicBlock("if.then", Func);
+  BasicBlock* merge = ctx_->CreateBasicBlock("if.cont");
   BasicBlock* else_block = merge;
 
   if (stmt.otherwise) {
     else_block = BasicBlock::Create(ctx_->GetContext(), "if.else");
   }
 
-  ctx_->GetBuilder().CreateCondBr(condition, then_block, else_block);
+  ctx_->CreateBasicCondBr(condition, then_block, else_block);
+  ctx_->SetInsertPoint(then_block);
 
-  ctx_->GetBuilder().SetInsertPoint(then_block);
   /// TODO: Add multiple statements in the body of the then and else branches
   /// We do not have block statements so passing a bunch of stuff at once
   /// probably needs a vector for now
   stmt.then->Accept(*this);
 
-  if (!ctx_->GetBuilder().GetInsertBlock()->getTerminator()) {
-    ctx_->GetBuilder().CreateBr(merge);
+  if (!ctx_->GetInsertBlockTerminator()) {
+    ctx_->CreateBr(merge);
   }
-  then_block = ctx_->GetBuilder().GetInsertBlock();
+
+  then_block = ctx_->GetInsertBlock();
 
   if (stmt.otherwise) {
     Func->insert(Func->end(), else_block);
-    ctx_->GetBuilder().SetInsertPoint(else_block);
+    ctx_->SetInsertPoint(else_block);
+
     stmt.otherwise->Accept(*this);
 
-    if (!ctx_->GetBuilder().GetInsertBlock()->getTerminator()) {
-      ctx_->GetBuilder().CreateBr(merge);
+    if (!ctx_->GetInsertBlockTerminator()) {
+      ctx_->CreateBr(merge);
     }
-    else_block = ctx_->GetBuilder().GetInsertBlock();
+    else_block = ctx_->GetInsertBlock();
   }
 
   Func->insert(Func->end(), merge);
-  ctx_->GetBuilder().SetInsertPoint(merge);
+  ctx_->SetInsertPoint(merge);
   return nullptr;
 }
 
 Value* Codegen::Visit(FunctionStmt& stmt) {
   Function* func = dyn_cast<Function>(stmt.proto->Accept(*this));
-  BasicBlock* entry = BasicBlock::Create(ctx_->GetContext(), "entry", func);
-  ctx_->GetBuilder().SetInsertPoint(entry);
+  BasicBlock* entry = ctx_->CreateBasicBlock("entry", func);
+  ctx_->SetInsertPoint(entry);
 
   for (auto& body_stmt : stmt.body) {
     body_stmt->Accept(*this);
@@ -275,9 +268,9 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
 
   /// TODO: Catch malformed non void fuctions
   /// Right now it seg faults when a return is not provided
-  if (!ctx_->GetBuilder().GetInsertBlock()->getTerminator()) {
+  if (!ctx_->GetInsertBlockTerminator()) {
     if (func->getReturnType()->isVoidTy()) {
-      ctx_->GetBuilder().CreateRetVoid();
+      ctx_->CreateVoidReturn();
     }
   }
 
@@ -286,24 +279,7 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
 }
 
 Value* Codegen::Visit(FunctionProto& stmt) {
-  auto match_type = [&](Token t) -> Type* {
-    switch (t.kind) {
-      case Token::Type::INT32_SPECIFIER:
-        return Type::getInt32Ty(ctx_->GetContext());
-      case Token::Type::FLT32_SPECIFIER:
-        return Type::getFloatTy(ctx_->GetContext());
-      case Token::Type::FLT64_SPECIFIER:
-        return Type::getDoubleTy(ctx_->GetContext());
-      case Token::Type::BOOL_SPECIFIER:
-        return Type::getInt1Ty(ctx_->GetContext());
-      case Token::Type::STR_SPECIFIER:
-        return PointerType::getInt8Ty(ctx_->GetContext());
-      case Token::Type::VOID_SPECIFIER:
-        return Type::getVoidTy(ctx_->GetContext());
-      default:
-        return nullptr;
-    }
-  };
+  Type* ret_type = ctx_->CreateTypeFromToken(stmt.return_type);
 
   std::vector<Type*> arg_types;
   arg_types.reserve(stmt.args.size());
@@ -311,11 +287,10 @@ Value* Codegen::Visit(FunctionProto& stmt) {
     arg_types.push_back(ResolveArgType(arg.resolved_type));
   }
 
-  FunctionType* func_type = FunctionType::get(match_type(stmt.return_type),
-                                              arg_types, stmt.is_variadic);
+  FunctionType* func_type =
+      ctx_->GetFuncType(ret_type, arg_types, stmt.is_variadic);
 
-  Function* func = Function::Create(func_type, Function::ExternalLinkage,
-                                    stmt.name.lexeme, ctx_->GetModule());
+  Function* func = ctx_->CreatePublicFunc(func_type, stmt.name.lexeme);
 
   size_t idx = 0;
   for (auto& arg : func->args()) {
@@ -324,35 +299,25 @@ Value* Codegen::Visit(FunctionProto& stmt) {
   }
 
   if (stmt.id.has_value()) {
-    std::unique_ptr<Binding>& b = ir_bindings_[stmt.id.value()];
+    std::unique_ptr<Binding>& b = ir_bindings_[stmt.GetID()];
     if (!b || !b->IsFunction()) {
       b = std::make_unique<FuncBinding>();
     }
-    FuncBinding* f = dynamic_cast<FuncBinding*>(b.get());
-    if (!f) {
+    auto f = b->CastTo<FuncBinding>();
+    if (std::error_code ec = f.getError()) {
       return nullptr;
     }
-    f->function = func;
+    f.get()->function = func;
   }
   return func;
 }
 
 Value* Codegen::Visit(ReturnStmt& stmt) {
-  if (!stmt.value) {
-    return ctx_->GetBuilder().CreateRetVoid();
+  if (stmt.value->type->Void()) {
+    return ctx_->CreateVoidReturn();
   }
-
   Value* ret = stmt.value->Accept(*this);
-  switch (stmt.value->type->kind) {
-    case types::TypeKind::Void:
-      return ctx_->GetBuilder().CreateRetVoid();
-    case types::TypeKind::Bool:
-    case types::TypeKind::String:
-    case types::TypeKind::Int:
-    case types::TypeKind::Float:
-    default:
-      return ctx_->GetBuilder().CreateRet(ret);
-  }
+  return ctx_->CreateReturn(ret);
   return nullptr;
 }
 
@@ -367,7 +332,7 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
     if (!b || !b->IsVariable()) {
       b = std::make_unique<VarBinding>();
     }
-    llvm::ErrorOr<VarBinding*> var = b->CastTo<VarBinding>();
+    ErrorOr<VarBinding*> var = b->CastTo<VarBinding>();
     if (var.getError()) {
       return nullptr;
     }
@@ -379,10 +344,6 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
 Value* Codegen::Visit(Conditional& expr) {
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
-
-  if (!left || !right) {
-    return nullptr;
-  }
 
   switch (expr.left->type->kind) {
     case types::TypeKind::Int:
@@ -411,17 +372,13 @@ Value* Codegen::Visit(Binary& expr) {
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
-  if (!expr.HasID()) {
-    return nullptr;
-  }
-
   auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
     return nullptr;
   }
 
-  llvm::ErrorOr<VarBinding*> bind = symbol->second->CastTo<VarBinding>();
+  ErrorOr<VarBinding*> bind = symbol->second->CastTo<VarBinding>();
   if (std::error_code ec = bind.getError()) {
     return nullptr;
   }
@@ -441,12 +398,11 @@ Value* Codegen::Visit(PreFixOp& expr) {
 
 Value* Codegen::Visit(Assign& expr) {
   auto symbol = ir_bindings_.find(expr.GetID());
-  if (symbol == ir_bindings_.end() || !symbol->second ||
-      !symbol->second->IsVariable()) {
+  if (symbol == ir_bindings_.end() || !symbol->second->IsVariable()) {
     return nullptr;
   }
 
-  llvm::ErrorOr<VarBinding*> var = symbol->second->CastTo<VarBinding>();
+  ErrorOr<VarBinding*> var = symbol->second->CastTo<VarBinding>();
   if (std::error_code ec = var.getError()) {
     return nullptr;
   }
@@ -469,10 +425,10 @@ Value* Codegen::Visit(CallExpr& expr) {
   }
 
   if (expr.type->kind == types::TypeKind::Void) {
-    return ctx_->GetBuilder().CreateCall(callee, call_args);
+    return ctx_->CreateVoidCall(callee, call_args);
   }
 
-  return ctx_->GetBuilder().CreateCall(callee, call_args, callee->getName());
+  return ctx_->CreateCall(callee, call_args, callee->getName());
 }
 
 Value* Codegen::Visit(Grouping& expr) {
@@ -480,7 +436,7 @@ Value* Codegen::Visit(Grouping& expr) {
 }
 
 Value* Codegen::Visit(Variable& expr) {
-  if (expr.id.has_value()) {
+  if (expr.HasID()) {
     auto it = ir_bindings_.find(expr.id.value());
     if (it != ir_bindings_.end()) {
       Binding* b = it->second.get();
@@ -488,11 +444,11 @@ Value* Codegen::Visit(Variable& expr) {
         return nullptr;
       }
       if (b->IsFunction()) {
-        llvm::ErrorOr<FuncBinding*> f = b->CastTo<FuncBinding>();
+        ErrorOr<FuncBinding*> f = b->CastTo<FuncBinding>();
         return f.get()->function;
       }
       if (b->IsVariable()) {
-        llvm::ErrorOr<VarBinding*> v = b->CastTo<VarBinding>();
+        ErrorOr<VarBinding*> v = b->CastTo<VarBinding>();
         if (!v.get()->GetAlloca()) {
           return nullptr;
         }
@@ -505,8 +461,8 @@ Value* Codegen::Visit(Variable& expr) {
 
   // Instead of tracking a scope, we simply search the parent block and see if
   // the variable is defined there
-  if (ctx_->GetBuilder().GetInsertBlock()) {
-    Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
+  if (ctx_->GetInsertBlock()) {
+    Function* func = ctx_->GetInsertBlockParent();
     if (func) {
       for (auto& arg : func->args()) {
         if (arg.getName() == expr.name.lexeme) {
@@ -539,7 +495,7 @@ Value* Codegen::Visit(Literal& expr) {
   return nullptr;
 }
 
-llvm::Value* Codegen::EmitInteger(Literal& expr) {
+Value* Codegen::EmitInteger(Literal& expr) {
   types::IntType* int_type = dynamic_cast<types::IntType*>(expr.type);
   int value = std::get<int>(expr.value);
   return ConstantInt::get(ctx_->GetContext(), APInt(int_type->bits, value));
@@ -550,20 +506,20 @@ static Type* ResolveStructType() {
   return ty;
 }
 
-llvm::Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
+Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
   auto& ctx = ctx_->GetContext();
 
   switch (type->kind) {
     case types::TypeKind::Bool:
-      return llvm::Type::getInt1Ty(ctx);
+      return Type::getInt1Ty(ctx);
     case types::TypeKind::Int:
-      return llvm::Type::getInt32Ty(ctx);
+      return Type::getInt32Ty(ctx);
     case types::TypeKind::Float:
-      return llvm::Type::getFloatTy(ctx);
+      return Type::getFloatTy(ctx);
     case types::TypeKind::String:
       return PointerType::getInt8Ty(ctx);
     case types::TypeKind::Void:
-      return allow_void ? llvm::Type::getVoidTy(ctx) : nullptr;
+      return allow_void ? Type::getVoidTy(ctx) : nullptr;
     case types::TypeKind::Struct:
       return ResolveStructType();
     default:
@@ -572,11 +528,11 @@ llvm::Type* Codegen::ResolveType(types::Type* type, bool allow_void) {
   }
 }
 
-llvm::Type* Codegen::ResolveArgType(types::Type* type) {
+Type* Codegen::ResolveArgType(types::Type* type) {
   return ResolveType(type, false);
 }
 
-llvm::Type* Codegen::ResolveType(types::Type* type) {
+Type* Codegen::ResolveType(types::Type* type) {
   return ResolveType(type, true);
 }
 

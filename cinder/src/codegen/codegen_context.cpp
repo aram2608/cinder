@@ -8,12 +8,14 @@
 #include "cinder/frontend/tokens.hpp"
 #include "cinder/support/utils.hpp"
 #include "llvm/ADT/Twine.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -23,9 +25,12 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
@@ -71,6 +76,25 @@ Module& CodegenContext::GetModule() {
 
 IRBuilder<>& CodegenContext::GetBuilder() {
   return *builder_;
+}
+
+Type* CodegenContext::CreateTypeFromToken(Token& tok) {
+  switch (tok.kind) {
+    case Token::Type::INT32_SPECIFIER:
+      return Type::getInt32Ty(*llvm_ctx_);
+    case Token::Type::FLT32_SPECIFIER:
+      return Type::getFloatTy(*llvm_ctx_);
+    case Token::Type::FLT64_SPECIFIER:
+      return Type::getDoubleTy(*llvm_ctx_);
+    case Token::Type::BOOL_SPECIFIER:
+      return Type::getInt1Ty(*llvm_ctx_);
+    case Token::Type::STR_SPECIFIER:
+      return PointerType::getInt8Ty(*llvm_ctx_);
+    case Token::Type::VOID_SPECIFIER:
+      return Type::getVoidTy(*llvm_ctx_);
+    default:
+      return nullptr;
+  }
 }
 
 AllocaInst* CodegenContext::CreateAlloca(Type* ty, Value* array_size,
@@ -188,4 +212,83 @@ Value* CodegenContext::CreatePreOp(types::Type* ty, Token::Type op, Value* val,
 
   builder_->CreateStore(var, alloca);
   return var;
+}
+
+BasicBlock* CodegenContext::GetInsertBlock() {
+  return builder_->GetInsertBlock();
+}
+
+Function* CodegenContext::GetInsertBlockParent() {
+  return builder_->GetInsertBlock()->getParent();
+}
+
+Instruction* CodegenContext::GetInsertBlockTerminator() {
+  return builder_->GetInsertBlock()->getTerminator();
+}
+
+BasicBlock* CodegenContext::CreateBasicBlock(const Twine name, Function* parent,
+                                             BasicBlock* before) {
+  return BasicBlock::Create(*llvm_ctx_, name, parent, before);
+}
+
+BranchInst* CodegenContext::CreateBr(BasicBlock* destination) {
+  return builder_->CreateBr(destination);
+}
+
+BranchInst* CodegenContext::CreateBasicCondBr(Value* val,
+                                              BasicBlock* true_block,
+                                              BasicBlock* false_block) {
+  return builder_->CreateCondBr(val, true_block, false_block);
+}
+
+FunctionType* CodegenContext::GetFuncType(Type* res, ArrayRef<Type*> params,
+                                          bool is_variadic) {
+  return FunctionType::get(res, params, is_variadic);
+}
+
+Function* CodegenContext::CreatePublicFunc(FunctionType* type,
+                                           const Twine& name) {
+  return Function::Create(type, Function::ExternalLinkage, name, *module_);
+}
+
+void CodegenContext::SetInsertPoint(BasicBlock* block) {
+  builder_->SetInsertPoint(block);
+}
+
+ReturnInst* CodegenContext::CreateVoidReturn() {
+  return builder_->CreateRetVoid();
+}
+
+llvm::ReturnInst* CodegenContext::CreateReturn(llvm::Value* val) {
+  return builder_->CreateRet(val);
+}
+
+llvm::CallInst* CodegenContext::CreateVoidCall(
+    llvm::FunctionCallee callee, llvm::ArrayRef<llvm::Value*> args) {
+  return builder_->CreateCall(callee, args);
+}
+
+llvm::CallInst* CodegenContext::CreateCall(llvm::FunctionCallee callee,
+                                           llvm::ArrayRef<llvm::Value*> args,
+                                           const llvm::Twine name) {
+  return builder_->CreateCall(callee, args, name);
+}
+
+void CodegenContext::SetTargetTriple(llvm::Triple trip) {
+  module_->setTargetTriple(trip);
+}
+
+const llvm::Target* CodegenContext::LookupTarget() {
+  std::string err;
+  return TargetRegistry::lookupTarget(module_->getTargetTriple(), err);
+}
+
+TargetMachine* CodegenContext::CreateTargetMachine(const Target* target,
+                                                   const std::string& trip) {
+  return target->createTargetMachine(Triple(trip), "generic", "", {},
+                                     Reloc::PIC_);
+}
+
+void CodegenContext::SetModDataLayout(TargetMachine* tm) {
+  module_->setDataLayout(tm->createDataLayout());
 }
