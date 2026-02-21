@@ -103,7 +103,9 @@ bool ModuleLoader::LoadFileRecursive(const std::string& file_path,
 
   ModuleStmt* module = casted.get();
 
-  if (!IndexModuleName(normalized_path, *module)) return false;
+  if (!IndexModuleName(normalized_path, *module)) {
+    return false;
+  }
 
   for (auto& s : module->stmts) {
     auto* imp = dynamic_cast<ImportStmt*>(s.get());
