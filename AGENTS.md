@@ -1,164 +1,160 @@
 # AGENTS Guide for `cinder`
-This file is for autonomous coding agents working in this repository.
-Keep edits minimal, scoped, and consistent with surrounding code.
+This file is for autonomous coding agents operating in this repository.
+Keep changes minimal, scoped, and aligned with existing conventions.
+
 ## 1) Project Snapshot
 - Language: C++20
-- Build system: CMake (root `CMakeLists.txt`)
-- Main executable: `build/bin/cinder`
-- Core library target: `cinder_core` (static)
-- Primary tests: compiler runs over `.ci` files in `tests/`
-- Formatting: `.clang-format` and `format.sh`
-- Toolchain: LLVM required, Clang package optional
-## 2) Important Paths
-- `CMakeLists.txt`: top-level configuration, diagnostics, compile_commands symlink
-- `cinder/CMakeLists.txt`: LLVM/Clang package discovery, source subtree entry
-- `cinder/src/CMakeLists.txt`: targets, warnings, no-exception flags, link setup
+- Build system: CMake (`CMakeLists.txt`) with optional presets (`CMakePresets.json`)
+- Main binary: `build/bin/cinder`
+- Core target: `cinder_core` (static library)
+- Unit tests: GoogleTest executable `cinder_unit_tests` discovered by CTest
+- Compiler smoke tests: run `cinder` against `tests/*.ci`
+- Formatting authority: `.clang-format`
+
+## 2) Key Paths
+- `CMakeLists.txt`: top-level options, diagnostics, test enablement, compile commands link
+- `CMakePresets.json`: configure/build/test presets (`debug`, `release`, `debug-tests`, etc.)
+- `BUILD.md`: canonical command documentation
+- `cinder/CMakeLists.txt`: LLVM/Clang package discovery
+- `cinder/src/CMakeLists.txt`: flags, compile definitions, links, subdirectories
 - `cinder/include/cinder/**`: public headers
 - `cinder/src/**`: implementation
-- `cinder/vendor/**`: third-party code (do not edit unless asked)
-- `tests/*.ci`: integration-style test inputs (`test.ci`, `fib.ci`, `bad_op.ci`)
-- `Makefile`: convenience wrappers for common compiler runs
-- `format.sh`: batch clang-format helper
+- `tests/CMakeLists.txt`: unit test target and `gtest_discover_tests`
+- `tests/*.ci`: language examples used for compile/semantic/codegen checks
+- `Makefile`: convenience wrappers (`test`, `fib`, `ast`, `semantic`, `llvm`, `cinder`)
+- `cinder/vendor/**`: vendored third-party code; avoid edits unless explicitly requested
+
 ## 3) Build Commands
-Run from repo root: `/Users/ja1473/cinder`
-### Configure
-```bash
-cmake -S . -B build
-```
-### Build
-```bash
-cmake --build build
-```
-### Configure + build (recommended first run)
-```bash
-cmake -S . -B build && cmake --build build
-```
-### Convenience target
-```bash
-make cinder
-```
-### Optional: enable clang-tidy during build
-```bash
-cmake -S . -B build -DCINDER_ENABLE_CLANG_TIDY=ON
-cmake --build build
-```
-Notes:
-- Build outputs: `build/bin` and `build/lib`
-- `compile_commands.json` is exported and symlinked at repo root
-- Configure prints compiler, target, sysroot, and include diagnostics
+Run from repository root: `/Users/ja1473/cinder`.
+
+### Direct CMake
+- Configure: `cmake -S . -B build`
+- Build: `cmake --build build`
+- Configure+build: `cmake -S . -B build && cmake --build build`
+
+### Presets
+- Debug: `cmake --preset debug && cmake --build --preset build-debug`
+- Release: `cmake --preset release && cmake --build --preset build-release`
+- Debug + tests: `cmake --preset debug-tests && cmake --build --preset build-debug-tests`
+
+### clang-tidy (optional)
+- `cmake -S . -B build -DCINDER_ENABLE_CLANG_TIDY=ON`
+- `cmake --build build`
+
+### Make convenience wrapper
+- `make cinder`
+
+### Build notes
+- `CMAKE_CXX_STANDARD` is pinned to 20.
+- Exceptions are disabled at compile level (`-fno-exceptions`).
+- Warnings in debug builds include `-Wall -Wextra -pedantic`.
+- `compile_commands.json` is exported and symlinked at repo root.
+
 ## 4) Lint / Formatting Commands
 There is no dedicated lint target by default.
-Formatting is the primary enforced style check.
-### Format all tracked C++ files
-```bash
-./format.sh
-```
-### Format one file
-```bash
-clang-format -i cinder/src/frontend/parser.cpp
-```
-### Useful verification
-```bash
-git diff -- cinder/src cinder/include
-```
-Formatting defaults from `.clang-format`:
-- BasedOnStyle: Google
-- IndentWidth: 2
-- ColumnLimit: 80
-- BreakBeforeBraces: Attach
-- PointerAlignment: Left
-- SortIncludes: true
+Primary style enforcement is clang-format + compiler warnings (+ optional clang-tidy).
+
+### Formatting
+- Format all tracked files: `./format.sh`
+- Format one file: `clang-format -i cinder/src/frontend/parser.cpp`
+- Quick review of touched C++/tests: `git diff -- cinder/src cinder/include tests`
+
+### `.clang-format` baseline
+- `BasedOnStyle: Google`
+- `IndentWidth: 2`
+- `ColumnLimit: 80`
+- `BreakBeforeBraces: Attach`
+- `PointerAlignment: Left`
+- `SortIncludes: true`
+
 ## 5) Test Commands
-There is no `ctest` suite currently.
-Treat tests as executable runs over `.ci` inputs.
-### Build before running tests
-```bash
-cmake --build build
-```
-### Canonical compile test
-```bash
-./build/bin/cinder --compile -o test ./tests/test.ci
-```
-### AST mode
-```bash
-./build/bin/cinder --emit-ast -o test ./tests/test.ci
-```
-### Semantic mode
-```bash
-./build/bin/cinder --test-semantic -o test ./tests/test.ci
-```
-### LLVM IR emission
-```bash
-./build/bin/cinder --emit-llvm -o test.ll ./tests/test.ci
-```
-### Run a single specific test file (important)
-```bash
-./build/bin/cinder --compile -o /tmp/out ./tests/fib.ci
-```
-### Additional focused case (negative behavior)
-```bash
-./build/bin/cinder --compile -o /tmp/out ./tests/bad_op.ci
-```
-### Makefile shortcuts
-```bash
-make test
-make fib
-make ast
-make semantic
-make llvm
-```
-Minimum regression set for parser/semantic/codegen changes:
-- `./tests/test.ci`
-- `./tests/fib.ci`
-## 6) Compiler and Build Constraints
-- C++ exceptions are disabled (`-fno-exceptions`)
-- Warning set includes `-Wall -Wextra -pedantic`
-- `-Wno-unused-parameter` is currently enabled
-- `CXXOPTS_NO_EXCEPTIONS` is defined for targets
-- Keep portability in mind for LLVM/Clang package discovery differences
-## 7) Code Style Guidelines
-Follow existing local patterns first; use these defaults when uncertain.
+Use both unit tests and `.ci` compiler runs.
+
+### Build tests
+- `cmake -S . -B build -DCINDER_BUILD_TESTS=ON`
+- `cmake --build build`
+
+### Run all unit tests
+- `ctest --test-dir build --output-on-failure`
+
+### Run a single unit test (important)
+- CTest filtering: `ctest --test-dir build --output-on-failure -R lexer`
+- Direct gtest filter: `./build/bin/cinder_unit_tests --gtest_filter='*Lexer*'`
+
+### Preset-based test run
+- `cmake --preset debug-tests`
+- `cmake --build --preset build-debug-tests`
+- `ctest --preset test-debug`
+
+### Run a single `.ci` test file (important)
+- `./build/bin/cinder --compile -o /tmp/out ./tests/fib.ci`
+
+### Useful `.ci` smoke commands
+- `./build/bin/cinder --compile -o /tmp/out ./tests/test.ci`
+- `./build/bin/cinder --compile -o /tmp/out ./tests/bad_op.ci`
+- `./build/bin/cinder --emit-ast -o /tmp/out ./tests/test.ci`
+- `./build/bin/cinder --test-semantic -o /tmp/out ./tests/test.ci`
+- `./build/bin/cinder --emit-llvm -o /tmp/test.ll ./tests/test.ci`
+
+### Makefile shortcuts for smoke runs
+- `make test`
+- `make fib`
+- `make ast`
+- `make semantic`
+- `make llvm`
+
+## 6) Code Style Guidelines
+Follow existing local file conventions first.
+When unclear, use the rules below.
+
 ### Includes and dependencies
-- Keep includes minimal and used
-- Standard library includes first
-- Project headers (`"cinder/..."`) before external headers where practical
-- Rely on clang-format include sorting; avoid manual churn-only reorderings
-### Formatting and structure
-- Run clang-format on touched C++ files
-- Use 2-space indentation and attached braces
-- Keep lines around 80 columns unless readability clearly improves
-- Avoid unrelated whitespace-only changes in untouched code
-### Naming
-- Types, enums, classes: `PascalCase`
-- Many methods use `PascalCase` (`Parse`, `Visit`, `Generate`, `ResolveType`)
-- Local variables: lower-case, often `snake_case`
-- Member fields commonly end with trailing underscore (`ctx_`, `tokens_`)
-- Match naming conventions of the file you are editing
+- Keep includes minimal and used.
+- Prefer project headers with `"cinder/..."` style.
+- Let clang-format sort includes; do not hand-sort just for churn.
+- Avoid dependency or include reordering unrelated to the requested task.
+
+### Formatting
+- Run clang-format on every touched C++ file before finishing.
+- Use 2-space indentation and attached braces.
+- Keep lines near 80 columns unless readability clearly improves.
+- Avoid broad whitespace-only edits.
+
 ### Types and ownership
-- Prefer `std::unique_ptr` for AST node ownership
-- Use references for required non-owning parameters
-- Raw pointers are acceptable for established non-owning links
-- Use `std::optional` for optional value-state where already used
-- Preserve visitor-based AST/semantic/codegen interfaces
+- Prefer `std::unique_ptr` for ownership-heavy AST/IR structures.
+- Use references for required non-owning parameters.
+- Raw pointers are acceptable for established non-owning links.
+- Use `std::optional` when optional state must be represented explicitly.
+- Preserve existing visitor-style interfaces and ownership boundaries.
+
+### Naming conventions
+- Types/classes/enums: `PascalCase`.
+- Core methods/functions are frequently `PascalCase`.
+- Local variables: lowercase, commonly `snake_case`.
+- Member fields often use trailing underscore (for example `ctx_`, `tokens_`).
+- Match naming already present in the file/module you edit.
+
 ### Error handling and diagnostics
-- Do not introduce exception-based flow
-- Prefer existing diagnostics mechanisms:
-  - `DiagnosticEngine` for semantic/codegen diagnostics
-  - `ostream::ErrorOutln` for direct CLI/parser-facing errors
-- Return `bool`, `nullptr`, or error-like status objects as established
-- Diagnostics should be actionable and location-aware when possible
-## 8) Change Scope Guidelines for Agents
-- Keep patches focused; avoid broad refactors unless requested
-- Do not edit `cinder/vendor/**` unless explicitly asked
-- Preserve public API shape unless task requires breaking changes
-- Update docs/comments only when behavior or contracts actually change
-- If toolchain/config behavior is changed, include verification commands
-## 9) Cursor/Copilot Rule Files
-Repository scan checked:
+- Do not introduce exception-based control flow.
+- Reuse existing diagnostics paths instead of ad-hoc stderr prints.
+- Use `DiagnosticEngine` where semantic/codegen diagnostics already flow.
+- Use `ostream::ErrorOutln` for CLI/parser-oriented diagnostics.
+- Prefer actionable messages with location context when available.
+- Return status (`bool`, nullable, optional) consistent with surrounding APIs.
+
+### Change hygiene
+- Keep patches focused; avoid broad refactors unless asked.
+- Preserve public API shape unless the task explicitly requires API changes.
+- Do not modify `cinder/vendor/**` unless explicitly requested.
+- If build/test workflows change, update `BUILD.md` and `AGENTS.md` together.
+
+## 7) Cursor / Copilot Rules
+Scanned locations:
 - `.cursor/rules/`
 - `.cursorrules`
 - `.github/copilot-instructions.md`
-Current status:
-- No Cursor rules found
-- No Copilot instruction file found
-If any of these files are added later, update this AGENTS guide accordingly.
+
+Current status in this repo:
+- No Cursor rules found.
+- No Copilot instruction file found.
+
+If these files are added later, merge their requirements into this guide.

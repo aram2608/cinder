@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <system_error>
 #include <unordered_map>
 
@@ -22,6 +23,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
@@ -38,6 +40,67 @@ static ExitOnError ExitOnErr;
 
 static ostream::RawOutStream errors{2};
 
+namespace {
+
+std::optional<cinder::SourceLocation> ExprLocation(const Expr* expr) {
+  if (!expr) {
+    return std::nullopt;
+  }
+
+  if (const auto* v = dynamic_cast<const Variable*>(expr)) {
+    return v->name.location;
+  }
+  if (const auto* m = dynamic_cast<const MemberAccess*>(expr)) {
+    return m->member.location;
+  }
+  if (const auto* p = dynamic_cast<const PreFixOp*>(expr)) {
+    return p->op.location;
+  }
+  if (const auto* b = dynamic_cast<const Binary*>(expr)) {
+    return b->op.location;
+  }
+  if (const auto* c = dynamic_cast<const Conditional*>(expr)) {
+    return c->op.location;
+  }
+  if (const auto* a = dynamic_cast<const Assign*>(expr)) {
+    return a->name.location;
+  }
+  if (const auto* ma = dynamic_cast<const MemberAssign*>(expr)) {
+    return ma->target ? std::optional<cinder::SourceLocation>(
+                            ma->target->member.location)
+                      : std::nullopt;
+  }
+  if (const auto* g = dynamic_cast<const Grouping*>(expr)) {
+    return ExprLocation(g->expr.get());
+  }
+  if (const auto* call = dynamic_cast<const CallExpr*>(expr)) {
+    return ExprLocation(call->callee.get());
+  }
+
+  return std::nullopt;
+}
+
+}  // namespace
+
+#ifdef __APPLE__
+static bool GenerateDsymBundle(const std::string& binary_path) {
+  llvm::ErrorOr<std::string> dsymutil =
+      llvm::sys::findProgramByName("dsymutil");
+  if (!dsymutil) {
+    return false;
+  }
+
+  llvm::SmallVector<llvm::StringRef, 4> args;
+  args.push_back(*dsymutil);
+  args.push_back(binary_path);
+  args.push_back("-o");
+  args.push_back(binary_path + ".dSYM");
+
+  int rc = llvm::sys::ExecuteAndWait(*dsymutil, args);
+  return rc == 0;
+}
+#endif
+
 Codegen::Codegen(std::vector<ModuleStmt*> modules, CodegenOpts opts)
     : modules_(std::move(modules)),
       opts(opts),
@@ -45,17 +108,15 @@ Codegen::Codegen(std::vector<ModuleStmt*> modules, CodegenOpts opts)
       pass_(types_) {}
 
 bool Codegen::Generate() {
-  InitializeAllTargetInfos();
-  InitializeAllTargets();
-  InitializeAllTargetMCs();
-  InitializeAllAsmParsers();
-  InitializeAllAsmPrinters();
+  InitAllTargets();
 
   if (!SemanticPass(modules_)) {
     return false;
   }
 
+  InitDebugInfo();
   GenerateIR();
+  FinalizeDebugInfo();
 
   std::string target_trip = sys::getDefaultTargetTriple();
   ctx_->SetTargetTriple(Triple(target_trip));
@@ -85,6 +146,113 @@ bool Codegen::Generate() {
       return false;
     default:
       UNREACHABLE(COMPILER_MODE, "Unknown compile type");
+  }
+}
+
+void Codegen::InitAllTargets() {
+  InitializeAllTargetInfos();
+  InitializeAllTargets();
+  InitializeAllTargetMCs();
+  InitializeAllAsmParsers();
+  InitializeAllAsmPrinters();
+}
+
+void Codegen::InitDebugInfo() {
+  if (!opts.debug_info) {
+    return;
+  }
+
+  auto& module = ctx_->GetModule();
+  module.addModuleFlag(Module::Warning, "Debug Info Version",
+                       DEBUG_METADATA_VERSION);
+#ifdef __APPLE__
+  module.addModuleFlag(Module::Warning, "Dwarf Version", 2);
+#else
+  module.addModuleFlag(Module::Warning, "Dwarf Version", 4);
+#endif
+
+  di_builder_ = std::make_unique<DIBuilder>(module);
+
+  std::string file_name = "input.ci";
+  if (!modules_.empty() && modules_[0] && !modules_[0]->name.lexeme.empty()) {
+    file_name = modules_[0]->name.lexeme + ".ci";
+  }
+
+  di_file_ = di_builder_->createFile(file_name, ".");
+  di_compile_unit_ = di_builder_->createCompileUnit(dwarf::DW_LANG_C, di_file_,
+                                                    "cinder", false, "", 0);
+  di_scope_ = di_compile_unit_;
+}
+
+void Codegen::FinalizeDebugInfo() {
+  if (!di_builder_) {
+    return;
+  }
+  di_builder_->finalize();
+}
+
+void Codegen::SetDebugLocation(const cinder::SourceLocation& loc) {
+  if (!opts.debug_info || !di_scope_) {
+    return;
+  }
+
+  unsigned line = static_cast<unsigned>(loc.line == 0 ? 1 : loc.line);
+  unsigned col = static_cast<unsigned>(loc.column == 0 ? 1 : loc.column);
+  auto* debug_loc = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
+  ctx_->GetBuilder().SetCurrentDebugLocation(debug_loc);
+}
+
+void Codegen::EmitDbgValue(llvm::Value* value, llvm::DILocalVariable* variable,
+                           const cinder::SourceLocation& loc) {
+  if (!opts.debug_info || !di_builder_ || !di_scope_ || !value || !variable) {
+    return;
+  }
+
+  unsigned line = static_cast<unsigned>(loc.line == 0 ? 1 : loc.line);
+  unsigned col = static_cast<unsigned>(loc.column == 0 ? 1 : loc.column);
+  auto* dl = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
+  di_builder_->insertDbgValueIntrinsic(value, variable,
+                                       di_builder_->createExpression(), dl,
+                                       ctx_->GetBuilder().GetInsertPoint());
+}
+
+DIType* Codegen::ResolveDebugType(cinder::types::Type* type) {
+  if (!di_builder_) {
+    return nullptr;
+  }
+
+  if (!type) {
+    return di_builder_->createUnspecifiedType("auto");
+  }
+
+  switch (type->kind) {
+    case types::TypeKind::Bool:
+      return di_builder_->createBasicType("bool", 1, dwarf::DW_ATE_boolean);
+    case types::TypeKind::Int: {
+      auto* i = dynamic_cast<types::IntType*>(type);
+      uint64_t bits = i ? i->bits : 32;
+      unsigned encoding =
+          (i && !i->is_signed) ? dwarf::DW_ATE_unsigned : dwarf::DW_ATE_signed;
+      return di_builder_->createBasicType("int", bits, encoding);
+    }
+    case types::TypeKind::Float: {
+      auto* f = dynamic_cast<types::FloatType*>(type);
+      uint64_t bits = f ? f->bits : 32;
+      return di_builder_->createBasicType("float", bits, dwarf::DW_ATE_float);
+    }
+    case types::TypeKind::String: {
+      DIType* char_ty =
+          di_builder_->createBasicType("char", 8, dwarf::DW_ATE_signed_char);
+      return di_builder_->createPointerType(char_ty, 64);
+    }
+    case types::TypeKind::Struct: {
+      auto* s = dynamic_cast<types::StructType*>(type);
+      return di_builder_->createUnspecifiedType(s ? s->name : "struct");
+    }
+    case types::TypeKind::Void:
+    case types::TypeKind::Function:
+    default:
+      return di_builder_->createUnspecifiedType("void");
   }
 }
 
@@ -127,14 +295,27 @@ void Codegen::CompileBinary(TargetMachine* target_machine) {
   pass.run(ctx_->GetModule());
   object_file.flush();
 
+  bool keep_temp_object = false;
   bool ok = ClangDriver::LinkObject(temp, opts.out_path, opts.linker_flags);
   if (!ok) {
     ostream::ErrorOutln(errors, "clang driver link step failed");
+    keep_temp_object = true;
+  } else if (opts.debug_info) {
+#ifdef __APPLE__
+    if (!GenerateDsymBundle(opts.out_path)) {
+      ostream::ErrorOutln(errors,
+                          "dsymutil not available or failed; keeping object "
+                          "file for debug map");
+      keep_temp_object = true;
+    }
+#endif
   }
 
-  auto err = sys::fs::remove(temp);
-  if (err) {
-    diagnose_.Error({0}, err.message());
+  if (!keep_temp_object) {
+    auto err = sys::fs::remove(temp);
+    if (err) {
+      diagnose_.Error({0}, err.message());
+    }
   }
 }
 
@@ -167,11 +348,17 @@ Value* Codegen::Visit(StructStmt& stmt) {
 }
 
 Value* Codegen::Visit(ExpressionStmt& stmt) {
+  if (auto loc = ExprLocation(stmt.expr.get())) {
+    SetDebugLocation(*loc);
+  }
   stmt.expr->Accept(*this);
   return nullptr;
 }
 
 Value* Codegen::Visit(WhileStmt& stmt) {
+  if (auto loc = ExprLocation(stmt.condition.get())) {
+    SetDebugLocation(*loc);
+  }
   Function* func = ctx_->GetInsertBlockParent();
 
   BasicBlock* cond_block = ctx_->CreateBasicBlock("loop.cond", func);
@@ -185,9 +372,20 @@ Value* Codegen::Visit(WhileStmt& stmt) {
 
   ctx_->CreateBasicCondBr(condition, loop_block, after_block);
   ctx_->SetInsertPoint(loop_block);
-  for (auto& stmt : stmt.body) {
-    stmt->Accept(*this);
+  DIScope* previous_scope = di_scope_;
+  if (opts.debug_info && di_builder_ && di_scope_) {
+    unsigned line = 1;
+    unsigned col = 1;
+    if (auto loc = ExprLocation(stmt.condition.get())) {
+      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
+      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
+    }
+    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
   }
+  for (auto& body_stmt : stmt.body) {
+    body_stmt->Accept(*this);
+  }
+  di_scope_ = previous_scope;
 
   ctx_->CreateBr(cond_block);
   ctx_->SetInsertPoint(after_block);
@@ -197,6 +395,12 @@ Value* Codegen::Visit(WhileStmt& stmt) {
 Value* Codegen::Visit(ForStmt& stmt) {
   if (stmt.initializer) {
     stmt.initializer->Accept(*this);
+  }
+
+  if (stmt.condition) {
+    if (auto loc = ExprLocation(stmt.condition.get())) {
+      SetDebugLocation(*loc);
+    }
   }
 
   Function* func = ctx_->GetBuilder().GetInsertBlock()->getParent();
@@ -213,14 +417,28 @@ Value* Codegen::Visit(ForStmt& stmt) {
   ctx_->CreateBasicCondBr(condition, loop_block, after_block);
   ctx_->SetInsertPoint(loop_block);
 
-  for (auto& stmt : stmt.body) {
-    stmt->Accept(*this);
+  DIScope* previous_scope = di_scope_;
+  if (opts.debug_info && di_builder_ && di_scope_) {
+    unsigned line = 1;
+    unsigned col = 1;
+    if (auto loc = ExprLocation(stmt.condition.get())) {
+      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
+      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
+    }
+    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
   }
+  for (auto& body_stmt : stmt.body) {
+    body_stmt->Accept(*this);
+  }
+  di_scope_ = previous_scope;
 
   ctx_->CreateBr(step_block);
   ctx_->SetInsertPoint(step_block);
 
   if (stmt.step) {
+    if (auto loc = ExprLocation(stmt.step.get())) {
+      SetDebugLocation(*loc);
+    }
     stmt.step->Accept(*this);
   }
 
@@ -230,6 +448,9 @@ Value* Codegen::Visit(ForStmt& stmt) {
 }
 
 Value* Codegen::Visit(IfStmt& stmt) {
+  if (auto loc = ExprLocation(stmt.cond.get())) {
+    SetDebugLocation(*loc);
+  }
   Value* condition = stmt.cond->Accept(*this);
 
   Function* Func = ctx_->GetBuilder().GetInsertBlock()->getParent();
@@ -245,6 +466,17 @@ Value* Codegen::Visit(IfStmt& stmt) {
   ctx_->CreateBasicCondBr(condition, then_block, else_block);
   ctx_->SetInsertPoint(then_block);
 
+  DIScope* previous_scope = di_scope_;
+  if (opts.debug_info && di_builder_ && di_scope_) {
+    unsigned line = 1;
+    unsigned col = 1;
+    if (auto loc = ExprLocation(stmt.cond.get())) {
+      line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
+      col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
+    }
+    di_scope_ = di_builder_->createLexicalBlock(di_scope_, di_file_, line, col);
+  }
+
   /// TODO: Add multiple statements in the body of the then and else branches
   /// We do not have block statements so passing a bunch of stuff at once
   /// probably needs a vector for now
@@ -255,10 +487,22 @@ Value* Codegen::Visit(IfStmt& stmt) {
   }
 
   then_block = ctx_->GetInsertBlock();
+  di_scope_ = previous_scope;
 
   if (stmt.otherwise) {
     Func->insert(Func->end(), else_block);
     ctx_->SetInsertPoint(else_block);
+
+    if (opts.debug_info && di_builder_ && previous_scope) {
+      unsigned line = 1;
+      unsigned col = 1;
+      if (auto loc = ExprLocation(stmt.cond.get())) {
+        line = static_cast<unsigned>(loc->line == 0 ? 1 : loc->line);
+        col = static_cast<unsigned>(loc->column == 0 ? 1 : loc->column);
+      }
+      di_scope_ =
+          di_builder_->createLexicalBlock(previous_scope, di_file_, line, col);
+    }
 
     stmt.otherwise->Accept(*this);
 
@@ -266,6 +510,7 @@ Value* Codegen::Visit(IfStmt& stmt) {
       ctx_->CreateBr(merge);
     }
     else_block = ctx_->GetInsertBlock();
+    di_scope_ = previous_scope;
   }
 
   Func->insert(Func->end(), merge);
@@ -274,9 +519,92 @@ Value* Codegen::Visit(IfStmt& stmt) {
 }
 
 Value* Codegen::Visit(FunctionStmt& stmt) {
+  auto* proto_stmt = dynamic_cast<FunctionProto*>(stmt.proto.get());
   Function* func = dyn_cast<Function>(stmt.proto->Accept(*this));
   BasicBlock* entry = ctx_->CreateBasicBlock("entry", func);
   ctx_->SetInsertPoint(entry);
+  di_locals_.clear();
+
+  DIScope* previous_scope = di_scope_;
+  if (opts.debug_info && di_builder_ && di_file_) {
+    auto debug_type_from_token = [&](const Token& tok) -> DIType* {
+      switch (tok.kind) {
+        case Token::Type::BOOL_SPECIFIER:
+          return di_builder_->createBasicType("bool", 1, dwarf::DW_ATE_boolean);
+        case Token::Type::INT32_SPECIFIER:
+          return di_builder_->createBasicType("int", 32, dwarf::DW_ATE_signed);
+        case Token::Type::INT64_SPECIFIER:
+          return di_builder_->createBasicType("int", 64, dwarf::DW_ATE_signed);
+        case Token::Type::FLT32_SPECIFIER:
+          return di_builder_->createBasicType("float", 32, dwarf::DW_ATE_float);
+        case Token::Type::FLT64_SPECIFIER:
+          return di_builder_->createBasicType("double", 64,
+                                              dwarf::DW_ATE_float);
+        case Token::Type::STR_SPECIFIER: {
+          auto* char_ty = di_builder_->createBasicType(
+              "char", 8, dwarf::DW_ATE_signed_char);
+          return di_builder_->createPointerType(char_ty, 64);
+        }
+        case Token::Type::VOID_SPECIFIER:
+        default:
+          return di_builder_->createUnspecifiedType("void");
+      }
+    };
+
+    SmallVector<Metadata*, 8> param_types;
+    if (proto_stmt) {
+      param_types.push_back(debug_type_from_token(proto_stmt->return_type));
+      for (const auto& arg : proto_stmt->args) {
+        param_types.push_back(ResolveDebugType(arg.resolved_type));
+      }
+    } else {
+      param_types.push_back(di_builder_->createUnspecifiedType("void"));
+    }
+
+    auto* subroutine = di_builder_->createSubroutineType(
+        di_builder_->getOrCreateTypeArray(ArrayRef<Metadata*>(param_types)));
+    unsigned line = 1;
+    if (proto_stmt) {
+      line = static_cast<unsigned>(proto_stmt->name.location.line == 0
+                                       ? 1
+                                       : proto_stmt->name.location.line);
+    }
+
+    auto* subprogram = di_builder_->createFunction(
+        di_file_, func->getName(), func->getName(), di_file_, line, subroutine,
+        line, DINode::FlagPrototyped, DISubprogram::SPFlagDefinition);
+    func->setSubprogram(subprogram);
+    di_scope_ = subprogram;
+    if (proto_stmt) {
+      SetDebugLocation(proto_stmt->name.location);
+
+      size_t arg_index = 0;
+      for (auto& arg : func->args()) {
+        if (arg_index >= proto_stmt->args.size()) {
+          break;
+        }
+
+        const FuncArg& arg_meta = proto_stmt->args[arg_index];
+        unsigned line =
+            static_cast<unsigned>(arg_meta.identifier.location.line == 0
+                                      ? 1
+                                      : arg_meta.identifier.location.line);
+        unsigned col =
+            static_cast<unsigned>(arg_meta.identifier.location.column == 0
+                                      ? 1
+                                      : arg_meta.identifier.location.column);
+
+        auto* dbg_param = di_builder_->createParameterVariable(
+            di_scope_, arg_meta.identifier.lexeme,
+            static_cast<unsigned>(arg_index + 1), di_file_, line,
+            ResolveDebugType(arg_meta.resolved_type), true);
+        auto* dl = DILocation::get(ctx_->GetContext(), line, col, di_scope_);
+        di_builder_->insertDbgValueIntrinsic(
+            &arg, dbg_param, di_builder_->createExpression(), dl, entry);
+        ++arg_index;
+      }
+    }
+  }
 
   for (auto& body_stmt : stmt.body) {
     body_stmt->Accept(*this);
@@ -291,10 +619,13 @@ Value* Codegen::Visit(FunctionStmt& stmt) {
   }
 
   verifyFunction(*func);
+  di_scope_ = previous_scope;
+  di_locals_.clear();
   return func;
 }
 
 Value* Codegen::Visit(FunctionProto& stmt) {
+  SetDebugLocation(stmt.name.location);
   Type* ret_type = ctx_->CreateTypeFromToken(stmt.return_type);
 
   std::vector<Type*> arg_types;
@@ -329,6 +660,7 @@ Value* Codegen::Visit(FunctionProto& stmt) {
 }
 
 Value* Codegen::Visit(ReturnStmt& stmt) {
+  SetDebugLocation(stmt.ret_token.location);
   if (stmt.value->type->Void()) {
     return ctx_->CreateVoidReturn();
   }
@@ -338,10 +670,30 @@ Value* Codegen::Visit(ReturnStmt& stmt) {
 }
 
 Value* Codegen::Visit(VarDeclarationStmt& stmt) {
+  SetDebugLocation(stmt.name.location);
   Value* init = stmt.value->Accept(*this);
   Type* ty = ResolveType(stmt.value->type);
   AllocaInst* slot = ctx_->CreateAlloca(ty, nullptr, stmt.name.lexeme);
   ctx_->CreateStore(init, slot);
+
+  if (opts.debug_info && di_builder_ && di_scope_) {
+    unsigned line = static_cast<unsigned>(
+        stmt.name.location.line == 0 ? 1 : stmt.name.location.line);
+    unsigned col = static_cast<unsigned>(
+        stmt.name.location.column == 0 ? 1 : stmt.name.location.column);
+    auto* variable = di_builder_->createAutoVariable(
+        di_scope_, stmt.name.lexeme, di_file_, line,
+        ResolveDebugType(stmt.value->type));
+    di_builder_->insertDeclare(
+        slot, variable, di_builder_->createExpression(),
+        DILocation::get(ctx_->GetContext(), line, col, di_scope_),
+        ctx_->GetBuilder().GetInsertBlock());
+
+    if (stmt.HasID()) {
+      di_locals_[stmt.GetID()] = variable;
+    }
+    EmitDbgValue(init, variable, stmt.name.location);
+  }
 
   if (stmt.HasID()) {
     std::unique_ptr<Binding>& b = ir_bindings_[stmt.GetID()];
@@ -358,6 +710,7 @@ Value* Codegen::Visit(VarDeclarationStmt& stmt) {
 }
 
 Value* Codegen::Visit(Conditional& expr) {
+  SetDebugLocation(expr.op.location);
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -373,6 +726,7 @@ Value* Codegen::Visit(Conditional& expr) {
 }
 
 Value* Codegen::Visit(Binary& expr) {
+  SetDebugLocation(expr.op.location);
   Value* left = expr.left->Accept(*this);
   Value* right = expr.right->Accept(*this);
 
@@ -388,6 +742,7 @@ Value* Codegen::Visit(Binary& expr) {
 }
 
 Value* Codegen::Visit(PreFixOp& expr) {
+  SetDebugLocation(expr.op.location);
   auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second ||
       !symbol->second->IsVariable()) {
@@ -408,11 +763,19 @@ Value* Codegen::Visit(PreFixOp& expr) {
   std::string name = expr.name.lexeme;
 
   Value* var = ctx_->CreateLoad(type, a, name);
+  Value* result = ctx_->CreatePreOp(expr.type, expr.op.kind, var, a);
+  if (expr.HasID()) {
+    auto it = di_locals_.find(expr.GetID());
+    if (it != di_locals_.end()) {
+      EmitDbgValue(result, it->second, expr.name.location);
+    }
+  }
 
-  return ctx_->CreatePreOp(expr.type, expr.op.kind, var, a);
+  return result;
 }
 
 Value* Codegen::Visit(Assign& expr) {
+  SetDebugLocation(expr.name.location);
   auto symbol = ir_bindings_.find(expr.GetID());
   if (symbol == ir_bindings_.end() || !symbol->second->IsVariable()) {
     return nullptr;
@@ -429,10 +792,17 @@ Value* Codegen::Visit(Assign& expr) {
 
   Value* value = expr.value->Accept(*this);
   ctx_->CreateStore(value, var.get()->GetAlloca());
+  if (expr.HasID()) {
+    auto it = di_locals_.find(expr.GetID());
+    if (it != di_locals_.end()) {
+      EmitDbgValue(value, it->second, expr.name.location);
+    }
+  }
   return value;
 }
 
 Value* Codegen::Visit(MemberAssign& expr) {
+  SetDebugLocation(expr.target->member.location);
   if (!expr.base_id.has_value() || !expr.target->field_index.has_value()) {
     return nullptr;
   }
@@ -468,6 +838,9 @@ Value* Codegen::Visit(MemberAssign& expr) {
 }
 
 Value* Codegen::Visit(CallExpr& expr) {
+  if (auto loc = ExprLocation(expr.callee.get())) {
+    SetDebugLocation(*loc);
+  }
   if (expr.type->kind == types::TypeKind::Struct) {
     std::error_code ec;
     expr.type->CastTo<types::StructType>(ec);
@@ -507,6 +880,7 @@ Value* Codegen::Visit(CallExpr& expr) {
 }
 
 Value* Codegen::Visit(MemberAccess& expr) {
+  SetDebugLocation(expr.member.location);
   if (expr.field_index.has_value()) {
     Value* object = expr.object->Accept(*this);
     if (!object) {
@@ -547,10 +921,14 @@ Value* Codegen::Visit(MemberAccess& expr) {
 }
 
 Value* Codegen::Visit(Grouping& expr) {
+  if (auto loc = ExprLocation(expr.expr.get())) {
+    SetDebugLocation(*loc);
+  }
   return expr.expr->Accept(*this);
 }
 
 Value* Codegen::Visit(Variable& expr) {
+  SetDebugLocation(expr.name.location);
   if (expr.HasID()) {
     auto it = ir_bindings_.find(expr.id.value());
     if (it != ir_bindings_.end()) {

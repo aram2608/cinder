@@ -7,16 +7,17 @@ semantic:
 	./build/bin/cinder --test-semantic -o test ./tests/test.ci
 
 test:
-	./build/bin/cinder --compile -o test ./tests/test.ci
+	./build/bin/cinder --compile -g -o test ./tests/test.ci
 
 fib:
 	./build/bin/cinder --compile -o fib ./tests/fib.ci
 
 llvm:
-	./build/bin/cinder --emit-llvm -o test.ll ./tests/test.ci
+	./build/bin/cinder --emit-llvm -g -o test.ll ./tests/test.ci
 
 # The -l="foo" syntax seems to be broken in cxxopts, the = is parsed as a command
-# line option for whatever reason
+# line option for whatever reason -Wall and -Wextra get ignored but do not break
+# anything
 linker:
 	./build/bin/cinder --compile \
 	-o test \
@@ -25,4 +26,4 @@ linker:
 
 # Ironic to use cmake inside of a makefile but it is what is it
 cinder:
-	cmake -B build -S . -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  && cmake --build build
+	cmake --preset debug && cmake --build --preset build-debug

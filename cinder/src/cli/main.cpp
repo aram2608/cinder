@@ -89,9 +89,7 @@ static bool ParseCLI(int argc, char** argv) {
   /// TODO: Add compile run option
   // options.add_options()("compile-run", "Compiles the program to llvm");
   options.add_options()("emit-llvm", "Emits llvm output");
-  /// TODO: Add debug information
-  // options.add_options()("g", "Debug information")
-
+  options.add_options()("g", "Emit debug information");
   options.add_options()("l,l-flags", "Linker option",
                         value<std::vector<std::string>>());
   options.add_options()("src", "The input files to be compiled",
